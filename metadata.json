@@ -1,0 +1,6 @@
+{
+  "name": "Agent Portal System",
+  "description": "Comprehensive order management and performance dashboard for sales and acquisition agents.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
