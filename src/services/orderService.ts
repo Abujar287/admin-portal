@@ -1,7 +1,9 @@
 import { AgentUser, DateFilterType, OrderItem, FollowupHistoryItem } from '../types';
 import { INITIAL_AGENTS, INITIAL_ORDERS } from '../data/mockOrders';
 
-export const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbznJBoaggkUhg0ztkcmJpEyeaiuJRVRJX7oItiIgzWqhNPkYIbG3zjnEe2Hn1voDFFg/exec';
+export const DEFAULT_SCRIPT_URL =
+  (import.meta.env?.VITE_GOOGLE_SCRIPT_URL as string) ||
+  'https://script.google.com/macros/s/AKfycbznJBoaggkUhg0ztkcmJpEyeaiuJRVRJX7oItiIgzWqhNPkYIbG3zjnEe2Hn1voDFFg/exec';
 
 const STORAGE_KEYS = {
   ORDERS: 'agent_portal_orders_v2',
