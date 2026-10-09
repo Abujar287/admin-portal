@@ -1,36 +1,18 @@
 import React from 'react';
 import { AgentUser } from '../types';
-import { 
-  User, 
-  PlusCircle, 
-  Package, 
-  BarChart3, 
-  LogOut, 
-  Settings, 
-  ChevronLeft, 
-  ChevronRight,
-  MoreVertical,
-  Layers
-} from 'lucide-react';
+import { User, Package, BarChart3, LogOut, ChevronRight, MoreVertical, Layers } from 'lucide-react';
 
-interface SidebarProps {
+interface AgentSidebarProps {
   currentAgent: AgentUser;
-  activeTab: 'profiles' | 'addOrder' | 'orders' | 'dashboard';
-  setActiveTab: (tab: 'profiles' | 'addOrder' | 'orders' | 'dashboard') => void;
+  activeTab: 'profiles' | 'orders' | 'dashboard';
+  setActiveTab: (tab: 'profiles' | 'orders' | 'dashboard') => void;
   collapsed: boolean;
   setCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
   onLogout: () => void;
   ordersCount: number;
 }
 
-interface NavItem {
-  id: 'profiles' | 'addOrder' | 'orders' | 'dashboard';
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  badge?: number;
-}
-
-export const Sidebar: React.FC<SidebarProps> = ({
+export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   currentAgent,
   activeTab,
   setActiveTab,
@@ -39,11 +21,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   ordersCount
 }) => {
-  const navItems: NavItem[] = [
-    { id: 'profiles', label: 'Profile', icon: User },
-    { id: 'addOrder', label: 'Create Order', icon: PlusCircle },
-    { id: 'orders', label: 'My Orders', icon: Package, badge: ordersCount },
-    { id: 'dashboard', label: 'Performance Dashboard', icon: BarChart3 }
+  // Only Profile, My Orders, Performance (Create Order removed from sidebar)
+  const navItems = [
+    { id: 'profiles' as const, label: 'Profile', icon: User },
+    { id: 'orders' as const, label: 'My Orders', icon: Package, badge: ordersCount },
+    { id: 'dashboard' as const, label: 'Performance', icon: BarChart3 }
   ];
 
   return (
@@ -70,7 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* 3-Dot Toggle button matching user's original HTML */}
+        {/* 3-Dot Toggle button */}
         <button
           onClick={() => setCollapsed(!collapsed)}
           title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
@@ -80,7 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
       </div>
 
-      {/* Navigation */}
+      {/* Navigation (Only 3 tabs, No Create Order) */}
       <nav className="flex-1 space-y-1.5 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -110,7 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </nav>
 
-      {/* Footer Actions */}
+      {/* Footer Sign Out */}
       <div className="pt-3 border-t border-white/15">
         <button
           onClick={onLogout}

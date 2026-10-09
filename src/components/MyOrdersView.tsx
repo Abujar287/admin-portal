@@ -1,17 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { AgentUser, DateFilterType, OrderItem } from '../types';
 import { OrderService } from '../services/orderService';
-import { 
-  RotateCw, 
-  Search, 
-  Download, 
-  FilterX, 
-  CheckCircle, 
-  Clock, 
-  AlertCircle,
-  Eye,
-  X
-} from 'lucide-react';
+import { CreateOrderModal } from './CreateOrderModal';
+import { RotateCw, Search, FilterX, Eye, X, CheckCircle, Clock, Plus } from 'lucide-react';
 
 interface MyOrdersViewProps {
   currentAgent: AgentUser;
@@ -19,6 +10,7 @@ interface MyOrdersViewProps {
   onRefresh: () => Promise<void>;
   isRefreshing: boolean;
   onUpdateOrderStatus: (orderId: string, updates: Partial<OrderItem>) => void;
+  onOrderCreated: (order: OrderItem) => void;
 }
 
 export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
@@ -26,36 +18,31 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
   orders,
   onRefresh,
   isRefreshing,
-  onUpdateOrderStatus
+  onUpdateOrderStatus,
+  onOrderCreated
 }) => {
-  const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
   const [filterCreateDate, setFilterCreateDate] = useState<DateFilterType>('');
   const [filterScheduleDate, setFilterScheduleDate] = useState<DateFilterType>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Filter orders based on viewMode
-  const baseOrders = useMemo(() => {
-    if (viewMode === 'all') {
-      return orders;
-    }
+  // STRICTLY only this agent's orders (data isolation for agent portal)
+  const myAgentOrders = useMemo(() => {
     return orders.filter(
       (o) => o.agentId.toLowerCase() === currentAgent.user.toLowerCase()
     );
-  }, [orders, currentAgent.user, viewMode]);
+  }, [orders, currentAgent.user]);
 
-  // Apply filters
+  // Apply search and date filters
   const filteredOrders = useMemo(() => {
-    return baseOrders.filter((order) => {
-      // Create date filter
+    return myAgentOrders.filter((order) => {
       const matchCreate = OrderService.checkDateMatch(order.createDate, filterCreateDate);
       if (!matchCreate) return false;
 
-      // Schedule date filter
       const matchSchedule = OrderService.checkDateMatch(order.scheduleDate, filterScheduleDate);
       if (!matchSchedule) return false;
 
-      // Search query filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const searchable = [
@@ -74,7 +61,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
 
       return true;
     });
-  }, [baseOrders, filterCreateDate, filterScheduleDate, searchQuery]);
+  }, [myAgentOrders, filterCreateDate, filterScheduleDate, searchQuery]);
 
   const handleClearFilters = () => {
     setFilterCreateDate('');
@@ -82,105 +69,42 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
     setSearchQuery('');
   };
 
-  const exportToCSV = () => {
-    if (filteredOrders.length === 0) return;
-    const headers = [
-      'Order Id', 'Customer Name', 'Customer Contact', 'Gender', 'Create Date',
-      'Order Channel', 'Agent ID', 'Agent Name', 'Product catrgory', 'Product Name',
-      'City', 'Delivery Area', 'Address Details', 'Schedule Date', 'Scheduled Time',
-      'Order Value', 'Order Status', 'Folllowup Status', 'Profit'
-    ];
-
-    const rows = filteredOrders.map(o => [
-      `"${o.id}"`,
-      `"${o.customerName}"`,
-      `"${o.customerContact}"`,
-      `"${o.gender}"`,
-      `"${o.createDate}"`,
-      `"${o.orderChannel}"`,
-      `"${o.agentId}"`,
-      `"${o.agentName}"`,
-      `"${o.productCategory}"`,
-      `"${o.productName}"`,
-      `"${o.city}"`,
-      `"${o.deliveryArea}"`,
-      `"${o.addressDetails.replace(/"/g, '""')}"`,
-      `"${o.scheduleDate}"`,
-      `"${o.scheduledTime}"`,
-      o.orderValue,
-      `"${o.orderStatus}"`,
-      `"${o.followupStatus}"`,
-      o.profit
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `agent_orders_${currentAgent.user}_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   return (
     <div className="w-full space-y-4">
+      {/* Create Order Modal (Triggered by the button in My Orders) */}
+      <CreateOrderModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        currentAgent={currentAgent}
+        onOrderCreated={onOrderCreated}
+      />
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-              {viewMode === 'mine' ? 'My Orders' : 'All Sheet Orders'}
-            </h1>
-            <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
-              <button
-                onClick={() => setViewMode('mine')}
-                className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
-                  viewMode === 'mine'
-                    ? 'bg-white text-blue-700 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                My Orders ({orders.filter(o => o.agentId.toLowerCase() === currentAgent.user.toLowerCase()).length})
-              </button>
-              <button
-                onClick={() => setViewMode('all')}
-                className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
-                  viewMode === 'all'
-                    ? 'bg-white text-blue-700 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                All Sheet Orders ({orders.length})
-              </button>
-            </div>
-          </div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">My Orders</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            {viewMode === 'mine' ? (
-              <>Orders placed by account <span className="font-semibold text-blue-700">{currentAgent.user}</span> ({baseOrders.length} total)</>
-            ) : (
-              <>Viewing entire orders database synced with Google Sheet ({orders.length} total)</>
-            )}
+            Orders logged by <span className="font-semibold text-blue-700">{currentAgent.user}</span> ({myAgentOrders.length} total orders)
           </p>
         </div>
 
+        {/* Action Buttons: ➕ Create Order & 🔄 Refresh (NO export button for agent) */}
         <div className="flex items-center gap-2">
           <button
-            onClick={exportToCSV}
-            title="Export filtered orders to CSV"
-            className="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            onClick={() => setIsCreateModalOpen(true)}
+            className="px-3.5 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold shadow-sm shadow-blue-700/20 flex items-center gap-1.5 transition-all cursor-pointer"
           >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span className="hidden sm:inline">Export CSV</span>
+            <Plus className="w-4 h-4" />
+            <span>Create Order</span>
           </button>
 
           <button
             onClick={() => onRefresh()}
             disabled={isRefreshing}
-            className="px-3.5 py-2 bg-blue-700 hover:bg-blue-800 disabled:opacity-70 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
           >
-            <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span>{isRefreshing ? 'Syncing...' : 'Refresh Sheet'}</span>
+            <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-600'}`} />
+            <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
           </button>
         </div>
       </div>
@@ -191,7 +115,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
           {/* Search bar */}
           <div className="relative">
             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-              Search Orders
+              Search My Orders
             </label>
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -260,12 +184,14 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
         {/* Filter badge summary */}
         {(filterCreateDate || filterScheduleDate || searchQuery) && (
           <div className="flex items-center gap-2 text-[11px] text-slate-500 pt-1 border-t border-slate-100">
-            <span>Showing <strong>{filteredOrders.length}</strong> of <strong>{baseOrders.length}</strong> orders</span>
+            <span>
+              Showing <strong>{filteredOrders.length}</strong> of <strong>{myAgentOrders.length}</strong> orders
+            </span>
           </div>
         )}
       </div>
 
-      {/* Orders Table Wrapper with Sticky Header */}
+      {/* Orders Table Wrapper with Sticky Header - All 19 Columns */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto overflow-y-auto max-h-[65vh]">
           <table className="w-full text-left border-collapse text-xs">
@@ -298,13 +224,12 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                 <tr>
                   <td colSpan={20} className="text-center py-12 text-slate-400">
                     <p className="font-semibold text-sm text-slate-600">No orders found</p>
-                    <p className="text-xs mt-1">Try adjusting your filters or create a new order.</p>
+                    <p className="text-xs mt-1">Use the Create Order button above to book your first order.</p>
                   </td>
                 </tr>
               ) : (
                 filteredOrders.map((ord) => {
                   const isDelivered = ord.followupStatus.toLowerCase() === 'delivered';
-                  const isPending = ord.followupStatus.toLowerCase() === 'pending';
 
                   return (
                     <tr key={ord.id} className="hover:bg-blue-50/40 transition-colors">
@@ -359,20 +284,20 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                         ৳ {ord.orderValue.toLocaleString()}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          isDelivered
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            isDelivered ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
                           {ord.orderStatus}
                         </span>
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          isDelivered
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            isDelivered ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
                           {ord.followupStatus}
                         </span>
                       </td>
@@ -382,7 +307,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                       <td className="py-3 px-3.5 whitespace-nowrap text-center">
                         <button
                           onClick={() => setSelectedOrder(ord)}
-                          title="View Details & Update"
+                          title="View Details"
                           className="p-1 rounded-md text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5" />
@@ -397,7 +322,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
         </div>
       </div>
 
-      {/* Order Details & Status Updater Modal */}
+      {/* Order Details Modal */}
       {selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
@@ -438,11 +363,10 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
               <div className="bg-slate-50 p-2.5 rounded-lg">
                 <span className="text-slate-500 block text-[10px] font-semibold uppercase">Order Value & Profit</span>
                 <span className="font-bold text-slate-900">৳ {selectedOrder.orderValue.toLocaleString()}</span>
-                <span className="block text-emerald-600 font-bold mt-0.5">৳ {selectedOrder.profit.toLocaleString()} Profit</span>
+                <span className="block text-emerald-600 font-bold mt-0.5">৳ {selectedOrder.profit.toLocaleString()} Profit (20%)</span>
               </div>
             </div>
 
-            {/* Quick Status toggle */}
             <div className="pt-2">
               <label className="block text-xs font-semibold text-slate-700 mb-2">Update Delivery Status</label>
               <div className="flex gap-2">
@@ -452,7 +376,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                       orderStatus: 'Delivered',
                       followupStatus: 'Delivered'
                     });
-                    setSelectedOrder(prev => prev ? { ...prev, orderStatus: 'Delivered', followupStatus: 'Delivered' } : null);
+                    setSelectedOrder((prev) => (prev ? { ...prev, orderStatus: 'Delivered', followupStatus: 'Delivered' } : null));
                   }}
                   className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
@@ -465,7 +389,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                       orderStatus: 'Pending',
                       followupStatus: 'Pending'
                     });
-                    setSelectedOrder(prev => prev ? { ...prev, orderStatus: 'Pending', followupStatus: 'Pending' } : null);
+                    setSelectedOrder((prev) => (prev ? { ...prev, orderStatus: 'Pending', followupStatus: 'Pending' } : null));
                   }}
                   className="flex-1 py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >

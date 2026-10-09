@@ -1,4 +1,4 @@
-import { AgentUser, DateFilterType, OrderItem } from '../types';
+import { AgentUser, DateFilterType, OrderItem, FollowupHistoryItem } from '../types';
 import { INITIAL_AGENTS, INITIAL_ORDERS } from '../data/mockOrders';
 
 export const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbznJBoaggkUhg0ztkcmJpEyeaiuJRVRJX7oItiIgzWqhNPkYIbG3zjnEe2Hn1voDFFg/exec';
@@ -7,7 +7,8 @@ const STORAGE_KEYS = {
   ORDERS: 'agent_portal_orders_v2',
   AGENTS: 'agentUsers',
   SCRIPT_URL: 'agent_portal_script_url',
-  LAST_SYNC: 'agent_portal_last_sync'
+  LAST_SYNC: 'agent_portal_last_sync',
+  FOLLOWUP_HISTORY: 'agent_portal_followup_history'
 };
 
 export interface SyncStatus {
@@ -322,11 +323,322 @@ export class OrderService {
     };
   }
 
-  static updateOrderStatus(orderId: string, updates: Partial<OrderItem>): OrderItem[] {
+  static getFollowupHistory(): FollowupHistoryItem[] {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.FOLLOWUP_HISTORY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // fallback
+    }
+    return [];
+  }
+
+  static saveFollowupHistory(history: FollowupHistoryItem[]): void {
+    localStorage.setItem(STORAGE_KEYS.FOLLOWUP_HISTORY, JSON.stringify(history));
+  }
+
+  static async updateOrderStatus(
+    orderId: string,
+    updates: Partial<OrderItem>,
+    updatedBy: string = 'manager',
+    notes: string = ''
+  ): Promise<{ updatedOrders: OrderItem[]; historyItem?: FollowupHistoryItem; remoteSynced: boolean }> {
     const orders = this.getLocalOrders();
-    const updated = orders.map(ord => (ord.id === orderId ? { ...ord, ...updates } : ord));
+    const existingOrder = orders.find((ord) => String(ord.id) === String(orderId));
+
+    const finalOrderStatus = updates.orderStatus || (updates.followupStatus === 'Delivered' ? 'Delivered' : existingOrder?.orderStatus || 'Pending');
+
+    const updated = orders.map((ord) => {
+      if (String(ord.id) === String(orderId)) {
+        const orderVal = updates.orderValue !== undefined ? Number(updates.orderValue) : ord.orderValue;
+        const profit = updates.orderValue !== undefined ? Number(updates.orderValue) * 0.20 : ord.profit;
+        return {
+          ...ord,
+          ...updates,
+          orderValue: orderVal,
+          profit: profit,
+          orderStatus: finalOrderStatus
+        };
+      }
+      return ord;
+    });
     this.saveLocalOrders(updated);
-    return updated;
+
+    // Record Historical Log for Followup Sheet
+    let historyItem: FollowupHistoryItem | undefined;
+    if (existingOrder) {
+      const orderVal = updates.orderValue !== undefined ? Number(updates.orderValue) : existingOrder.orderValue;
+      const schedDate = updates.scheduleDate !== undefined ? updates.scheduleDate : existingOrder.scheduleDate;
+      const schedTime = updates.scheduledTime !== undefined ? updates.scheduledTime : existingOrder.scheduledTime;
+
+      historyItem = {
+        id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+        orderId: String(orderId),
+        customerName: existingOrder.customerName,
+        customerContact: existingOrder.customerContact,
+        previousStatus: existingOrder.followupStatus || 'Pending',
+        newStatus: updates.followupStatus || existingOrder.followupStatus || 'Pending',
+        orderStatus: finalOrderStatus,
+        orderValue: orderVal,
+        scheduleDate: schedDate,
+        scheduledTime: schedTime,
+        updatedBy: updatedBy || 'Manager',
+        timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        notes: notes || ''
+      };
+
+      const existingHistory = this.getFollowupHistory();
+      this.saveFollowupHistory([historyItem, ...existingHistory]);
+    }
+
+    let remoteSynced = false;
+    const scriptUrl = this.getScriptUrl();
+
+    if (scriptUrl) {
+      try {
+        const params = new URLSearchParams();
+        // action 'updateFollowup' instructs Google Apps Script to update Sheet1 and log in 'Followup' sheet
+        params.append('action', 'updateFollowup');
+        params.append('orderId', String(orderId));
+        if (updates.followupStatus) {
+          params.append('followupStatus', updates.followupStatus);
+        }
+        params.append('orderStatus', finalOrderStatus);
+        if (updates.orderValue !== undefined) {
+          params.append('orderValue', String(updates.orderValue));
+          params.append('profit', String(Number(updates.orderValue) * 0.20));
+        }
+        if (updates.scheduleDate !== undefined) {
+          params.append('scheduleDate', updates.scheduleDate);
+        }
+        if (updates.scheduledTime !== undefined) {
+          params.append('scheduledTime', updates.scheduledTime);
+        }
+        params.append('updatedBy', updatedBy);
+        params.append('notes', notes);
+        if (existingOrder) {
+          params.append('customerName', existingOrder.customerName);
+          params.append('customerContact', existingOrder.customerContact);
+        }
+        params.append('timestamp', new Date().toISOString().replace('T', ' ').slice(0, 19));
+
+        await fetch(scriptUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: params.toString(),
+          mode: 'no-cors'
+        });
+        remoteSynced = true;
+      } catch (err) {
+        console.warn('Google Apps Script status update error:', err);
+      }
+    }
+
+    return { updatedOrders: updated, historyItem, remoteSynced };
+  }
+
+  static getUpdatedAppsScriptCode(): string {
+    return `// ==========================================
+// Google Apps Script for Agent & Manager Portal
+// Supports:
+// 1. Reading all orders (doGet)
+// 2. Creating orders with 20% profit (doPost - default)
+// 3. Updating Followup Status, Order Status, Order Value,
+//    Schedule Date & Time in Sheet1 (action: 'updateFollowup')
+// 4. Storing complete audit trail in 'Followup' historical sheet
+// ==========================================
+
+function doGet(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Sheet1") || ss.getSheets()[0];
+  var rows = sheet.getDataRange().getValues();
+  
+  return ContentService.createTextOutput(JSON.stringify(rows))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var mainSheet = ss.getSheetByName("Sheet1") || ss.getSheets()[0];
+  var data = (e && e.parameter) ? e.parameter : {};
+  
+  // Also parse JSON payload if sent via application/json
+  if (e && e.postData && e.postData.contents) {
+    try {
+      var json = JSON.parse(e.postData.contents);
+      for (var k in json) {
+        data[k] = json[k];
+      }
+    } catch (err) {}
+  }
+
+  var action = data.action;
+
+  // 1. UPDATE FOLLOWUP / ORDER STATUS / ORDER VALUE / SCHEDULE DATE & TIME
+  // AND LOG HISTORICAL AUDIT ROW TO "Followup" SHEET
+  if (action === 'updateFollowup' || action === 'updateStatus' || action === 'updateOrder') {
+    var orderIdToFind = String(data.orderId || '').trim();
+    var newFollowupStatus = data.followupStatus || '';
+    var newOrderStatus = data.orderStatus || (newFollowupStatus === 'Delivered' ? 'Delivered' : '');
+    var updatedBy = data.updatedBy || 'Manager';
+    var note = data.notes || data.remarks || '';
+    var timestamp = new Date();
+
+    var rows = mainSheet.getDataRange().getValues();
+    var foundRowIndex = -1;
+    var prevFollowupStatus = '';
+    var prevOrderStatus = '';
+    var prevOrderVal = '';
+    var prevScheduleDate = '';
+    var prevScheduleTime = '';
+    var customerName = data.customerName || '';
+    var customerContact = data.customerContact || '';
+
+    for (var r = 1; r < rows.length; r++) {
+      if (String(rows[r][0]).trim() === orderIdToFind) {
+        foundRowIndex = r + 1; // 1-indexed row in sheet
+        customerName = rows[r][1] || customerName;
+        customerContact = rows[r][2] || customerContact;
+        prevScheduleDate = rows[r][13] || '';
+        prevScheduleTime = rows[r][14] || '';
+        prevOrderVal = rows[r][15] || '';
+        prevOrderStatus = rows[r][16] || '';
+        prevFollowupStatus = rows[r][17] || '';
+        break;
+      }
+    }
+
+    if (foundRowIndex > 0) {
+      // (a) Update Column 18 (R): Followup Status
+      if (newFollowupStatus) {
+        mainSheet.getRange(foundRowIndex, 18).setValue(newFollowupStatus);
+      }
+      // (b) Update Column 17 (Q): Order Status
+      if (newOrderStatus) {
+        mainSheet.getRange(foundRowIndex, 17).setValue(newOrderStatus);
+      }
+      // (c) Update Column 16 (P): Order Value & Column 19 (S): 20% Profit
+      if (data.orderValue !== undefined && data.orderValue !== '') {
+        var numVal = parseFloat(data.orderValue) || 0;
+        mainSheet.getRange(foundRowIndex, 16).setValue(numVal);
+        mainSheet.getRange(foundRowIndex, 19).setValue(numVal * 0.20);
+      }
+      // (d) Update Column 14 (N): Schedule Date
+      if (data.scheduleDate !== undefined && data.scheduleDate !== '') {
+        mainSheet.getRange(foundRowIndex, 14).setValue(data.scheduleDate);
+      }
+      // (e) Update Column 15 (O): Scheduled Time
+      if (data.scheduledTime !== undefined && data.scheduledTime !== '') {
+        mainSheet.getRange(foundRowIndex, 15).setValue(data.scheduledTime);
+      }
+
+      // (f) Record Historical Log into 'Followup' sheet
+      var followupSheet = ss.getSheetByName("Followup");
+      if (!followupSheet) {
+        followupSheet = ss.insertSheet("Followup");
+        followupSheet.appendRow([
+          "Log Timestamp",
+          "Order ID",
+          "Customer Name",
+          "Customer Contact",
+          "Previous Followup Status",
+          "New Followup Status",
+          "Order Status",
+          "Order Value",
+          "Schedule Date",
+          "Scheduled Time",
+          "Updated By",
+          "Notes / Remarks"
+        ]);
+        followupSheet.getRange(1, 1, 1, 12).setFontWeight("bold").setBackground("#e2e8f0");
+      }
+
+      var finalOrderVal = (data.orderValue !== undefined && data.orderValue !== '') ? data.orderValue : prevOrderVal;
+      var finalSchedDate = (data.scheduleDate !== undefined && data.scheduleDate !== '') ? data.scheduleDate : prevScheduleDate;
+      var finalSchedTime = (data.scheduledTime !== undefined && data.scheduledTime !== '') ? data.scheduledTime : prevScheduleTime;
+
+      followupSheet.appendRow([
+        timestamp,
+        orderIdToFind,
+        customerName,
+        customerContact,
+        prevFollowupStatus,
+        newFollowupStatus || prevFollowupStatus,
+        newOrderStatus || prevOrderStatus,
+        finalOrderVal,
+        finalSchedDate,
+        finalSchedTime,
+        updatedBy,
+        note
+      ]);
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'success',
+        message: 'Order #' + orderIdToFind + ' updated in Sheet1 & logged in Followup sheet',
+        orderId: orderIdToFind,
+        followupStatus: newFollowupStatus,
+        orderStatus: newOrderStatus,
+        orderValue: finalOrderVal,
+        scheduleDate: finalSchedDate,
+        scheduledTime: finalSchedTime
+      })).setMimeType(ContentService.MimeType.JSON);
+    } else {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'error',
+        message: 'Order ID not found: ' + orderIdToFind
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  // 2. CREATE NEW ORDER (Default appendRow to main sheet)
+  var lastRow = mainSheet.getLastRow();
+  var newOrderId = 1001;
+  if (lastRow > 1) {
+    var prevId = mainSheet.getRange(lastRow, 1).getValue();
+    newOrderId = Number(prevId) + 1;
+    if (isNaN(newOrderId)) newOrderId = lastRow + 1000;
+  }
+  
+  var orderVal = parseFloat(data.orderValue) || 0;
+  var calculatedProfit = orderVal * 0.20; // 20% profit calculation
+  
+  var rowData = [
+    newOrderId,                  // 0: Order Id
+    data.customerName || '',     // 1: Customer Name
+    data.customerContact || '',  // 2: Customer Contact
+    data.gender || '',           // 3: Gender
+    data.createDate || '',       // 4: Create Date
+    data.orderChannel || '',     // 5: Order Channel
+    data.createdByNum || '',     // 6: Agent ID
+    data.createdByName || '',    // 7: Agent Name
+    data.productCategory || '',  // 8: Product catrgory
+    data.productName || '',      // 9: Product Name
+    data.city || '',             // 10: City
+    data.deliveryArea || '',     // 11: Delivery Area
+    data.addressDetails || '',   // 12: Address Details
+    data.scheduleDate || '',     // 13: Schedule Date
+    data.scheduledTime || '',    // 14: Scheduled Time
+    orderVal,                    // 15: Order Value
+    data.orderStatus || 'Pending',     // 16: Order Status
+    data.followupStatus || 'Pending',  // 17: Folllowup Status
+    calculatedProfit             // 18: Profit
+  ];
+  
+  mainSheet.appendRow(rowData);
+  
+  return ContentService.createTextOutput(JSON.stringify({status: 'success', orderId: newOrderId}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doOptions(e) {
+  return ContentService.createTextOutput("")
+    .setMimeType(ContentService.MimeType.TEXT);
+}`;
   }
 
   static checkDateMatch(dateVal: string, filterOption: DateFilterType): boolean {

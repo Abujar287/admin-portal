@@ -1,15 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { AgentUser, OrderItem } from '../types';
-import { 
-  RotateCw, 
-  TrendingUp, 
-  CheckCircle2, 
-  Clock, 
-  DollarSign, 
-  Award,
-  Layers,
-  ArrowUpRight
-} from 'lucide-react';
+import { RotateCw, CheckCircle2, Clock, Award, Layers } from 'lucide-react';
 
 interface DashboardViewProps {
   currentAgent: AgentUser;
@@ -24,21 +15,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onRefresh,
   isRefreshing
 }) => {
-  const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
-
-  // Filter based on viewMode
-  const activeOrders = useMemo(() => {
-    if (viewMode === 'all') {
-      return orders;
-    }
+  // STRICTLY filter only for this agent
+  const myAgentOrders = useMemo(() => {
     return orders.filter(
       (o) => o.agentId.toLowerCase() === currentAgent.user.toLowerCase()
     );
-  }, [orders, currentAgent.user, viewMode]);
+  }, [orders, currentAgent.user]);
 
-  // Aggregate stats matching original specification
+  // Aggregate stats strictly for this agent
   const stats = useMemo(() => {
-    let totalCreated = activeOrders.length;
+    let totalCreated = myAgentOrders.length;
     let deliveredCount = 0;
     let openCount = 0;
     let totalVal = 0;
@@ -48,7 +34,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const channelMap: Record<string, number> = {};
     const categoryMap: Record<string, number> = {};
 
-    activeOrders.forEach((o) => {
+    myAgentOrders.forEach((o) => {
       const val = Number(o.orderValue) || 0;
       const profit = Number(o.profit) || 0;
       const isDelivered = o.followupStatus.toLowerCase() === 'delivered';
@@ -81,44 +67,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       channelMap,
       categoryMap
     };
-  }, [activeOrders]);
+  }, [myAgentOrders]);
 
   return (
     <div className="w-full space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Performance Dashboard</h1>
-            <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
-              <button
-                onClick={() => setViewMode('mine')}
-                className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
-                  viewMode === 'mine'
-                    ? 'bg-white text-blue-700 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                My Stats ({currentAgent.user})
-              </button>
-              <button
-                onClick={() => setViewMode('all')}
-                className={`px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
-                  viewMode === 'all'
-                    ? 'bg-white text-blue-700 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                All Sheet Orders ({orders.length})
-              </button>
-            </div>
-          </div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Performance Dashboard</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            {viewMode === 'mine' ? (
-              <>Lifetime order statistics and profit analytics for <span className="font-semibold text-blue-700">{currentAgent.user}</span></>
-            ) : (
-              <>Aggregated lifetime statistics across all agents and channels in Google Sheet</>
-            )}
+            Personal performance and profit analytics for <span className="font-semibold text-blue-700">{currentAgent.user}</span>
           </p>
         </div>
 
@@ -128,17 +86,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           className="px-3.5 py-2 bg-blue-700 hover:bg-blue-800 disabled:opacity-70 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto"
         >
           <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-          <span>{isRefreshing ? 'Refreshing...' : '🔄 Refresh Stats'}</span>
+          <span>{isRefreshing ? 'Refreshing...' : 'Refresh Stats'}</span>
         </button>
       </div>
 
-      {/* 6 Core Cards matching user's original HTML structure */}
+      {/* 6 Core Cards strictly for this Agent */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Card 1: Total Created Orders */}
         <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Total Created Orders
+              My Created Orders
             </span>
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
               <Layers className="w-4 h-4" />
@@ -146,7 +104,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-3">
             <span className="text-3xl font-extrabold text-[#1e3a8a]">{stats.totalCreated}</span>
-            <span className="text-xs text-slate-400 ml-2">all time</span>
+            <span className="text-xs text-slate-400 ml-2">booked by you</span>
           </div>
         </div>
 
@@ -170,7 +128,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Open / Pending Orders
+              Pending Orders
             </span>
             <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
               <Clock className="w-4 h-4" />
@@ -220,7 +178,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Delivered Profit
+              Delivered Profit (20%)
             </span>
             <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
               <Award className="w-4 h-4" />
@@ -234,13 +192,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Secondary Insights Section */}
+      {/* Channel and Category Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Orders by Channel */}
         <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Orders by Channel</h3>
-            <span className="text-[11px] text-slate-400">{Object.keys(stats.channelMap).length} Active Channels</span>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">My Orders by Channel</h3>
+            <span className="text-[11px] text-slate-400">{Object.keys(stats.channelMap).length} Channels</span>
           </div>
 
           <div className="space-y-3">
@@ -268,10 +225,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Orders by Product Category */}
         <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Orders by Category</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">My Orders by Category</h3>
             <span className="text-[11px] text-slate-400">{Object.keys(stats.categoryMap).length} Categories</span>
           </div>
 

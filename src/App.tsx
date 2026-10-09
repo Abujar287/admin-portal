@@ -4,45 +4,66 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { AgentUser, OrderItem } from './types';
+import { AgentUser, ManagerUser, OrderItem, FollowupHistoryItem } from './types';
 import { OrderService } from './services/orderService';
-import { LoginModal } from './components/LoginModal';
-import { Sidebar } from './components/Sidebar';
-import { ProfileView } from './components/ProfileView';
-import { CreateOrderView } from './components/CreateOrderView';
+import { AuthScreen } from './components/AuthScreen';
+import { AgentSidebar } from './components/AgentSidebar';
+import { AgentProfileView } from './components/AgentProfileView';
 import { MyOrdersView } from './components/MyOrdersView';
 import { DashboardView } from './components/DashboardView';
-import { Menu, Plus, RefreshCw, CheckCircle2, Shield } from 'lucide-react';
+import { ManagerPortal } from './components/ManagerPortal';
+import { Menu, Shield, RefreshCw, CheckCircle2 } from 'lucide-react';
 
 export default function App() {
   const [agents, setAgents] = useState<AgentUser[]>(() => OrderService.getAgents());
-  const [currentAgent, setCurrentAgent] = useState<AgentUser | null>(null);
-  const [activeTab, setActiveTab] = useState<'profiles' | 'addOrder' | 'orders' | 'dashboard'>('profiles');
+  const [currentSession, setCurrentSession] = useState<
+    { role: 'agent'; agent: AgentUser } | { role: 'manager'; manager: ManagerUser } | null
+  >(null);
+
+  // Agent navigation state (strictly Profile, My Orders, Performance - no Create Order in sidebar)
+  const [agentActiveTab, setAgentActiveTab] = useState<'profiles' | 'orders' | 'dashboard'>('orders');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Orders State
+  // Orders State (synced from Google Sheet)
   const [orders, setOrders] = useState<OrderItem[]>(() => OrderService.getLocalOrders());
+  const [followupHistory, setFollowupHistory] = useState<FollowupHistoryItem[]>(() => OrderService.getFollowupHistory());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Auto-login check
+  // Check saved session on mount (using sessionStorage so testing logins doesn't stick accidentally)
   useEffect(() => {
-    const savedUserId = localStorage.getItem('agent_portal_current_user');
-    if (savedUserId) {
-      const found = agents.find(a => a.user.toLowerCase() === savedUserId.toLowerCase());
-      if (found) {
-        setCurrentAgent(found);
+    const savedRole = sessionStorage.getItem('portal_session_role');
+    const savedUser = sessionStorage.getItem('portal_session_user');
+
+    if (savedRole === 'manager' && (savedUser === 'manager' || savedUser === 'manager01')) {
+      setCurrentSession({
+        role: 'manager',
+        manager: {
+          user: 'manager',
+          pass: 'manager',
+          name: 'Manager (Admin)',
+          role: 'System Administrator'
+        }
+      });
+    } else if (savedRole === 'agent' && savedUser) {
+      const allAgents = OrderService.getAgents();
+      const found = allAgents.find((a) => a.user.toLowerCase() === savedUser.toLowerCase());
+      if (found && found.status !== 'deactivated') {
+        setCurrentSession({ role: 'agent', agent: found });
+      } else {
+        sessionStorage.removeItem('portal_session_role');
+        sessionStorage.removeItem('portal_session_user');
       }
     }
-  }, [agents]);
+  }, []);
 
   // Initial fetch from Google Apps Script
   useEffect(() => {
-    if (currentAgent) {
+    if (currentSession) {
       loadOrdersData(false);
     }
-  }, [currentAgent]);
+  }, [currentSession]);
 
   const loadOrdersData = async (forceRefresh = false) => {
     setIsRefreshing(true);
@@ -50,7 +71,7 @@ export default function App() {
       const res = await OrderService.fetchOrders(forceRefresh);
       setOrders(res.orders);
       if (forceRefresh) {
-        showToast('Orders refreshed successfully!');
+        showToast('Sheet data refreshed successfully!');
       }
     } catch {
       // fallback
@@ -64,32 +85,72 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const handleLogin = (agent: AgentUser) => {
-    setCurrentAgent(agent);
-    localStorage.setItem('agent_portal_current_user', agent.user);
-    setActiveTab('profiles');
-    showToast(`Welcome, ${agent.name}!`);
+  const handleAgentLogin = (agent: AgentUser) => {
+    setCurrentSession({ role: 'agent', agent });
+    sessionStorage.setItem('portal_session_role', 'agent');
+    sessionStorage.setItem('portal_session_user', agent.user);
+    setAgentActiveTab('orders');
+    showToast(`Welcome, ${agent.name || agent.user}!`);
+  };
+
+  const handleManagerLogin = (manager: ManagerUser) => {
+    setCurrentSession({ role: 'manager', manager });
+    sessionStorage.setItem('portal_session_role', 'manager');
+    sessionStorage.setItem('portal_session_user', manager.user);
+    showToast('Manager Portal session active!');
   };
 
   const handleLogout = () => {
-    setCurrentAgent(null);
-    localStorage.removeItem('agent_portal_current_user');
+    setCurrentSession(null);
+    sessionStorage.removeItem('portal_session_role');
+    sessionStorage.removeItem('portal_session_user');
+    localStorage.removeItem('portal_session_role');
+    localStorage.removeItem('portal_session_user');
+  };
+
+  const handleUpdateAgentProfile = (updatedAgent: AgentUser) => {
+    const updatedList = agents.map((a) => (a.user === updatedAgent.user ? updatedAgent : a));
+    setAgents(updatedList);
+    OrderService.saveAgents(updatedList);
+    if (currentSession?.role === 'agent') {
+      setCurrentSession({ role: 'agent', agent: updatedAgent });
+    }
+    showToast('Profile updated successfully!');
+  };
+
+  const handleUpdateAgentsFromManager = (newAgents: AgentUser[], showNotification = false) => {
+    setAgents(newAgents);
+    OrderService.saveAgents(newAgents);
+    if (showNotification) {
+      showToast('Agents directory updated!');
+    }
   };
 
   const handleOrderCreated = (newOrder: OrderItem) => {
-    setOrders(prev => [newOrder, ...prev]);
-    showToast(`Order #${newOrder.id} logged!`);
-    setTimeout(() => setActiveTab('orders'), 800);
+    setOrders((prev) => [newOrder, ...prev]);
+    showToast(`Order #${newOrder.id} placed and recorded!`);
   };
 
-  const handleUpdateOrderStatus = (orderId: string, updates: Partial<OrderItem>) => {
-    const updated = OrderService.updateOrderStatus(orderId, updates);
-    setOrders(updated);
-    showToast(`Order #${orderId} updated!`);
+  const handleUpdateOrderStatus = async (
+    orderId: string, 
+    updates: Partial<OrderItem>, 
+    updatedBy = 'Manager',
+    notes = ''
+  ) => {
+    const res = await OrderService.updateOrderStatus(orderId, updates, updatedBy, notes);
+    setOrders(res.updatedOrders);
+    if (res.historyItem) {
+      setFollowupHistory((prev) => [res.historyItem!, ...prev]);
+    }
+    showToast(
+      updates.followupStatus
+        ? `Order #${orderId} followup status updated to "${updates.followupStatus}"!`
+        : `Order #${orderId} status updated!`
+    );
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-50 text-slate-900 font-sans antialiased overflow-hidden">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased overflow-hidden select-none">
       {/* Toast popup */}
       {toastMessage && (
         <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xl flex items-center gap-2 border border-slate-700 animate-fadeIn">
@@ -98,28 +159,52 @@ export default function App() {
         </div>
       )}
 
-      {/* Login Modal Overlay */}
-      {!currentAgent && (
-        <LoginModal agents={agents} onLogin={handleLogin} />
+      {/* 1st Entry Interface: Dual Agent / Manager Login */}
+      {!currentSession && (
+        <AuthScreen
+          agents={agents}
+          onAgentLogin={handleAgentLogin}
+          onManagerLogin={handleManagerLogin}
+          onUpdateAgents={handleUpdateAgentsFromManager}
+        />
       )}
 
-      {/* Main App Layout */}
-      {currentAgent && (
-        <>
-          {/* Desktop & Collapsible Sidebar */}
+      {/* MANAGER PORTAL INTERFACE */}
+      {currentSession?.role === 'manager' && (
+        <ManagerPortal
+          currentManager={currentSession.manager}
+          agents={agents}
+          onUpdateAgents={handleUpdateAgentsFromManager}
+          orders={orders}
+          followupHistory={followupHistory}
+          onRefreshOrders={() => loadOrdersData(true)}
+          isRefreshing={isRefreshing}
+          onLogout={handleLogout}
+          onUpdateOrderStatus={handleUpdateOrderStatus}
+        />
+      )}
+
+      {/* AGENT PORTAL INTERFACE */}
+      {currentSession?.role === 'agent' && (
+        <div className="flex h-screen overflow-hidden">
+          {/* Agent Desktop Sidebar (Create Order removed from sidebar) */}
           <div className="hidden md:flex">
-            <Sidebar
-              currentAgent={currentAgent}
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
+            <AgentSidebar
+              currentAgent={currentSession.agent}
+              activeTab={agentActiveTab}
+              setActiveTab={setAgentActiveTab}
               collapsed={sidebarCollapsed}
               setCollapsed={setSidebarCollapsed}
               onLogout={handleLogout}
-              ordersCount={orders.filter(o => o.agentId.toLowerCase() === currentAgent.user.toLowerCase()).length}
+              ordersCount={
+                orders.filter(
+                  (o) => o.agentId.toLowerCase() === currentSession.agent.user.toLowerCase()
+                ).length
+              }
             />
           </div>
 
-          {/* Mobile Drawer */}
+          {/* Agent Mobile Drawer */}
           {isMobileMenuOpen && (
             <div className="fixed inset-0 z-40 md:hidden flex">
               <div
@@ -127,25 +212,29 @@ export default function App() {
                 onClick={() => setIsMobileMenuOpen(false)}
               />
               <div className="relative z-50">
-                <Sidebar
-                  currentAgent={currentAgent}
-                  activeTab={activeTab}
+                <AgentSidebar
+                  currentAgent={currentSession.agent}
+                  activeTab={agentActiveTab}
                   setActiveTab={(tab) => {
-                    setActiveTab(tab);
+                    setAgentActiveTab(tab);
                     setIsMobileMenuOpen(false);
                   }}
                   collapsed={false}
                   setCollapsed={() => {}}
                   onLogout={handleLogout}
-                  ordersCount={orders.filter(o => o.agentId.toLowerCase() === currentAgent.user.toLowerCase()).length}
+                  ordersCount={
+                    orders.filter(
+                      (o) => o.agentId.toLowerCase() === currentSession.agent.user.toLowerCase()
+                    ).length
+                  }
                 />
               </div>
             </div>
           )}
 
-          {/* Main Content Area */}
+          {/* Agent Main Content */}
           <div className="flex-1 flex flex-col h-screen overflow-hidden">
-            {/* Top Bar for Mobile & Breadcrumbs */}
+            {/* Top Bar */}
             <header className="h-14 border-b border-slate-200/80 bg-white px-4 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <button
@@ -156,32 +245,19 @@ export default function App() {
                 </button>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    {activeTab === 'profiles' && 'Agent Profile'}
-                    {activeTab === 'addOrder' && 'Create Order'}
-                    {activeTab === 'orders' && 'My Orders'}
-                    {activeTab === 'dashboard' && 'Performance Dashboard'}
+                    {agentActiveTab === 'profiles' && 'My Profile'}
+                    {agentActiveTab === 'orders' && 'My Orders'}
+                    {agentActiveTab === 'dashboard' && 'Performance Analytics'}
                   </span>
                   <span className="text-slate-300">•</span>
                   <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 flex items-center gap-1">
                     <Shield className="w-3 h-3" />
-                    {currentAgent.user}
+                    {currentSession.agent.user}
                   </span>
                 </div>
               </div>
 
-              {/* Top Header Actions: Simple Refresh Button & New Order */}
               <div className="flex items-center gap-2">
-                {activeTab !== 'addOrder' && (
-                  <button
-                    onClick={() => setActiveTab('addOrder')}
-                    className="px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Create Order</span>
-                  </button>
-                )}
-
-                {/* Clean Simple Refresh Button */}
                 <button
                   onClick={() => loadOrdersData(true)}
                   disabled={isRefreshing}
@@ -194,37 +270,29 @@ export default function App() {
               </div>
             </header>
 
-            {/* Scrollable View Container */}
+            {/* Scrollable Agent Workspace */}
             <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50">
-              {activeTab === 'profiles' && (
-                <ProfileView
-                  currentAgent={currentAgent}
-                  orders={orders}
-                  onNavigateToCreate={() => setActiveTab('addOrder')}
-                  onNavigateToOrders={() => setActiveTab('orders')}
+              {agentActiveTab === 'profiles' && (
+                <AgentProfileView
+                  currentAgent={currentSession.agent}
+                  onUpdateAgentProfile={handleUpdateAgentProfile}
                 />
               )}
 
-              {activeTab === 'addOrder' && (
-                <CreateOrderView
-                  currentAgent={currentAgent}
-                  onOrderCreated={handleOrderCreated}
-                />
-              )}
-
-              {activeTab === 'orders' && (
+              {agentActiveTab === 'orders' && (
                 <MyOrdersView
-                  currentAgent={currentAgent}
+                  currentAgent={currentSession.agent}
                   orders={orders}
                   onRefresh={() => loadOrdersData(true)}
                   isRefreshing={isRefreshing}
                   onUpdateOrderStatus={handleUpdateOrderStatus}
+                  onOrderCreated={handleOrderCreated}
                 />
               )}
 
-              {activeTab === 'dashboard' && (
+              {agentActiveTab === 'dashboard' && (
                 <DashboardView
-                  currentAgent={currentAgent}
+                  currentAgent={currentSession.agent}
                   orders={orders}
                   onRefresh={() => loadOrdersData(true)}
                   isRefreshing={isRefreshing}
@@ -232,7 +300,7 @@ export default function App() {
               )}
             </main>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

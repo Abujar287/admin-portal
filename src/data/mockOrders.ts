@@ -1,8 +1,32 @@
 import { AgentUser, OrderItem } from '../types';
 
 export const INITIAL_AGENTS: AgentUser[] = [
-  { user: 'agent01', pass: 'agent01', name: 'Agent 01 (Tareq)', team: 'Acquisition', email: 'agent01@portal.local' },
-  { user: 'aqn01', pass: 'aqn01', name: 'AQN Officer (Rahim)', team: 'Acquisition', email: 'aqn01@portal.local' },
+  { 
+    user: 'agent01', 
+    pass: 'agent01', 
+    name: 'Agent 01 (Tareq)', 
+    team: 'Acquisition', 
+    contact: '01711223344',
+    email: 'tareq.agent01@portal.local',
+    address: 'House 14, Road 5, Dhanmondi, Dhaka',
+    bloodGroup: 'B+',
+    birthday: '1996-05-14',
+    status: 'active',
+    failedAttempts: 0
+  },
+  { 
+    user: 'aqn01', 
+    pass: 'aqn01', 
+    name: 'AQN Officer (Rahim)', 
+    team: 'Acquisition',
+    contact: '01822334455',
+    email: 'rahim.aqn01@portal.local',
+    address: 'House 8, Road 2, Mirpur 10, Dhaka',
+    bloodGroup: 'O+',
+    birthday: '1994-11-20',
+    status: 'active',
+    failedAttempts: 0
+  },
 ];
 
 export const CITY_AREA_MAP: Record<string, string[]> = {
