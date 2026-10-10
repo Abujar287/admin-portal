@@ -109,6 +109,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
     const newOrderPayload = {
       customerName: customerName.trim(),
+      customerId: customerContact.trim(),
       customerContact: customerContact.trim(),
       gender: gender || 'Other',
       createDate: createDate,

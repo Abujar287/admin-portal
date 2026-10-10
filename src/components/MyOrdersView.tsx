@@ -22,7 +22,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
   const [filterCreateDate, setFilterCreateDate] = useState<DateFilterType>('');
   const [filterScheduleDate, setFilterScheduleDate] = useState<DateFilterType>('');
   const [filterFollowupStatus, setFilterFollowupStatus] = useState<string>('all');
-  const [searchType, setSearchType] = useState<'orderId' | 'customer' | 'name'>('orderId');
+  const [searchType, setSearchType] = useState<'orderId' | 'customerId' | 'customer' | 'name'>('orderId');
   const [searchValue, setSearchValue] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -54,9 +54,10 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
 
       if (searchValue.trim()) {
         const q = searchValue.toLowerCase();
-        if (searchType === 'orderId' && !order.id.toLowerCase().includes(q)) return false;
-        if (searchType === 'customer' && !order.customerContact.toLowerCase().includes(q)) return false;
-        if (searchType === 'name' && !order.customerName.toLowerCase().includes(q)) return false;
+        if (searchType === 'orderId' && !String(order.id || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'customerId' && !String(order.customerId || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'customer' && !String(order.customerContact || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'name' && !String(order.customerName || '').toLowerCase().includes(q)) return false;
       }
 
       return true;
@@ -190,12 +191,13 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
             <div className="flex items-center gap-2">
               <select
                 value={searchType}
-                onChange={(e) => setSearchType(e.target.value as 'orderId' | 'customer' | 'name')}
+                onChange={(e) => setSearchType(e.target.value as 'orderId' | 'customerId' | 'customer' | 'name')}
                 className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white"
               >
                 <option value="orderId">Order ID</option>
-                <option value="customer">Customer #</option>
-                <option value="name">Name</option>
+                <option value="customerId">Customer ID</option>
+                <option value="customer">Customer Mobile</option>
+                <option value="name">Customer Name</option>
               </select>
               <input
                 type="text"
@@ -237,6 +239,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
             <thead>
               <tr className="bg-slate-100/90 text-slate-700 sticky top-0 z-10 font-bold border-b border-slate-200">
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Order Id</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Customer Id</th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Customer Name</th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Customer Contact</th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Gender</th>
@@ -263,7 +266,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
             <tbody className="divide-y divide-slate-100 text-slate-800">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={22} className="text-center py-12 text-slate-400">
+                  <td colSpan={23} className="text-center py-12 text-slate-400">
                     <p className="font-semibold text-sm text-slate-600">No orders found</p>
                     <p className="text-xs mt-1">Use the Create Order button above to book your first order.</p>
                   </td>
@@ -276,6 +279,9 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                     <tr key={ord.id} className="hover:bg-blue-50/40 transition-colors">
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-blue-700">
                         #{ord.id}
+                      </td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">
+                        {ord.customerId}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">
                         {ord.customerName}

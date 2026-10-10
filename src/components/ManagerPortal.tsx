@@ -194,7 +194,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   const [orderIdSearch, setOrderIdSearch] = useState('');
   const [contactSearch, setContactSearch] = useState('');
-  const [searchType, setSearchType] = useState<'orderId' | 'customer' | 'name'>('orderId');
+  const [searchType, setSearchType] = useState<'orderId' | 'customerId' | 'customer' | 'name'>('orderId');
   const [searchValue, setSearchValue] = useState('');
 
   // Single Summary Date Filter State
@@ -796,6 +796,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         if (searchType === 'orderId') {
           const idStr = String(r.id || '').toLowerCase();
           if (!idStr.includes(val)) return false;
+        } else if (searchType === 'customerId') {
+          const cIdStr = String(r.customerId || '').toLowerCase();
+          if (!cIdStr.includes(val)) return false;
         } else if (searchType === 'customer') {
           const cStr = String(r.customerContact || '').toLowerCase();
           if (!cStr.includes(val)) return false;
@@ -1985,16 +1988,17 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <div className="flex items-center gap-2">
                       <select
                         value={searchType}
-                        onChange={(e) => setSearchType(e.target.value as 'orderId' | 'customer' | 'name')}
+                        onChange={(e) => setSearchType(e.target.value as 'orderId' | 'customerId' | 'customer' | 'name')}
                         className="px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
                       >
                         <option value="orderId">Order ID</option>
-                        <option value="customer">Customer #</option>
-                        <option value="name">Name</option>
+                        <option value="customerId">Customer ID</option>
+                        <option value="customer">Customer Mobile</option>
+                        <option value="name">Customer Name</option>
                       </select>
                       <input
                         type="text"
-                        placeholder={`Search by ${searchType === 'orderId' ? 'ID' : searchType === 'customer' ? 'Customer #' : 'Name'}...`}
+                        placeholder={`Search...`}
                         value={searchValue}
                         onChange={(e) => setSearchValue(e.target.value)}
                         className="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-300"
@@ -2015,6 +2019,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <thead>
                       <tr className="bg-gradient-to-r from-indigo-700 to-purple-800 text-white sticky top-0 z-10 font-bold">
                         <th className="py-3.5 px-3.5 whitespace-nowrap">Order Id</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap">Customer Id</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">Customer Name</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">Customer Contact</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">Gender</th>
@@ -2040,7 +2045,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <tbody className="divide-y divide-slate-100 text-slate-800">
                       {filteredOrders.length === 0 ? (
                         <tr>
-                          <td colSpan={21} className="text-center py-12 text-slate-400 font-semibold">
+                          <td colSpan={22} className="text-center py-12 text-slate-400 font-semibold">
                             No orders found matching filters.
                           </td>
                         </tr>
@@ -2051,6 +2056,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             <tr key={ord.id} className="hover:bg-indigo-50/40 transition-colors">
                               <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-indigo-700">
                                 #{ord.id}
+                              </td>
+                              <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-800">
+                                {ord.customerId}
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">
                                 {ord.customerName}
