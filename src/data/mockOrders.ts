@@ -98,6 +98,19 @@ export const ORDER_CHANNELS = [
   'VOC'
 ];
 
+export const getOrderChannels = () => {
+  const stored = localStorage.getItem('agent_portal_order_channels');
+  return stored ? JSON.parse(stored) : ORDER_CHANNELS;
+};
+
+export const addOrderChannel = (channel: string) => {
+  const channels = getOrderChannels();
+  if (!channels.includes(channel)) {
+    channels.push(channel);
+    localStorage.setItem('agent_portal_order_channels', JSON.stringify(channels));
+  }
+};
+
 export const PRODUCT_CATEGORIES = [
   'Electronics',
   'Room Accessories',

@@ -3,6 +3,7 @@ export interface AgentUser {
   pass: string;
   name: string;
   team: string;
+  teamLeaderId?: string;
   contact?: string;
   email?: string;
   address?: string;
@@ -10,7 +11,7 @@ export interface AgentUser {
   birthday?: string;
   status?: 'active' | 'deactivated';
   failedAttempts?: number;
-  role?: string; // 'Agent' | 'Team Leader'
+  role?: string; // 'Agent' | 'Team Leader' | 'Sr Agent'
   permissions?: {
     canCreate: boolean;
     canUpdateStatus: boolean;

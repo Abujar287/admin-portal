@@ -42,7 +42,7 @@ import {
   ArrowUp,
   ArrowDown
 } from 'lucide-react';
-import { ORDER_CHANNELS, TIME_SLOTS } from '../data/mockOrders';
+import { ORDER_CHANNELS, TIME_SLOTS, getOrderChannels, addOrderChannel } from '../data/mockOrders';
 
 interface ManagerPortalProps {
   currentManager: ManagerUser;
@@ -130,6 +130,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [newAgentUser, setNewAgentUser] = useState('');
   const [newAgentPass, setNewAgentPass] = useState('');
   const [newAgentTeam, setNewAgentTeam] = useState('Acquisition');
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newAgentTeamLeader, setNewAgentTeamLeader] = useState('');
   const [newAgentName, setNewAgentName] = useState('');
   const [newAgentRole, setNewAgentRole] = useState('Agent');
   const [newCanCreate, setNewCanCreate] = useState(true);
@@ -175,6 +177,31 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   // Script URL state in Profiles
   const [profileScriptUrl, setProfileScriptUrl] = useState<string>(() => OrderService.getScriptUrl());
   const [scriptUrlSaved, setScriptUrlSaved] = useState(false);
+  const [availableChannels, setAvailableChannels] = useState<string[]>(getOrderChannels());
+
+  const handleExportCsv = (data: any[], filename: string) => {
+    if (data.length === 0) return;
+    const headers = Object.keys(data[0]).join(",");
+    const rows = data.map(row => 
+      Object.values(row).map(value => `"${String(value).replace(/"/g, '""')}"`).join(",")
+    );
+    const csvContent = [headers, ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleAddChannel = (channel: string) => {
+    addOrderChannel(channel);
+    setAvailableChannels(getOrderChannels());
+    setNewAgentTeam(channel);
+    setNewTeamName('');
+  };
 
   const handleSortToggle = (
     currentKey: string,
@@ -308,6 +335,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 user: u, 
                 pass: p, 
                 team: newAgentTeam, 
+                teamLeaderId: newAgentTeamLeader,
                 name: newAgentName.trim() || agent.name,
                 role: newAgentRole,
                 permissions: permissions
@@ -321,6 +349,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             user: u,
             pass: p,
             team: newAgentTeam,
+            teamLeaderId: newAgentTeamLeader,
             name: newAgentName.trim() || `Agent ${u}`,
             email: `${u.toLowerCase()}@portal.local`,
             status: 'active',
@@ -775,6 +804,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   const filteredAgentPerformance = useMemo(() => {
     const list = summaryStats.agentSummary.filter((ag) => {
+      // If user is a Team Leader, only show agents assigned to them
+      if (currentManager.role === 'Team Leader' && (ag as any).id !== currentManager.user && (ag as any).teamLeaderId !== currentManager.user) {
+        return false;
+      }
+
       const matchSearch =
         !agentPerformanceSearch ||
         ag.name.toLowerCase().includes(agentPerformanceSearch.toLowerCase()) ||
@@ -785,7 +819,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       return matchSearch && matchTeam;
     });
     return sortItems(list, agentSortKey, agentSortDirection);
-  }, [summaryStats.agentSummary, agentPerformanceSearch, agentPerformanceTeamFilter, agentSortKey, agentSortDirection]);
+  }, [summaryStats.agentSummary, agentPerformanceSearch, agentPerformanceTeamFilter, agentSortKey, agentSortDirection, currentManager.role, currentManager.user]);
 
   const filteredAgentGrandTotal = useMemo(() => {
     const cOrders = filteredAgentPerformance.reduce((acc, cur) => acc + (cur.createOrders || 0), 0);
@@ -911,17 +945,19 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             </span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('profiles')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-              activeTab === 'profiles'
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                : 'text-slate-300 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <User className="w-4 h-4" />
-            <span>Profiles</span>
-          </button>
+          {currentManager.role === 'Manager' && (
+            <button
+              onClick={() => setActiveTab('profiles')}
+              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                activeTab === 'profiles'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <User className="w-4 h-4" />
+              <span>Profiles</span>
+            </button>
+          )}
         </nav>
 
         <div className="pt-4 border-t border-white/10">
@@ -1042,22 +1078,68 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white font-medium"
                       >
                         <option value="Agent">Agent (Regular)</option>
-                        <option value="Team Leader">Team Leader (Summary Only)</option>
+                        <option value="Sr Agent">Sr Agent</option>
+                        <option value="Team Leader">Team Leader</option>
                       </select>
+                    </div>
+
+                    <div className="md:col-span-5 flex items-end gap-3">
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                          Team Assignment
+                        </label>
+                        <select
+                          value={newAgentTeam}
+                          onChange={(e) => setNewAgentTeam(e.target.value)}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
+                        >
+                          {availableChannels.map((team: string) => (
+                            <option key={team} value={team}>
+                              {team}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                          Or Create New Team
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={newTeamName}
+                            onChange={(e) => setNewTeamName(e.target.value)}
+                            placeholder="New team name"
+                            className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (newTeamName.trim()) {
+                                handleAddChannel(newTeamName.trim());
+                              }
+                            }}
+                            className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold"
+                          >
+                            Add Team
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     <div>
                       <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                        Team Assignment
+                        Assign Team Leader
                       </label>
                       <select
-                        value={newAgentTeam}
-                        onChange={(e) => setNewAgentTeam(e.target.value)}
+                        value={newAgentTeamLeader}
+                        onChange={(e) => setNewAgentTeamLeader(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
                       >
-                        {ORDER_CHANNELS.map((team) => (
-                          <option key={team} value={team}>
-                            {team}
+                        <option value="">-- No TL Assigned --</option>
+                        {agents.filter(a => a.role === 'Team Leader').map((tl) => (
+                          <option key={tl.user} value={tl.user}>
+                            {tl.name} (@{tl.user})
                           </option>
                         ))}
                       </select>
@@ -1935,6 +2017,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       ) : (
                         followupHistory
                           .filter((h) => {
+                            // Filter by current user or TL's agents
+                            const isAuthorized = currentManager.role === 'Manager' || 
+                                                 h.updatedBy === currentManager.user ||
+                                                 agents.some(a => a.user === h.updatedBy && a.teamLeaderId === currentManager.user);
+                            if (!isAuthorized) return false;
+                            
                             if (!followupSearch.trim()) return true;
                             const q = followupSearch.toLowerCase();
                             return (
@@ -1948,63 +2036,19 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           })
                           .map((hist) => (
                             <tr key={hist.id} className="hover:bg-slate-50 transition-colors">
-                              <td className="py-3 px-3.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">
-                                {hist.timestamp}
-                              </td>
-                              <td className="py-3 px-3.5 font-mono font-bold text-indigo-800 whitespace-nowrap">
-                                <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-2 py-0.5 rounded-md font-bold text-[11px]">
-                                  #{hist.followupId || hist.id}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">
-                                #{hist.orderId}
-                              </td>
-                              <td className="py-3 px-3.5 font-medium whitespace-nowrap text-slate-900">
-                                {hist.customerName || '-'}
-                              </td>
-                              <td className="py-3 px-3.5 font-mono text-slate-600 whitespace-nowrap">
-                                {hist.customerContact || '-'}
-                              </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap">
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-700">
-                                  {hist.previousStatus || 'Pending'}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap">
-                                <span
-                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                    hist.newStatus === 'Delivered'
-                                      ? 'bg-emerald-100 text-emerald-800'
-                                      : hist.newStatus === 'Confirmed'
-                                      ? 'bg-blue-100 text-blue-800'
-                                      : hist.newStatus === 'Cancelled'
-                                      ? 'bg-red-100 text-red-800'
-                                      : 'bg-amber-100 text-amber-800'
-                                  }`}
-                                >
-                                  {hist.newStatus}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-700">
-                                {hist.orderStatus}
-                              </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-bold text-slate-900">
-                                {hist.orderValue !== undefined ? `৳ ${hist.orderValue.toLocaleString()}` : '-'}
-                              </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap text-slate-600 text-[11px]">
-                                {hist.scheduleDate ? `${hist.scheduleDate} ${hist.scheduledTime || ''}` : '-'}
-                              </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-semibold text-indigo-900">
-                                {hist.updatedBy}
-                              </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap">
-                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                                  {hist.action || 'Follow-up Update'}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3.5 text-slate-600 max-w-[250px] truncate" title={hist.notes}>
-                                {hist.notes || '-'}
-                              </td>
+                              <td className="py-3 px-3.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">{hist.timestamp}</td>
+                              <td className="py-3 px-3.5 font-mono font-bold text-indigo-800 whitespace-nowrap">#{hist.followupId || hist.id}</td>
+                              <td className="py-3 px-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">#{hist.orderId}</td>
+                              <td className="py-3 px-3.5 text-slate-700 whitespace-nowrap">{hist.customerName || '-'}</td>
+                              <td className="py-3 px-3.5 text-slate-600 font-mono whitespace-nowrap">{hist.customerContact || '-'}</td>
+                              <td className="py-3 px-3.5 text-slate-500 whitespace-nowrap">{hist.previousStatus}</td>
+                              <td className="py-3 px-3.5 font-bold text-indigo-700 whitespace-nowrap">{hist.newStatus}</td>
+                              <td className="py-3 px-3.5 text-slate-600 whitespace-nowrap">{hist.orderStatus}</td>
+                              <td className="py-3 px-3.5 text-slate-700 font-medium whitespace-nowrap">৳ {hist.orderValue?.toLocaleString() || '-'}</td>
+                              <td className="py-3 px-3.5 text-slate-600 text-[10px] whitespace-nowrap">{hist.scheduleDate}<br/>{hist.scheduledTime}</td>
+                              <td className="py-3 px-3.5 font-bold text-slate-700 whitespace-nowrap">{hist.updatedBy}</td>
+                              <td className="py-3 px-3.5 whitespace-nowrap"><span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">{hist.action || 'Follow-up Update'}</span></td>
+                              <td className="py-3 px-3.5 text-slate-600 max-w-[250px] truncate" title={hist.notes}>{hist.notes || '-'}</td>
                             </tr>
                           ))
                       )}
@@ -2919,23 +2963,23 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left">
                     <thead>
-                      <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 whitespace-nowrap">
-                        <th className="py-3 px-3.5">Agent Details</th>
-                        <th className="py-3 px-3.5">Team</th>
-                        <th className="py-3 px-3.5">Role</th>
-                        <th className="py-3 px-3.5 text-right text-indigo-700">Create Orders</th>
-                        <th className="py-3 px-3.5 text-right text-emerald-700">Served Orders</th>
-                        <th className="py-3 px-3.5 text-right text-red-700">Cancelled Orders</th>
-                        <th className="py-3 px-3.5 text-right text-amber-700">Pending Orders</th>
-                        <th className="py-3 px-3.5 text-right">Order Value</th>
-                        <th className="py-3 px-3.5 text-right text-emerald-700">Delivered Value</th>
-                        <th className="py-3 px-3.5 text-right text-emerald-700">Profit</th>
-                        <th className="py-3 px-3.5 text-right text-blue-700">Bucket Size</th>
-                        <th className="py-3 px-3.5 text-right text-emerald-700">Delivered Ratio</th>
-                        <th className="py-3 px-3.5 text-right text-red-700">Cancelled Ratio</th>
-                        <th className="py-3 px-3.5 text-right text-purple-700">NR Ratio</th>
-                        <th className="py-3 px-3.5 text-center">Follow-ups</th>
-                        <th className="py-3 px-3.5 text-center">Status</th>
+                      <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 whitespace-nowrap select-none">
+                        <th className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'name', setAgentSortKey, setAgentSortDirection)}>Agent Details</th>
+                        <th className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'team', setAgentSortKey, setAgentSortDirection)}>Team</th>
+                        <th className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'role', setAgentSortKey, setAgentSortDirection)}>Role</th>
+                        <th className="py-3 px-3.5 text-right text-indigo-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'createOrders', setAgentSortKey, setAgentSortDirection)}>Create Orders</th>
+                        <th className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'servedOrders', setAgentSortKey, setAgentSortDirection)}>Served Orders</th>
+                        <th className="py-3 px-3.5 text-right text-red-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'cancelledOrders', setAgentSortKey, setAgentSortDirection)}>Cancelled Orders</th>
+                        <th className="py-3 px-3.5 text-right text-amber-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'pendingOrders', setAgentSortKey, setAgentSortDirection)}>Pending Orders</th>
+                        <th className="py-3 px-3.5 text-right cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'orderValue', setAgentSortKey, setAgentSortDirection)}>Order Value</th>
+                        <th className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'deliveredOrderValue', setAgentSortKey, setAgentSortDirection)}>Delivered Value</th>
+                        <th className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'profit', setAgentSortKey, setAgentSortDirection)}>Profit</th>
+                        <th className="py-3 px-3.5 text-right text-blue-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'bucketSize', setAgentSortKey, setAgentSortDirection)}>Bucket Size</th>
+                        <th className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'deliveredRatio', setAgentSortKey, setAgentSortDirection)}>Delivered Ratio</th>
+                        <th className="py-3 px-3.5 text-right text-red-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'cancelledRatio', setAgentSortKey, setAgentSortDirection)}>Cancelled Ratio</th>
+                        <th className="py-3 px-3.5 text-right text-purple-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'nrRatio', setAgentSortKey, setAgentSortDirection)}>NR Ratio</th>
+                        <th className="py-3 px-3.5 text-center cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'followupCount', setAgentSortKey, setAgentSortDirection)}>Follow-ups</th>
+                        <th className="py-3 px-3.5 text-center cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'status', setAgentSortKey, setAgentSortDirection)}>Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-800">
@@ -3049,6 +3093,31 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       {currentManager.role}
                     </p>
                   </div>
+                </div>
+              </div>
+
+              {/* CSV Export */}
+              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+                <div className="flex items-center gap-3 pb-2 border-b border-slate-100">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center font-bold text-blue-700">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 text-base">Data Export (CSV)</h3>
+                    <p className="text-xs text-slate-500">Download system data for offline analysis</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <button onClick={() => handleExportCsv(orders, 'orders_export.csv')} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold cursor-pointer">Export Orders</button>
+                  <button onClick={() => handleExportCsv(followupHistory, 'followup_history_export.csv')} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold cursor-pointer">Export Followup History</button>
+                  <button onClick={() => {
+                      const blob = new Blob([OrderService.getUpdatedAppsScriptCode()], {type: 'text/plain'});
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement("a");
+                      link.href = url;
+                      link.download = 'Code.gs';
+                      link.click();
+                    }} className="px-4 py-2 bg-slate-100 hover:bg-slate-800 text-slate-800 hover:text-white rounded-xl text-xs font-bold cursor-pointer">Export Apps Script (.gs)</button>
                 </div>
               </div>
 
