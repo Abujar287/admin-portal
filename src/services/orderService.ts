@@ -53,13 +53,16 @@ export class OrderService {
       const stored = localStorage.getItem(STORAGE_KEYS.ORDERS);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Filter out any legacy dummy mock orders (1001-1008)
+          const filtered = parsed.filter(o => !['1001', '1002', '1003', '1004', '1005', '1006', '1007', '1008'].includes(String(o.id)));
+          return filtered;
+        }
       }
     } catch {
       // fallback
     }
-    localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(INITIAL_ORDERS));
-    return INITIAL_ORDERS;
+    return [];
   }
 
   static saveLocalOrders(orders: OrderItem[]): void {
@@ -201,8 +204,19 @@ export class OrderService {
     const idxCancDt   = getColIdx(['cancelled date', 'cancelled_date'], 20);
 
     return rows
-      .filter(row => row && row.length > 0 && (row[idxOrder] !== '' || row[idxCustName] !== ''))
-      .map((row, index) => {
+      .filter(row => {
+        if (!row || !Array.isArray(row) || row.length === 0) return false;
+        const rawId = idxOrder !== -1 && row[idxOrder] !== undefined && row[idxOrder] !== null
+          ? String(row[idxOrder]).trim()
+          : '';
+        // Strictly filter out any row without an explicit, valid order ID
+        const lower = rawId.toLowerCase();
+        if (!rawId || rawId === '-' || lower === 'null' || lower === 'undefined' || lower === 'order id' || lower.includes('total')) {
+          return false;
+        }
+        return true;
+      })
+      .map((row) => {
         const valOrEmpty = (idx: number, fallback = '') =>
           idx !== -1 && row[idx] !== undefined && row[idx] !== null ? String(row[idx]).trim() : fallback;
 
@@ -213,7 +227,7 @@ export class OrderService {
         };
 
         const rawOrderId = valOrEmpty(idxOrder);
-        const orderId = rawOrderId || String(1001 + index);
+        const orderId = rawOrderId;
         const orderVal = numOrZero(idxValue);
         const profitVal = idxProfit !== -1 && row[idxProfit] !== undefined && row[idxProfit] !== ''
           ? numOrZero(idxProfit)
@@ -357,8 +371,29 @@ export class OrderService {
     const isCancelled = updates.followupStatus?.toLowerCase() === 'cancelled';
     const isDelivered = updates.followupStatus?.toLowerCase() === 'delivered';
 
-    const newDeliveredDate = isDelivered ? currentTimestamp : existingOrder?.deliveredDate;
-    const newCancelledDate = isCancelled ? currentTimestamp : existingOrder?.cancelledDate;
+    // Clear delivered date when transitioning away from Delivered (e.g. to Pending)
+    let newDeliveredDate = existingOrder?.deliveredDate || '';
+    if (updates.followupStatus !== undefined) {
+      if (isDelivered) {
+        newDeliveredDate = updates.deliveredDate || currentTimestamp;
+      } else {
+        newDeliveredDate = '';
+      }
+    } else if (updates.deliveredDate !== undefined) {
+      newDeliveredDate = updates.deliveredDate;
+    }
+
+    // Clear cancelled date when transitioning away from Cancelled
+    let newCancelledDate = existingOrder?.cancelledDate || '';
+    if (updates.followupStatus !== undefined) {
+      if (isCancelled) {
+        newCancelledDate = updates.cancelledDate || currentTimestamp;
+      } else {
+        newCancelledDate = '';
+      }
+    } else if (updates.cancelledDate !== undefined) {
+      newCancelledDate = updates.cancelledDate;
+    }
 
     const updated = orders.map((ord) => {
       if (String(ord.id) === String(orderId)) {
@@ -372,26 +407,64 @@ export class OrderService {
           orderValue: orderVal,
           profit: profit,
           orderStatus: finalOrderStatus,
-          deliveredDate: newDeliveredDate || ord.deliveredDate,
-          cancelledDate: newCancelledDate || ord.cancelledDate
+          deliveredDate: newDeliveredDate,
+          cancelledDate: newCancelledDate
         };
       }
       return ord;
     });
     this.saveLocalOrders(updated);
 
-    // Record Historical Log for Followup Sheet with sequential ID
+    // Record Historical Log for Followup Sheet with sequential ID and detected Action
     let historyItem: FollowupHistoryItem | undefined;
+    let actionStr = 'Follow-up Update';
+    let nextFollowupId = 1;
+
     if (existingOrder) {
       const orderVal = updates.orderValue !== undefined ? Number(updates.orderValue) : existingOrder.orderValue;
       const schedDate = updates.scheduleDate !== undefined ? updates.scheduleDate : existingOrder.scheduleDate;
       const schedTime = updates.scheduledTime !== undefined ? updates.scheduledTime : existingOrder.scheduledTime;
 
       const existingHistory = this.getFollowupHistory();
-      const nextId = String(existingHistory.length + 1);
+      nextFollowupId = existingHistory.length + 1;
+      const nextId = String(nextFollowupId);
+
+      // Detect changes to generate Action name
+      const statusChanged = updates.followupStatus !== undefined && updates.followupStatus !== existingOrder.followupStatus;
+      const priceChanged = updates.orderValue !== undefined && Number(updates.orderValue) !== Number(existingOrder.orderValue);
+      const profitChanged = updates.profit !== undefined && Number(updates.profit) !== Number(existingOrder.profit);
+      const schedDateChanged = updates.scheduleDate !== undefined && updates.scheduleDate !== existingOrder.scheduleDate;
+      const schedTimeChanged = updates.scheduledTime !== undefined && updates.scheduledTime !== existingOrder.scheduledTime;
+
+      const changedParts: string[] = [];
+      if (priceChanged) changedParts.push('price');
+      if (profitChanged) changedParts.push('profit');
+      if (schedDateChanged && schedTimeChanged) {
+        changedParts.push('schedule date & time');
+      } else if (schedDateChanged) {
+        changedParts.push('schedule');
+      } else if (schedTimeChanged) {
+        changedParts.push('schedule time');
+      }
+      if (statusChanged) changedParts.push('status');
+
+      if (changedParts.length === 0) {
+        actionStr = 'Follow-up Update';
+      } else if (changedParts.length === 1) {
+        const p = changedParts[0];
+        if (p === 'schedule') actionStr = 'Schedule Change';
+        else if (p === 'schedule time') actionStr = 'Schedule Time Change';
+        else if (p === 'status') actionStr = 'Status Change';
+        else if (p === 'price') actionStr = 'Price Change';
+        else if (p === 'profit') actionStr = 'Profit Add';
+        else actionStr = `${p} Change`;
+      } else {
+        actionStr = `(${changedParts.join(', ')}) change`;
+      }
 
       historyItem = {
         id: nextId,
+        followupId: nextFollowupId,
         orderId: String(orderId),
         customerName: existingOrder.customerName,
         customerContact: existingOrder.customerContact,
@@ -403,6 +476,7 @@ export class OrderService {
         scheduledTime: schedTime,
         updatedBy: updatedBy || 'Manager',
         timestamp: currentTimestamp,
+        action: actionStr,
         notes: notes || ''
       };
 
@@ -417,6 +491,8 @@ export class OrderService {
         const params = new URLSearchParams();
         params.append('action', 'updateFollowup');
         params.append('orderId', String(orderId));
+        params.append('followupId', String(nextFollowupId));
+        params.append('actionName', actionStr);
         if (updates.followupStatus) {
           params.append('followupStatus', updates.followupStatus);
         }
@@ -428,8 +504,8 @@ export class OrderService {
         if (finalProfitParam !== undefined) {
           params.append('profit', String(finalProfitParam));
         }
-        if (newDeliveredDate) params.append('deliveredDate', newDeliveredDate);
-        if (newCancelledDate) params.append('cancelledDate', newCancelledDate);
+        params.append('deliveredDate', newDeliveredDate || '');
+        params.append('cancelledDate', newCancelledDate || '');
         if (updates.scheduleDate !== undefined) {
           params.append('scheduleDate', updates.scheduleDate);
         }
@@ -551,15 +627,23 @@ function doPost(e) {
         var profitVal = parseFloat(data.profit) || 0;
         mainSheet.getRange(foundRowIndex, 19).setValue(profitVal);
       }
-      // (d) Update Column 20 (T): Delivered Date
-      if (newFollowupStatus === 'Delivered' || data.deliveredDate) {
+      // (d) Update Column 20 (T): Delivered Date (clear when moved to pending or non-delivered)
+      if (newFollowupStatus === 'Delivered' || (data.deliveredDate && data.deliveredDate !== '')) {
         var delivDt = data.deliveredDate || new Date();
         mainSheet.getRange(foundRowIndex, 20).setValue(delivDt);
+      } else if (newFollowupStatus && newFollowupStatus !== 'Delivered') {
+        mainSheet.getRange(foundRowIndex, 20).setValue('');
+      } else if (data.deliveredDate === '') {
+        mainSheet.getRange(foundRowIndex, 20).setValue('');
       }
-      // (e) Update Column 21 (U): Cancelled Date
-      if (newFollowupStatus === 'Cancelled' || data.cancelledDate) {
+      // (e) Update Column 21 (U): Cancelled Date (clear when moved away from cancelled)
+      if (newFollowupStatus === 'Cancelled' || (data.cancelledDate && data.cancelledDate !== '')) {
         var cancDt = data.cancelledDate || new Date();
         mainSheet.getRange(foundRowIndex, 21).setValue(cancDt);
+      } else if (newFollowupStatus && newFollowupStatus !== 'Cancelled') {
+        mainSheet.getRange(foundRowIndex, 21).setValue('');
+      } else if (data.cancelledDate === '') {
+        mainSheet.getRange(foundRowIndex, 21).setValue('');
       }
       // (f) Update Column 14 (N): Schedule Date
       if (data.scheduleDate !== undefined && data.scheduleDate !== '') {
@@ -576,6 +660,7 @@ function doPost(e) {
         followupSheet = ss.insertSheet("Followup");
         followupSheet.appendRow([
           "Log Timestamp",
+          "Followup ID",
           "Order ID",
           "Customer Name",
           "Customer Contact",
@@ -586,17 +671,57 @@ function doPost(e) {
           "Schedule Date",
           "Scheduled Time",
           "Updated By",
+          "Action",
           "Notes / Remarks"
         ]);
-        followupSheet.getRange(1, 1, 1, 12).setFontWeight("bold").setBackground("#e2e8f0");
+        followupSheet.getRange(1, 1, 1, 14).setFontWeight("bold").setBackground("#e2e8f0");
       }
 
       var finalOrderVal = (data.orderValue !== undefined && data.orderValue !== '') ? data.orderValue : prevOrderVal;
       var finalSchedDate = (data.scheduleDate !== undefined && data.scheduleDate !== '') ? data.scheduleDate : prevScheduleDate;
       var finalSchedTime = (data.scheduledTime !== undefined && data.scheduledTime !== '') ? data.scheduledTime : prevScheduleTime;
 
+      // Determine Followup ID (sequential numeric)
+      var nextFollowupId = data.followupId;
+      if (!nextFollowupId) {
+        var lastFollowupRow = followupSheet.getLastRow();
+        nextFollowupId = lastFollowupRow > 1 ? (lastFollowupRow - 1) : 1;
+      }
+
+      // Determine Action Name
+      var actionName = data.actionName || '';
+      if (!actionName) {
+        var actionChanges = [];
+        if (data.orderValue !== undefined && String(data.orderValue) !== String(prevOrderVal)) actionChanges.push("price");
+        if (data.profit !== undefined) actionChanges.push("profit");
+        var isDateDiff = data.scheduleDate !== undefined && String(data.scheduleDate) !== String(prevScheduleDate);
+        var isTimeDiff = data.scheduledTime !== undefined && String(data.scheduledTime) !== String(prevScheduleTime);
+        if (isDateDiff && isTimeDiff) {
+          actionChanges.push("schedule date & time");
+        } else if (isDateDiff) {
+          actionChanges.push("schedule");
+        } else if (isTimeDiff) {
+          actionChanges.push("schedule time");
+        }
+        if (newFollowupStatus && newFollowupStatus !== prevFollowupStatus) actionChanges.push("status");
+
+        if (actionChanges.length === 0) actionName = "Follow-up Update";
+        else if (actionChanges.length === 1) {
+          var singleAction = actionChanges[0];
+          if (singleAction === "schedule") actionName = "Schedule Change";
+          else if (singleAction === "schedule time") actionName = "Schedule Time Change";
+          else if (singleAction === "status") actionName = "Status Change";
+          else if (singleAction === "price") actionName = "Price Change";
+          else if (singleAction === "profit") actionName = "Profit Add";
+          else actionName = singleAction + " Change";
+        } else {
+          actionName = "(" + actionChanges.join(", ") + ") change";
+        }
+      }
+
       followupSheet.appendRow([
         timestamp,
+        nextFollowupId,
         orderIdToFind,
         customerName,
         customerContact,
@@ -607,6 +732,7 @@ function doPost(e) {
         finalSchedDate,
         finalSchedTime,
         updatedBy,
+        actionName,
         note
       ]);
 

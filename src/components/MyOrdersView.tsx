@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { AgentUser, DateFilterType, OrderItem } from '../types';
 import { OrderService } from '../services/orderService';
+import { TIME_SLOTS } from '../data/mockOrders';
 import { CreateOrderModal } from './CreateOrderModal';
 import { RotateCw, Search, FilterX, Eye, X, CheckCircle, Clock, Plus } from 'lucide-react';
 
@@ -25,7 +26,56 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
   const [filterScheduleDate, setFilterScheduleDate] = useState<DateFilterType>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
+  const [modalFollowupStatus, setModalFollowupStatus] = useState<string>('Delivered');
+  const [modalOrderValue, setModalOrderValue] = useState<string>('');
+  const [modalProfit, setModalProfit] = useState<string>('');
+  const [modalScheduleDate, setModalScheduleDate] = useState<string>('');
+  const [modalScheduledTime, setModalScheduledTime] = useState<string>('');
+  const [modalNotes, setModalNotes] = useState<string>('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  // Agent's individual permissions
+  const perms = currentAgent.permissions || {
+    canCreate: true,
+    canUpdateStatus: true,
+    canChangeValue: true,
+    canAddProfit: true,
+    canCancel: true
+  };
+
+  const handleOpenOrder = (ord: OrderItem) => {
+    setSelectedOrder(ord);
+    setModalFollowupStatus(ord.followupStatus || 'Pending');
+    setModalOrderValue(String(ord.orderValue ?? ''));
+    setModalProfit(String(ord.profit ?? ''));
+    setModalScheduleDate(ord.scheduleDate || '');
+    setModalScheduledTime(ord.scheduledTime || '');
+    setModalNotes('');
+  };
+
+  const handleSaveOrderUpdate = () => {
+    if (!selectedOrder) return;
+    const isCancelled = modalFollowupStatus.toLowerCase() === 'cancelled';
+    const isDelivered = modalFollowupStatus.toLowerCase() === 'delivered';
+    const numVal = modalOrderValue !== '' ? Number(modalOrderValue) : selectedOrder.orderValue;
+    const numProfit = isCancelled 
+      ? 0 
+      : (modalProfit !== '' ? Number(modalProfit) : (isDelivered ? Math.round(numVal * 0.20) : selectedOrder.profit));
+
+    onUpdateOrderStatus(
+      selectedOrder.id,
+      {
+        followupStatus: modalFollowupStatus,
+        orderStatus: isDelivered ? 'Delivered' : (isCancelled ? 'Cancelled' : selectedOrder.orderStatus),
+        orderValue: numVal,
+        profit: numProfit,
+        scheduleDate: modalScheduleDate,
+        scheduledTime: modalScheduledTime
+      }
+    );
+
+    setSelectedOrder(null);
+  };
 
   // STRICTLY only this agent's orders (data isolation for agent portal)
   const myAgentOrders = useMemo(() => {
@@ -90,13 +140,24 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
 
         {/* Action Buttons: ➕ Create Order & 🔄 Refresh (NO export button for agent) */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="px-3.5 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold shadow-sm shadow-blue-700/20 flex items-center gap-1.5 transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Create Order</span>
-          </button>
+          {perms.canCreate ? (
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="px-3.5 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold shadow-sm shadow-blue-700/20 flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create Order</span>
+            </button>
+          ) : (
+            <button
+              disabled
+              title="Order creation restricted by Manager"
+              className="px-3.5 py-2 bg-slate-200 text-slate-400 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-not-allowed opacity-75"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create Order (Disabled)</span>
+            </button>
+          )}
 
           <button
             onClick={() => onRefresh()}
@@ -314,11 +375,12 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-center">
                         <button
-                          onClick={() => setSelectedOrder(ord)}
-                          title="View Details"
-                          className="p-1 rounded-md text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
+                          onClick={() => handleOpenOrder(ord)}
+                          title="View / Update Details"
+                          className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5" />
+                          <span>View</span>
                         </button>
                       </td>
                     </tr>
@@ -330,7 +392,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
         </div>
       </div>
 
-      {/* Order Details Modal */}
+      {/* Order Details & Action Modal */}
       {selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
@@ -369,43 +431,132 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                 <span className="block text-slate-600 mt-0.5">{selectedOrder.scheduledTime}</span>
               </div>
               <div className="bg-slate-50 p-2.5 rounded-lg">
-                <span className="text-slate-500 block text-[10px] font-semibold uppercase">Order Value & Profit</span>
-                <span className="font-bold text-slate-900">৳ {selectedOrder.orderValue.toLocaleString()}</span>
-                <span className="block text-emerald-600 font-bold mt-0.5">৳ {selectedOrder.profit.toLocaleString()} Profit (20%)</span>
+                <span className="text-slate-500 block text-[10px] font-semibold uppercase">Current Status</span>
+                <span className="font-bold text-indigo-700">{selectedOrder.followupStatus || 'Pending'}</span>
+                <span className="block text-slate-500 mt-0.5">Value: ৳{selectedOrder.orderValue.toLocaleString()}</span>
               </div>
             </div>
 
-            <div className="pt-2">
-              <label className="block text-xs font-semibold text-slate-700 mb-2">Update Delivery Status</label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    onUpdateOrderStatus(selectedOrder.id, {
-                      orderStatus: 'Delivered',
-                      followupStatus: 'Delivered'
-                    });
-                    setSelectedOrder((prev) => (prev ? { ...prev, orderStatus: 'Delivered', followupStatus: 'Delivered' } : null));
-                  }}
-                  className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  <span>Mark as Delivered</span>
-                </button>
-                <button
-                  onClick={() => {
-                    onUpdateOrderStatus(selectedOrder.id, {
-                      orderStatus: 'Pending',
-                      followupStatus: 'Pending'
-                    });
-                    setSelectedOrder((prev) => (prev ? { ...prev, orderStatus: 'Pending', followupStatus: 'Pending' } : null));
-                  }}
-                  className="flex-1 py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>Mark as Pending</span>
-                </button>
+            {/* Status Update / Action Section with Granular Permission Checks */}
+            {perms.canUpdateStatus ? (
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Follow-up Status
+                  </label>
+                  <select
+                    value={modalFollowupStatus}
+                    onChange={(e) => {
+                      const newStatus = e.target.value;
+                      setModalFollowupStatus(newStatus);
+                      if (newStatus.toLowerCase() === 'cancelled') {
+                        setModalProfit('0');
+                      } else if (modalProfit === '0') {
+                        const v = Number(modalOrderValue) || selectedOrder.orderValue;
+                        setModalProfit(String(Math.round(v * 0.2)));
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-semibold focus:outline-hidden focus:border-blue-600 bg-white"
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Delivered">Delivered</option>
+                    {perms.canCancel && <option value="Cancelled">Cancelled</option>}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Schedule Date
+                    </label>
+                    <input
+                      type="date"
+                      value={modalScheduleDate}
+                      onChange={(e) => setModalScheduleDate(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-semibold text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Scheduled Time (Slot)
+                    </label>
+                    <select
+                      value={modalScheduledTime}
+                      onChange={(e) => setModalScheduledTime(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-semibold text-slate-900 cursor-pointer"
+                    >
+                      <option value="">-- Select Time Slot --</option>
+                      {modalScheduledTime && !TIME_SLOTS.includes(modalScheduledTime) && (
+                        <option value={modalScheduledTime}>{modalScheduledTime}</option>
+                      )}
+                      {TIME_SLOTS.map((slot) => (
+                        <option key={slot} value={slot}>
+                          {slot}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1 flex items-center justify-between">
+                      <span>Order Value (৳)</span>
+                      {!perms.canChangeValue && <span className="text-[10px] text-amber-600 font-normal">Locked</span>}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      disabled={!perms.canChangeValue}
+                      value={modalOrderValue}
+                      onChange={(e) => setModalOrderValue(e.target.value)}
+                      placeholder="Order value"
+                      className={`w-full px-3 py-2 text-xs rounded-xl border font-semibold ${perms.canChangeValue ? 'border-slate-300 bg-white text-slate-900' : 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1 flex items-center justify-between">
+                      <span>Profit (৳)</span>
+                      {!perms.canAddProfit && <span className="text-[10px] text-amber-600 font-normal">Locked</span>}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      disabled={!perms.canAddProfit || modalFollowupStatus.toLowerCase() === 'cancelled'}
+                      value={modalFollowupStatus.toLowerCase() === 'cancelled' ? '0' : modalProfit}
+                      onChange={(e) => setModalProfit(e.target.value)}
+                      placeholder="Profit amount"
+                      className={`w-full px-3 py-2 text-xs rounded-xl border font-semibold ${perms.canAddProfit && modalFollowupStatus.toLowerCase() !== 'cancelled' ? 'border-slate-300 bg-white text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOrder(null)}
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveOrderUpdate}
+                    className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold shadow-sm shadow-blue-700/20 cursor-pointer"
+                  >
+                    Update &amp; Save Order
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="pt-2 border-t border-slate-100 text-center py-2">
+                <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 inline-block">
+                  Status update access is not enabled for your agent ID (View Only).
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -67,6 +67,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   }, [isOpen]);
 
   if (!isOpen) return null;
+  if (currentAgent.permissions && currentAgent.permissions.canCreate === false) return null;
 
   const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newCity = e.target.value;

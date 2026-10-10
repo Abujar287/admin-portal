@@ -55,6 +55,7 @@ export type DateFilterType = '' | 'all' | 'today' | 'yesterday' | 'last7' | 'las
 
 export interface FollowupHistoryItem {
   id: string;
+  followupId: string | number;
   orderId: string;
   customerName?: string;
   customerContact?: string;
@@ -66,5 +67,6 @@ export interface FollowupHistoryItem {
   scheduledTime?: string;
   updatedBy: string;
   timestamp: string;
+  action?: string;
   notes?: string;
 }

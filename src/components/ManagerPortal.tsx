@@ -33,9 +33,16 @@ import {
   ExternalLink,
   MessageSquare,
   Clock,
-  ArrowRight
+  ArrowRight,
+  TrendingUp,
+  Award,
+  Target,
+  Activity,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
-import { ORDER_CHANNELS } from '../data/mockOrders';
+import { ORDER_CHANNELS, TIME_SLOTS } from '../data/mockOrders';
 
 interface ManagerPortalProps {
   currentManager: ManagerUser;
@@ -61,7 +68,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   onUpdateOrderStatus
 }) => {
   const isTeamLeader = currentManager.role === 'Team Leader';
-  const [activeTab, setActiveTab] = useState<'profiles' | 'users' | 'orders' | 'followup' | 'summary'>(
+  const [activeTab, setActiveTab] = useState<'profiles' | 'users' | 'orders' | 'followup' | 'summary' | 'agent-performance'>(
     isTeamLeader ? 'summary' : 'users'
   );
 
@@ -76,6 +83,28 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [isSavingStatus, setIsSavingStatus] = useState<boolean>(false);
   const [showAppsScriptModal, setShowAppsScriptModal] = useState<boolean>(false);
   const [copiedScript, setCopiedScript] = useState<boolean>(false);
+
+  // User Edit Modal Popup State
+  const [editingAgentModal, setEditingAgentModal] = useState<AgentUser | null>(null);
+  const [editModalIndex, setEditModalIndex] = useState<number | null>(null);
+  const [editUser, setEditUser] = useState('');
+  const [editPass, setEditPass] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editRole, setEditRole] = useState('Agent');
+  const [editTeam, setEditTeam] = useState('Acquisition');
+  const [editContact, setEditContact] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editBloodGroup, setEditBloodGroup] = useState('');
+  const [editStatus, setEditStatus] = useState<'active' | 'deactivated'>('active');
+  const [editCanCreate, setEditCanCreate] = useState(true);
+  const [editCanUpdateStatus, setEditCanUpdateStatus] = useState(true);
+  const [editCanChangeValue, setEditCanChangeValue] = useState(true);
+  const [editCanAddProfit, setEditCanAddProfit] = useState(true);
+  const [editCanCancel, setEditCanCancel] = useState(true);
+
+  // Agent Performance Tab Filters & Search
+  const [agentPerformanceSearch, setAgentPerformanceSearch] = useState('');
+  const [agentPerformanceTeamFilter, setAgentPerformanceTeamFilter] = useState('all');
 
   // Followup Tab State
   const [quickUpdateOrderId, setQuickUpdateOrderId] = useState<string>('');
@@ -128,6 +157,59 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [summaryDateFilter, setSummaryDateFilter] = useState<DateFilterType>('all');
   const [summaryStartDate, setSummaryStartDate] = useState('');
   const [summaryEndDate, setSummaryEndDate] = useState('');
+  const [summaryBreakdownTab, setSummaryBreakdownTab] = useState<'all' | 'channel' | 'category' | 'city'>('all');
+
+  // Sorting states for tables
+  const [channelSortKey, setChannelSortKey] = useState<string>('createOrders');
+  const [channelSortDirection, setChannelSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const [categorySortKey, setCategorySortKey] = useState<string>('createOrders');
+  const [categorySortDirection, setCategorySortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const [citySortKey, setCitySortKey] = useState<string>('createOrders');
+  const [citySortDirection, setCitySortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const [agentSortKey, setAgentSortKey] = useState<string>('createOrders');
+  const [agentSortDirection, setAgentSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  // Script URL state in Profiles
+  const [profileScriptUrl, setProfileScriptUrl] = useState<string>(() => OrderService.getScriptUrl());
+  const [scriptUrlSaved, setScriptUrlSaved] = useState(false);
+
+  const handleSortToggle = (
+    currentKey: string,
+    currentDir: 'asc' | 'desc',
+    newKey: string,
+    setKey: (k: string) => void,
+    setDir: (d: 'asc' | 'desc') => void
+  ) => {
+    if (currentKey === newKey) {
+      setDir(currentDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setKey(newKey);
+      setDir('desc');
+    }
+  };
+
+  const sortItems = <T extends Record<string, any>>(
+    items: T[],
+    sortKey: string,
+    sortDirection: 'asc' | 'desc'
+  ): T[] => {
+    return [...items].sort((a, b) => {
+      let aVal = a[sortKey];
+      let bVal = b[sortKey];
+
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        const cmp = aVal.localeCompare(bVal);
+        return sortDirection === 'asc' ? cmp : -cmp;
+      }
+
+      aVal = Number(aVal) || 0;
+      bVal = Number(bVal) || 0;
+      return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+  };
 
   // Helper date matcher
   const matchDate = (
@@ -192,6 +274,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     const p = newAgentPass.trim();
     if (!u || !p) return;
 
+    const permissions = {
+      canCreate: newCanCreate,
+      canUpdateStatus: newCanUpdateStatus,
+      canChangeValue: newCanChangeValue,
+      canAddProfit: newCanAddProfit,
+      canCancel: newCanCancel
+    };
+
     let updated: AgentUser[];
     if (editingIndex !== null && editingIndex >= 0 && editingIndex < agents.length) {
       updated = agents.map((agent, idx) =>
@@ -201,7 +291,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               user: u,
               pass: p,
               team: newAgentTeam,
-              name: newAgentName.trim() || agent.name || `Agent ${u}`
+              name: newAgentName.trim() || agent.name || `Agent ${u}`,
+              role: newAgentRole,
+              permissions: permissions
             }
           : agent
       );
@@ -211,7 +303,15 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       if (existingIdx >= 0) {
         updated = agents.map((agent, idx) =>
           idx === existingIdx
-            ? { ...agent, user: u, pass: p, team: newAgentTeam, name: newAgentName.trim() || agent.name }
+            ? { 
+                ...agent, 
+                user: u, 
+                pass: p, 
+                team: newAgentTeam, 
+                name: newAgentName.trim() || agent.name,
+                role: newAgentRole,
+                permissions: permissions
+              }
             : agent
         );
       } else {
@@ -224,7 +324,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             name: newAgentName.trim() || `Agent ${u}`,
             email: `${u.toLowerCase()}@portal.local`,
             status: 'active',
-            failedAttempts: 0
+            failedAttempts: 0,
+            role: newAgentRole,
+            permissions: permissions
           }
         ];
       }
@@ -235,15 +337,72 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setNewAgentPass('');
     setNewAgentName('');
     setNewAgentTeam('Acquisition');
+    setNewAgentRole('Agent');
+    setNewCanCreate(true);
+    setNewCanUpdateStatus(true);
+    setNewCanChangeValue(true);
+    setNewCanAddProfit(true);
+    setNewCanCancel(true);
   };
 
   const handleEditAgent = (index: number) => {
     const ag = agents[index];
-    setNewAgentUser(ag.user);
-    setNewAgentPass(ag.pass);
-    setNewAgentName(ag.name || '');
-    setNewAgentTeam(ag.team || 'Acquisition');
-    setEditingIndex(index);
+    setEditModalIndex(index);
+    setEditingAgentModal(ag);
+    setEditUser(ag.user);
+    setEditPass(ag.pass);
+    setEditName(ag.name || '');
+    setEditTeam(ag.team || 'Acquisition');
+    setEditRole(ag.role === 'Team Leader' ? 'Team Leader' : 'Agent');
+    setEditContact(ag.contact || '');
+    setEditEmail(ag.email || '');
+    setEditBloodGroup(ag.bloodGroup || '');
+    setEditStatus(ag.status === 'deactivated' ? 'deactivated' : 'active');
+    setEditCanCreate(ag.permissions?.canCreate ?? true);
+    setEditCanUpdateStatus(ag.permissions?.canUpdateStatus ?? true);
+    setEditCanChangeValue(ag.permissions?.canChangeValue ?? true);
+    setEditCanAddProfit(ag.permissions?.canAddProfit ?? true);
+    setEditCanCancel(ag.permissions?.canCancel ?? true);
+  };
+
+  const handleSaveEditedAgentModal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editModalIndex === null || !editingAgentModal) return;
+
+    const u = editUser.trim();
+    const p = editPass.trim();
+    if (!u || !p) return;
+
+    const permissions = {
+      canCreate: editCanCreate,
+      canUpdateStatus: editCanUpdateStatus,
+      canChangeValue: editCanChangeValue,
+      canAddProfit: editCanAddProfit,
+      canCancel: editCanCancel
+    };
+
+    const updated = agents.map((agent, idx) =>
+      idx === editModalIndex
+        ? {
+            ...agent,
+            user: u,
+            pass: p,
+            name: editName.trim() || agent.name || `Agent ${u}`,
+            role: editRole,
+            team: editTeam,
+            contact: editContact.trim(),
+            email: editEmail.trim(),
+            bloodGroup: editBloodGroup.trim(),
+            status: editStatus,
+            failedAttempts: editStatus === 'active' ? 0 : (agent.failedAttempts || 3),
+            permissions: permissions
+          }
+        : agent
+    );
+
+    onUpdateAgents(updated, true);
+    setEditingAgentModal(null);
+    setEditModalIndex(null);
   };
 
   const handleDeleteAgent = (index: number) => {
@@ -332,52 +491,155 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     let createOrdersCount = 0;
     let deliveredOrdersCount = 0;
     let cancelledOrdersCount = 0;
-    let openOrdersCount = 0;
+    let openOrdersCount = 0; // Always Lifetime
+    let openOrdersValue = 0; // Always Lifetime
     let totalOrderValue = 0;
     let deliveredOrderValue = 0;
     let totalProfit = 0;
 
-    const cityMap: Record<string, number> = {};
-    const channelMap: Record<string, number> = {};
-    const categoryMap: Record<string, number> = {};
+    const buildGroupMap = () => ({
+      createOrders: 0,
+      servedOrders: 0,
+      cancelledOrders: 0,
+      orderValue: 0,
+      deliveredOrderValue: 0,
+      profit: 0
+    });
+
+    const chMap: Record<string, ReturnType<typeof buildGroupMap>> = {};
+    const catMap: Record<string, ReturnType<typeof buildGroupMap>> = {};
+    const cityMap: Record<string, ReturnType<typeof buildGroupMap>> = {};
+
+    const buildAgentMapItem = (id: string, name: string, team: string, role: string, status: string) => ({
+      id,
+      name,
+      team,
+      role,
+      status,
+      createOrders: 0,
+      servedOrders: 0,
+      cancelledOrders: 0,
+      pendingOrders: 0,
+      orderValue: 0,
+      deliveredOrderValue: 0,
+      profit: 0,
+      followupCount: 0
+    });
+
+    const agentMap: Record<string, ReturnType<typeof buildAgentMapItem>> = {};
+    agents.forEach((a) => {
+      const key = a.user.trim();
+      agentMap[key] = buildAgentMapItem(
+        a.user,
+        a.name || `Agent ${a.user}`,
+        a.team || 'Acquisition',
+        a.role || 'Agent',
+        a.status || 'active'
+      );
+    });
+
+    const getOrInitAgent = (agentId: string, agentName?: string) => {
+      const cleanId = (agentId || 'Unknown').trim();
+      if (!agentMap[cleanId]) {
+        agentMap[cleanId] = buildAgentMapItem(
+          cleanId,
+          agentName || cleanId,
+          'Unassigned',
+          'Agent',
+          'active'
+        );
+      }
+      return agentMap[cleanId];
+    };
+
+    const getOrInit = (map: Record<string, ReturnType<typeof buildGroupMap>>, key: string) => {
+      const cleanKey = key || 'Unknown';
+      if (!map[cleanKey]) {
+        map[cleanKey] = buildGroupMap();
+      }
+      return map[cleanKey];
+    };
 
     orders.forEach((r) => {
       const val = Number(r.orderValue) || 0;
       const profit = Number(r.profit) || 0;
-      const fStatus = (r.followupStatus || '').toLowerCase();
+      const fStatus = (r.followupStatus || '').trim().toLowerCase();
       const delivDt = orderDeliveredDateMap.get(String(r.id)) || r.deliveredDate || '';
       const cancDt = orderCancelledDateMap.get(String(r.id)) || r.cancelledDate || '';
+
+      const chItem = getOrInit(chMap, r.orderChannel);
+      const catItem = getOrInit(catMap, r.productCategory);
+      const cityItem = getOrInit(cityMap, r.city);
+      const agItem = getOrInitAgent(r.agentId, r.agentName);
 
       // 1. Create Orders (Create Date)
       if (matchDate(r.createDate, summaryDateFilter, summaryStartDate, summaryEndDate)) {
         createOrdersCount++;
         totalOrderValue += val;
-        cityMap[r.city || 'Unknown'] = (cityMap[r.city || 'Unknown'] || 0) + 1;
-        channelMap[r.orderChannel || 'Unknown'] = (channelMap[r.orderChannel || 'Unknown'] || 0) + 1;
-        categoryMap[r.productCategory || 'Unknown'] = (categoryMap[r.productCategory || 'Unknown'] || 0) + 1;
+
+        chItem.createOrders += 1;
+        chItem.orderValue += val;
+
+        catItem.createOrders += 1;
+        catItem.orderValue += val;
+
+        cityItem.createOrders += 1;
+        cityItem.orderValue += val;
+
+        agItem.createOrders += 1;
+        agItem.orderValue += val;
       }
 
-      // 2. Delivered Orders (Delivered Date & Followup Status = Delivered)
-      if (fStatus === 'delivered' || delivDt) {
-        if (matchDate(delivDt || r.createDate, summaryDateFilter, summaryStartDate, summaryEndDate)) {
+      // 2. Delivered Orders (Followup status = Delivered & Delivered date exists)
+      if (fStatus === 'delivered' && Boolean(delivDt)) {
+        if (matchDate(delivDt, summaryDateFilter, summaryStartDate, summaryEndDate)) {
           deliveredOrdersCount++;
           deliveredOrderValue += val;
           totalProfit += profit;
+
+          chItem.servedOrders += 1;
+          chItem.deliveredOrderValue += val;
+          chItem.profit += profit;
+
+          catItem.servedOrders += 1;
+          catItem.deliveredOrderValue += val;
+          catItem.profit += profit;
+
+          cityItem.servedOrders += 1;
+          cityItem.deliveredOrderValue += val;
+          cityItem.profit += profit;
+
+          agItem.servedOrders += 1;
+          agItem.deliveredOrderValue += val;
+          agItem.profit += profit;
         }
       }
 
-      // 3. Cancelled Orders (Cancelled Date & Followup Status = Cancelled)
-      if (fStatus === 'cancelled' || cancDt) {
-        if (matchDate(cancDt || r.createDate, summaryDateFilter, summaryStartDate, summaryEndDate)) {
+      // 3. Cancelled Orders (Followup status = Cancelled & Cancelled date exists)
+      if (fStatus === 'cancelled' && Boolean(cancDt)) {
+        if (matchDate(cancDt, summaryDateFilter, summaryStartDate, summaryEndDate)) {
           cancelledOrdersCount++;
+
+          chItem.cancelledOrders += 1;
+          catItem.cancelledOrders += 1;
+          cityItem.cancelledOrders += 1;
+          agItem.cancelledOrders += 1;
         }
       }
 
-      // 4. Open Orders (Followup Status not in Delivered, Cancelled)
+      // 4. Open Orders (Always Lifetime: Followup Status not in Delivered, Cancelled)
       if (fStatus !== 'delivered' && fStatus !== 'cancelled') {
-        if (matchDate(r.createDate, summaryDateFilter, summaryStartDate, summaryEndDate)) {
-          openOrdersCount++;
-        }
+        openOrdersCount++;
+        openOrdersValue += val;
+        agItem.pendingOrders += 1;
+      }
+    });
+
+    // Also count follow-ups logged by agents
+    followupHistory.forEach((h) => {
+      if (h.updatedBy && matchDate(h.timestamp, summaryDateFilter, summaryStartDate, summaryEndDate)) {
+        const ag = getOrInitAgent(h.updatedBy);
+        ag.followupCount += 1;
       }
     });
 
@@ -387,11 +649,99 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     const bucketSize = deliveredOrdersCount > 0 ? Math.round(deliveredOrderValue / deliveredOrdersCount) : 0;
     const nrRatio = deliveredOrderValue > 0 ? Number(((totalProfit / deliveredOrderValue) * 100).toFixed(1)) : 0;
 
+    const finalizeGroups = (map: Record<string, ReturnType<typeof buildGroupMap>>) => {
+      return Object.entries(map).map(([name, item]) => {
+        const totalDelivCanc = item.servedOrders + item.cancelledOrders;
+        const delivRatio = totalDelivCanc > 0 ? Math.round((item.servedOrders / totalDelivCanc) * 100) : 0;
+        const cancRatio = totalDelivCanc > 0 ? Math.round((item.cancelledOrders / totalDelivCanc) * 100) : 0;
+        const bSize = item.servedOrders > 0 ? Math.round(item.deliveredOrderValue / item.servedOrders) : 0;
+        const netRevRatio = item.deliveredOrderValue > 0 ? Number(((item.profit / item.deliveredOrderValue) * 100).toFixed(1)) : 0;
+
+        return {
+          name,
+          createOrders: item.createOrders,
+          servedOrders: item.servedOrders,
+          cancelledOrders: item.cancelledOrders,
+          orderValue: item.orderValue,
+          deliveredOrderValue: item.deliveredOrderValue,
+          profit: item.profit,
+          bucketSize: bSize,
+          deliveredRatio: delivRatio,
+          cancelledRatio: cancRatio,
+          nrRatio: netRevRatio
+        };
+      });
+    };
+
+    const channelSummary = finalizeGroups(chMap);
+    const categorySummary = finalizeGroups(catMap);
+    const citySummary = finalizeGroups(cityMap);
+
+    // Filter out agents who have no data
+    const agentSummary = Object.values(agentMap)
+      .filter((item) => (item.createOrders + item.servedOrders + item.cancelledOrders + item.pendingOrders + item.followupCount) > 0)
+      .map((item) => {
+        const totalDelivCanc = item.servedOrders + item.cancelledOrders;
+        const delivRatio = totalDelivCanc > 0 ? Math.round((item.servedOrders / totalDelivCanc) * 100) : 0;
+        const cancRatio = totalDelivCanc > 0 ? Math.round((item.cancelledOrders / totalDelivCanc) * 100) : 0;
+        const bSize = item.servedOrders > 0 ? Math.round(item.deliveredOrderValue / item.servedOrders) : 0;
+        const netRevRatio = item.deliveredOrderValue > 0 ? Number(((item.profit / item.deliveredOrderValue) * 100).toFixed(1)) : 0;
+
+        return {
+          ...item,
+          bucketSize: bSize,
+          deliveredRatio: delivRatio,
+          cancelledRatio: cancRatio,
+          nrRatio: netRevRatio
+        };
+      });
+
+    const computeGrandTotal = (items: Array<{
+      createOrders: number;
+      servedOrders: number;
+      cancelledOrders: number;
+      orderValue: number;
+      deliveredOrderValue: number;
+      profit: number;
+    }>) => {
+      const cOrders = items.reduce((acc, cur) => acc + (cur.createOrders || 0), 0);
+      const sOrders = items.reduce((acc, cur) => acc + (cur.servedOrders || 0), 0);
+      const cancOrders = items.reduce((acc, cur) => acc + (cur.cancelledOrders || 0), 0);
+      const oVal = items.reduce((acc, cur) => acc + (cur.orderValue || 0), 0);
+      const dVal = items.reduce((acc, cur) => acc + (cur.deliveredOrderValue || 0), 0);
+      const pFit = items.reduce((acc, cur) => acc + (cur.profit || 0), 0);
+
+      const totDC = sOrders + cancOrders;
+      const dRatio = totDC > 0 ? Math.round((sOrders / totDC) * 100) : 0;
+      const cRatio = totDC > 0 ? Math.round((cancOrders / totDC) * 100) : 0;
+      const bSize = sOrders > 0 ? Math.round(dVal / sOrders) : 0;
+      const nRatio = dVal > 0 ? Number(((pFit / dVal) * 100).toFixed(1)) : 0;
+
+      return {
+        createOrders: cOrders,
+        servedOrders: sOrders,
+        cancelledOrders: cancOrders,
+        orderValue: oVal,
+        deliveredOrderValue: dVal,
+        profit: pFit,
+        bucketSize: bSize,
+        deliveredRatio: dRatio,
+        cancelledRatio: cRatio,
+        nrRatio: nRatio
+      };
+    };
+
+    const channelGrandTotal = computeGrandTotal(channelSummary);
+    const categoryGrandTotal = computeGrandTotal(categorySummary);
+    const cityGrandTotal = computeGrandTotal(citySummary);
+    const agentGrandTotal = computeGrandTotal(agentSummary);
+
     return {
       createOrdersCount,
       deliveredOrdersCount,
       cancelledOrdersCount,
       openOrdersCount,
+      openOrdersValue,
       totalOrderValue,
       deliveredOrderValue,
       totalProfit,
@@ -399,11 +749,75 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       cancelledRatio,
       bucketSize,
       nrRatio,
-      cityMap,
-      channelMap,
-      categoryMap
+      channelSummary,
+      categorySummary,
+      citySummary,
+      agentSummary,
+      channelGrandTotal,
+      categoryGrandTotal,
+      cityGrandTotal,
+      agentGrandTotal
     };
-  }, [orders, summaryDateFilter, summaryStartDate, summaryEndDate, orderDeliveredDateMap, orderCancelledDateMap]);
+  }, [orders, agents, followupHistory, summaryDateFilter, summaryStartDate, summaryEndDate, orderDeliveredDateMap, orderCancelledDateMap]);
+
+  // Sorted summaries
+  const sortedChannelSummary = useMemo(() => {
+    return sortItems(summaryStats.channelSummary, channelSortKey, channelSortDirection);
+  }, [summaryStats.channelSummary, channelSortKey, channelSortDirection]);
+
+  const sortedCategorySummary = useMemo(() => {
+    return sortItems(summaryStats.categorySummary, categorySortKey, categorySortDirection);
+  }, [summaryStats.categorySummary, categorySortKey, categorySortDirection]);
+
+  const sortedCitySummary = useMemo(() => {
+    return sortItems(summaryStats.citySummary, citySortKey, citySortDirection);
+  }, [summaryStats.citySummary, citySortKey, citySortDirection]);
+
+  const filteredAgentPerformance = useMemo(() => {
+    const list = summaryStats.agentSummary.filter((ag) => {
+      const matchSearch =
+        !agentPerformanceSearch ||
+        ag.name.toLowerCase().includes(agentPerformanceSearch.toLowerCase()) ||
+        ag.id.toLowerCase().includes(agentPerformanceSearch.toLowerCase());
+      const matchTeam =
+        agentPerformanceTeamFilter === 'all' ||
+        ag.team.toLowerCase() === agentPerformanceTeamFilter.toLowerCase();
+      return matchSearch && matchTeam;
+    });
+    return sortItems(list, agentSortKey, agentSortDirection);
+  }, [summaryStats.agentSummary, agentPerformanceSearch, agentPerformanceTeamFilter, agentSortKey, agentSortDirection]);
+
+  const filteredAgentGrandTotal = useMemo(() => {
+    const cOrders = filteredAgentPerformance.reduce((acc, cur) => acc + (cur.createOrders || 0), 0);
+    const sOrders = filteredAgentPerformance.reduce((acc, cur) => acc + (cur.servedOrders || 0), 0);
+    const cancOrders = filteredAgentPerformance.reduce((acc, cur) => acc + (cur.cancelledOrders || 0), 0);
+    const pOrders = filteredAgentPerformance.reduce((acc, cur) => acc + (cur.pendingOrders || 0), 0);
+    const oVal = filteredAgentPerformance.reduce((acc, cur) => acc + (cur.orderValue || 0), 0);
+    const dVal = filteredAgentPerformance.reduce((acc, cur) => acc + (cur.deliveredOrderValue || 0), 0);
+    const pFit = filteredAgentPerformance.reduce((acc, cur) => acc + (cur.profit || 0), 0);
+    const fCount = filteredAgentPerformance.reduce((acc, cur) => acc + (cur.followupCount || 0), 0);
+
+    const totDC = sOrders + cancOrders;
+    const dRatio = totDC > 0 ? Math.round((sOrders / totDC) * 100) : 0;
+    const cRatio = totDC > 0 ? Math.round((cancOrders / totDC) * 100) : 0;
+    const bSize = sOrders > 0 ? Math.round(dVal / sOrders) : 0;
+    const nRatio = dVal > 0 ? Number(((pFit / dVal) * 100).toFixed(1)) : 0;
+
+    return {
+      createOrders: cOrders,
+      servedOrders: sOrders,
+      cancelledOrders: cancOrders,
+      pendingOrders: pOrders,
+      orderValue: oVal,
+      deliveredOrderValue: dVal,
+      profit: pFit,
+      bucketSize: bSize,
+      deliveredRatio: dRatio,
+      cancelledRatio: cRatio,
+      nrRatio: nRatio,
+      followupCount: fCount
+    };
+  }, [filteredAgentPerformance]);
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 font-sans antialiased overflow-hidden">
@@ -422,54 +836,53 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         </div>
 
         <nav className="flex-1 space-y-1.5">
+          {/* User Details strictly restricted for Team Leader */}
           {!isTeamLeader && (
-            <>
-              <button
-                onClick={() => setActiveTab('users')}
-                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-                  activeTab === 'users'
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <Users className="w-4 h-4" />
-                <span>User Details</span>
-                <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
-                  {agents.length}
-                </span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('orders')}
-                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-                  activeTab === 'orders'
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <FileText className="w-4 h-4" />
-                <span>Orders</span>
-                <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
-                  {orders.length}
-                </span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('followup')}
-                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-                  activeTab === 'followup'
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <History className="w-4 h-4" />
-                <span>Followup &amp; Sync</span>
-                <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
-                  {followupHistory.length}
-                </span>
-              </button>
-            </>
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                activeTab === 'users'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>User Details</span>
+              <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
+                {agents.length}
+              </span>
+            </button>
           )}
+
+          <button
+            onClick={() => setActiveTab('orders')}
+            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+              activeTab === 'orders'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                : 'text-slate-300 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            <span>Orders</span>
+            <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
+              {orders.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('followup')}
+            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+              activeTab === 'followup'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                : 'text-slate-300 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <History className="w-4 h-4" />
+            <span>Followup</span>
+            <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
+              {followupHistory.length}
+            </span>
+          </button>
 
           <button
             onClick={() => setActiveTab('summary')}
@@ -481,6 +894,21 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           >
             <BarChart2 className="w-4 h-4" />
             <span>Summary</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('agent-performance')}
+            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+              activeTab === 'agent-performance'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                : 'text-slate-300 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4 text-amber-400" />
+            <span>Agent Performance</span>
+            <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
+              {summaryStats.agentSummary.length}
+            </span>
           </button>
 
           <button
@@ -519,8 +947,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             <h1 className="text-lg font-extrabold text-slate-900 capitalize">
               {activeTab === 'users' && 'User Details (Agent Directory)'}
               {activeTab === 'orders' && 'All Orders Database'}
+              {activeTab === 'followup' && 'Followup Status & History'}
               {activeTab === 'summary' && 'Analytics & Summary'}
-              {activeTab === 'profiles' && 'Manager Profile'}
+              {activeTab === 'agent-performance' && 'Agent Performance Report'}
+              {activeTab === 'profiles' && 'Manager Profile & Sheet Integration'}
             </h1>
           </div>
 
@@ -533,12 +963,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-indigo-600' : ''}`} />
               <span>{isRefreshing ? 'Refreshing...' : 'Refresh Sheet'}</span>
             </button>
-            <button
-              onClick={onLogout}
-              className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-xs font-semibold border border-red-200 transition-colors cursor-pointer"
-            >
-              Logout
-            </button>
           </div>
         </header>
 
@@ -549,70 +973,177 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             <div className="space-y-6">
               {/* Add / Edit Agent Card */}
               <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs">
-                <h3 className="font-extrabold text-slate-900 text-base mb-4">
-                  {editingIndex !== null ? 'Edit Agent Profile' : 'Add New Agent'}
-                </h3>
-
-                <form onSubmit={handleSaveAgent} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+                <div className="flex items-center justify-between mb-4">
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                      Agent Username
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={newAgentUser}
-                      onChange={(e) => setNewAgentUser(e.target.value)}
-                      placeholder="e.g. agent01"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
-                    />
+                    <h3 className="font-extrabold text-slate-900 text-base">
+                      {editingIndex !== null ? 'Edit Agent Profile & Permissions' : 'Add New Agent'}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Configure credentials, team, role, and granular action permissions for this Agent ID.
+                    </p>
+                  </div>
+                  {editingIndex !== null && (
+                    <span className="text-xs font-bold px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-200">
+                      Editing: {newAgentUser}
+                    </span>
+                  )}
+                </div>
+
+                <form onSubmit={handleSaveAgent} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                        Agent Username (ID)
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newAgentUser}
+                        onChange={(e) => setNewAgentUser(e.target.value)}
+                        placeholder="e.g. agent01"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                        Agent Full Name
+                      </label>
+                      <input
+                        type="text"
+                        value={newAgentName}
+                        onChange={(e) => setNewAgentName(e.target.value)}
+                        placeholder="Enter agent full name"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                        Password
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newAgentPass}
+                        onChange={(e) => setNewAgentPass(e.target.value)}
+                        placeholder="Enter password"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                        Role
+                      </label>
+                      <select
+                        value={newAgentRole}
+                        onChange={(e) => setNewAgentRole(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white font-medium"
+                      >
+                        <option value="Agent">Agent (Regular)</option>
+                        <option value="Team Leader">Team Leader (Summary Only)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                        Team Assignment
+                      </label>
+                      <select
+                        value={newAgentTeam}
+                        onChange={(e) => setNewAgentTeam(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
+                      >
+                        {ORDER_CHANNELS.map((team) => (
+                          <option key={team} value={team}>
+                            {team}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                      Agent Full Name
-                    </label>
-                    <input
-                      type="text"
-                      value={newAgentName}
-                      onChange={(e) => setNewAgentName(e.target.value)}
-                      placeholder="e.g. Tareq Hasan"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
-                    />
+                  {/* Individual Access & Permissions (Agent ID Wise) */}
+                  <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                        Agent ID-Wise Permissions &amp; Access Controls
+                      </label>
+                      <span className="text-[11px] text-slate-500">
+                        Choose exactly what actions this agent is authorized to perform
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                      <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${newCanCreate ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900' : 'bg-white border-slate-200 text-slate-600'}`}>
+                        <input
+                          type="checkbox"
+                          checked={newCanCreate}
+                          onChange={(e) => setNewCanCreate(e.target.checked)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                        />
+                        <div className="text-xs">
+                          <span className="font-bold block">Order Create</span>
+                          <span className="text-[10px] text-slate-500">Create new orders</span>
+                        </div>
+                      </label>
+
+                      <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${newCanUpdateStatus ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900' : 'bg-white border-slate-200 text-slate-600'}`}>
+                        <input
+                          type="checkbox"
+                          checked={newCanUpdateStatus}
+                          onChange={(e) => setNewCanUpdateStatus(e.target.checked)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                        />
+                        <div className="text-xs">
+                          <span className="font-bold block">Status Update</span>
+                          <span className="text-[10px] text-slate-500">Change follow-up status</span>
+                        </div>
+                      </label>
+
+                      <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${newCanChangeValue ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900' : 'bg-white border-slate-200 text-slate-600'}`}>
+                        <input
+                          type="checkbox"
+                          checked={newCanChangeValue}
+                          onChange={(e) => setNewCanChangeValue(e.target.checked)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                        />
+                        <div className="text-xs">
+                          <span className="font-bold block">Change Value</span>
+                          <span className="text-[10px] text-slate-500">Edit order value (৳)</span>
+                        </div>
+                      </label>
+
+                      <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${newCanAddProfit ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900' : 'bg-white border-slate-200 text-slate-600'}`}>
+                        <input
+                          type="checkbox"
+                          checked={newCanAddProfit}
+                          onChange={(e) => setNewCanAddProfit(e.target.checked)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                        />
+                        <div className="text-xs">
+                          <span className="font-bold block">Add Profit</span>
+                          <span className="text-[10px] text-slate-500">Set profit on delivery</span>
+                        </div>
+                      </label>
+
+                      <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${newCanCancel ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900' : 'bg-white border-slate-200 text-slate-600'}`}>
+                        <input
+                          type="checkbox"
+                          checked={newCanCancel}
+                          onChange={(e) => setNewCanCancel(e.target.checked)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                        />
+                        <div className="text-xs">
+                          <span className="font-bold block">Cancel Order</span>
+                          <span className="text-[10px] text-slate-500">Mark order as cancelled</span>
+                        </div>
+                      </label>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                      Password
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={newAgentPass}
-                      onChange={(e) => setNewAgentPass(e.target.value)}
-                      placeholder="Enter password"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                      Team Assignment
-                    </label>
-                    <select
-                      value={newAgentTeam}
-                      onChange={(e) => setNewAgentTeam(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
-                    >
-                      {ORDER_CHANNELS.map((team) => (
-                        <option key={team} value={team}>
-                          {team}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="sm:col-span-4 flex justify-end gap-2 pt-2">
+                  <div className="flex justify-end gap-2 pt-1">
                     {editingIndex !== null && (
                       <button
                         type="button"
@@ -621,6 +1152,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           setNewAgentUser('');
                           setNewAgentPass('');
                           setNewAgentName('');
+                          setNewAgentTeam('Acquisition');
+                          setNewAgentRole('Agent');
+                          setNewCanCreate(true);
+                          setNewCanUpdateStatus(true);
+                          setNewCanChangeValue(true);
+                          setNewCanAddProfit(true);
+                          setNewCanCancel(true);
                         }}
                         className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
                       >
@@ -632,7 +1170,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       className="py-2.5 px-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>{editingIndex !== null ? 'Update Agent Profile' : 'Add Agent'}</span>
+                      <span>{editingIndex !== null ? 'Update Agent Profile & Permissions' : 'Save & Add Agent'}</span>
                     </button>
                   </div>
                 </form>
@@ -644,7 +1182,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   <div>
                     <h3 className="font-extrabold text-slate-900 text-sm">User Details &amp; Directory</h3>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      Stores all contact info, birthday, blood group, address, and login status updated by agents.
+                      Configure agent permissions, role assignments, passwords, and profile directory.
                     </p>
                   </div>
                   <span className="text-xs font-bold bg-indigo-100 text-indigo-800 px-2.5 py-1 rounded-full">
@@ -659,12 +1197,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <th className="py-3 px-3.5 whitespace-nowrap">Agent ID</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Full Name</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Password</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Role</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Team</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Individual Permissions</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Contact</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Email</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Blood Group</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Birthday</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Address</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Blood</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Status</th>
                         <th className="py-3 px-3.5 whitespace-nowrap text-center">Manager Actions</th>
                       </tr>
@@ -672,6 +1210,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <tbody className="divide-y divide-slate-100 text-slate-800">
                       {agents.map((agent, index) => {
                         const isDeactivated = agent.status === 'deactivated';
+                        const isTL = agent.role === 'Team Leader';
+                        const perms = agent.permissions || {
+                          canCreate: true,
+                          canUpdateStatus: true,
+                          canChangeValue: true,
+                          canAddProfit: true,
+                          canCancel: true
+                        };
 
                         return (
                           <tr key={agent.user} className="hover:bg-slate-50/80 transition-colors">
@@ -687,9 +1233,54 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               </span>
                             </td>
                             <td className="py-3 px-3.5 whitespace-nowrap">
+                              {isTL ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200">
+                                  Team Leader
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                  Agent
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3.5 whitespace-nowrap">
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                                 {agent.team}
                               </span>
+                            </td>
+                            <td className="py-3 px-3.5 whitespace-nowrap">
+                              <div className="flex items-center gap-1">
+                                <span
+                                  title={perms.canCreate ? 'Can Create Orders: YES' : 'Can Create Orders: NO'}
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${perms.canCreate ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-400 line-through'}`}
+                                >
+                                  Create
+                                </span>
+                                <span
+                                  title={perms.canUpdateStatus ? 'Can Update Status: YES' : 'Can Update Status: NO'}
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${perms.canUpdateStatus ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-400 line-through'}`}
+                                >
+                                  Status
+                                </span>
+                                <span
+                                  title={perms.canChangeValue ? 'Can Change Value: YES' : 'Can Change Value: NO'}
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${perms.canChangeValue ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-400 line-through'}`}
+                                >
+                                  Value
+                                </span>
+                                <span
+                                  title={perms.canAddProfit ? 'Can Add Profit: YES' : 'Can Add Profit: NO'}
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${perms.canAddProfit ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-400 line-through'}`}
+                                >
+                                  Profit
+                                </span>
+                                <span
+                                  title={perms.canCancel ? 'Can Cancel Order: YES' : 'Can Cancel Order: NO'}
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${perms.canCancel ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-400 line-through'}`}
+                                >
+                                  Cancel
+                                </span>
+                              </div>
                             </td>
                             <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600">
                               {agent.contact || '-'}
@@ -706,12 +1297,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                 '-'
                               )}
                             </td>
-                            <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600 text-[11px]">
-                              {agent.birthday || '-'}
-                            </td>
-                            <td className="py-3 px-3.5 max-w-[180px] truncate text-slate-500" title={agent.address || ''}>
-                              {agent.address || '-'}
-                            </td>
                             <td className="py-3 px-3.5 whitespace-nowrap">
                               {isDeactivated ? (
                                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-red-800 border border-red-200 flex items-center gap-1 w-fit">
@@ -724,6 +1309,16 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               )}
                             </td>
                             <td className="py-3 px-3.5 whitespace-nowrap text-center space-x-1.5">
+                              {/* Edit Profile & Permissions */}
+                              <button
+                                onClick={() => handleEditAgent(index)}
+                                title="Edit Credentials & Permissions"
+                                className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-md font-semibold text-[11px] cursor-pointer inline-flex items-center gap-1"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                                <span>Edit</span>
+                              </button>
+
                               {/* Activate / Deactivate button */}
                               <button
                                 onClick={() => handleToggleAgentStatus(index)}
@@ -754,15 +1349,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                 className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-semibold text-[11px] cursor-pointer inline-flex items-center gap-1"
                               >
                                 <Eye className="w-3 h-3" />
-                              </button>
-
-                              {/* Edit */}
-                              <button
-                                onClick={() => handleEditAgent(index)}
-                                title="Edit Credentials"
-                                className="px-2 py-1 bg-sky-100 hover:bg-sky-200 text-sky-800 rounded-md font-semibold text-[11px] cursor-pointer inline-flex items-center gap-1"
-                              >
-                                <Edit2 className="w-3 h-3" />
                               </button>
 
                               {/* Delete */}
@@ -1083,57 +1669,21 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               {/* Header Card */}
               <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold text-slate-900">Followup Status &amp; Google Sheet Dual-Sync</h2>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                      Live Dual-Sheet Sync
-                    </span>
-                  </div>
+                  <h2 className="text-lg font-bold text-slate-900">Followup Status &amp; Order Management</h2>
                   <p className="text-xs text-slate-500 mt-1 max-w-2xl">
-                    Followup status updates are directly replaced in <strong>Sheet1</strong> (Column 18) for the selected Order ID, while full historical audit logs are permanently stored in the <strong>Followup</strong> sheet.
+                    Update order status, delivery schedule date &amp; time, order values, and record audit notes directly for customer followups.
                   </p>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => setShowAppsScriptModal(true)}
-                    className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    <Code className="w-3.5 h-3.5" />
-                    <span>View &amp; Copy Apps Script</span>
-                  </button>
                   <button
                     onClick={() => onRefreshOrders()}
                     disabled={isRefreshing}
                     className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
                   >
                     <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    <span>Refresh Sheet Data</span>
+                    <span>Refresh Orders</span>
                   </button>
-                </div>
-              </div>
-
-              {/* Status Summary KPI Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Total Orders</span>
-                  <div className="text-2xl font-extrabold text-slate-900 mt-1">{orders.length}</div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 block">Delivered Orders</span>
-                  <div className="text-2xl font-extrabold text-emerald-600 mt-1">
-                    {orders.filter(o => o.followupStatus?.toLowerCase() === 'delivered').length}
-                  </div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 block">Confirmed Orders</span>
-                  <div className="text-2xl font-extrabold text-blue-600 mt-1">
-                    {orders.filter(o => o.followupStatus?.toLowerCase() === 'confirmed').length}
-                  </div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-purple-600 block">Updates Logged</span>
-                  <div className="text-2xl font-extrabold text-purple-600 mt-1">{followupHistory.length}</div>
                 </div>
               </div>
 
@@ -1144,9 +1694,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     ⚡
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-sm text-white">Order Details &amp; Followup Status Updater</h3>
+                    <h3 className="font-extrabold text-sm text-white">Order Followup Status &amp; Schedule Updater</h3>
                     <p className="text-[11px] text-indigo-200">
-                      Pick any Order ID, update its Followup Status, Order Value, Schedule Date &amp; Time, and sync to Google Sheet &amp; 'Followup' audit log.
+                      Pick any Order ID, update its Followup Status, Order Value, Schedule Date &amp; Time dropdown, and log remarks.
                     </p>
                   </div>
                 </div>
@@ -1274,15 +1824,23 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
                     <div>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1">
-                        Scheduled Time
+                        Scheduled Time (Slot)
                       </label>
-                      <input
-                        type="text"
+                      <select
                         value={quickUpdateScheduledTime}
                         onChange={(e) => setQuickUpdateScheduledTime(e.target.value)}
-                        placeholder="e.g. 14:00 or 02:00 PM"
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-400/30 bg-slate-900 text-white font-medium focus:border-indigo-400 placeholder:text-slate-500"
-                      />
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-400/30 bg-slate-900 text-white font-medium focus:border-indigo-400 cursor-pointer"
+                      >
+                        <option value="">-- Select Time Slot --</option>
+                        {quickUpdateScheduledTime && !TIME_SLOTS.includes(quickUpdateScheduledTime) && (
+                          <option value={quickUpdateScheduledTime}>{quickUpdateScheduledTime}</option>
+                        )}
+                        {TIME_SLOTS.map((slot) => (
+                          <option key={slot} value={slot}>
+                            {slot}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
@@ -1353,6 +1911,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <thead>
                       <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10">
                         <th className="py-3 px-3.5 whitespace-nowrap">Timestamp</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap text-indigo-700">Followup ID</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Order ID</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Customer Name</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Contact</th>
@@ -1362,13 +1921,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <th className="py-3 px-3.5 whitespace-nowrap">Order Value</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Schedule</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Updated By</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap text-purple-700">Action Name</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Remarks / Notes</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-800">
                       {followupHistory.length === 0 ? (
                         <tr>
-                          <td colSpan={11} className="text-center py-10 text-slate-400 font-semibold">
+                          <td colSpan={13} className="text-center py-10 text-slate-400 font-semibold">
                             No followup history records logged yet. Change any order status above to create the first record!
                           </td>
                         </tr>
@@ -1378,9 +1938,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             if (!followupSearch.trim()) return true;
                             const q = followupSearch.toLowerCase();
                             return (
+                              String(h.followupId || '').toLowerCase().includes(q) ||
                               h.orderId.toLowerCase().includes(q) ||
                               (h.customerName || '').toLowerCase().includes(q) ||
                               (h.newStatus || '').toLowerCase().includes(q) ||
+                              (h.action || '').toLowerCase().includes(q) ||
                               (h.notes || '').toLowerCase().includes(q)
                             );
                           })
@@ -1389,7 +1951,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               <td className="py-3 px-3.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">
                                 {hist.timestamp}
                               </td>
-                              <td className="py-3 px-3.5 font-mono font-bold text-indigo-700 whitespace-nowrap">
+                              <td className="py-3 px-3.5 font-mono font-bold text-indigo-800 whitespace-nowrap">
+                                <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-2 py-0.5 rounded-md font-bold text-[11px]">
+                                  #{hist.followupId || hist.id}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">
                                 #{hist.orderId}
                               </td>
                               <td className="py-3 px-3.5 font-medium whitespace-nowrap text-slate-900">
@@ -1429,6 +1996,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-semibold text-indigo-900">
                                 {hist.updatedBy}
+                              </td>
+                              <td className="py-3 px-3.5 whitespace-nowrap">
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                  {hist.action || 'Follow-up Update'}
+                                </span>
                               </td>
                               <td className="py-3 px-3.5 text-slate-600 max-w-[250px] truncate" title={hist.notes}>
                                 {hist.notes || '-'}
@@ -1503,10 +2075,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   <p className="text-3xl font-extrabold text-red-700 mt-2">{summaryStats.cancelledOrdersCount}</p>
                 </div>
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Open Orders</span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Open Orders (Lifetime)</span>
                   <p className="text-3xl font-extrabold text-amber-700 mt-2">{summaryStats.openOrdersCount}</p>
                 </div>
 
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Open Order Value (Lifetime)</span>
+                  <p className="text-2xl font-extrabold text-amber-700 mt-2">৳ {summaryStats.openOrdersValue.toLocaleString()}</p>
+                </div>
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Order Value</span>
                   <p className="text-2xl font-extrabold text-slate-900 mt-2">৳ {summaryStats.totalOrderValue.toLocaleString()}</p>
@@ -1519,11 +2095,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Profit</span>
                   <p className="text-2xl font-extrabold text-emerald-700 mt-2">৳ {summaryStats.totalProfit.toLocaleString()}</p>
                 </div>
+
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Bucket Size</span>
                   <p className="text-2xl font-extrabold text-blue-700 mt-2">৳ {summaryStats.bucketSize.toLocaleString()}</p>
                 </div>
-
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Delivered Ratio</span>
                   <p className="text-2xl font-extrabold text-emerald-600 mt-2">{summaryStats.deliveredRatio}%</p>
@@ -1538,84 +2114,898 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 </div>
               </div>
 
-              {/* 3 Summary Tables (Channel, Category, City) */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Channel Wise */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col">
-                  <h4 className="font-extrabold text-sm text-slate-900 mb-3 flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-indigo-600" />
-                    <span>Channel Wise Summary</span>
-                  </h4>
-                  <div className="overflow-x-auto flex-1 border rounded-xl">
-                    <table className="w-full text-xs">
+              {/* Breakdown Tables Navigation */}
+              <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Breakdown View:</span>
+                  <div className="inline-flex p-1 bg-slate-100 rounded-xl flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setSummaryBreakdownTab('all')}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        summaryBreakdownTab === 'all'
+                          ? 'bg-white text-indigo-700 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      All Breakdowns
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSummaryBreakdownTab('channel')}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        summaryBreakdownTab === 'channel'
+                          ? 'bg-white text-indigo-700 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Channel Wise ({summaryStats.channelSummary.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSummaryBreakdownTab('category')}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        summaryBreakdownTab === 'category'
+                          ? 'bg-white text-indigo-700 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Category Wise ({summaryStats.categorySummary.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSummaryBreakdownTab('city')}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        summaryBreakdownTab === 'city'
+                          ? 'bg-white text-indigo-700 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      City Wise ({summaryStats.citySummary.length})
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Click column header to sort Asc / Desc • Grand Total remains pinned at bottom
+                </p>
+              </div>
+
+              {/* Channel Wise Summary */}
+              {(summaryBreakdownTab === 'all' || summaryBreakdownTab === 'channel') && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                  <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                    <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-indigo-600" />
+                      <span>Channel Wise Summary</span>
+                    </h4>
+                    <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">
+                      {summaryStats.channelSummary.length} Channels
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
                       <thead>
-                        <tr className="bg-slate-100 text-slate-700 font-bold">
-                          <th className="py-2.5 px-3 text-left">Channel</th>
-                          <th className="py-2.5 px-3 text-right">Count</th>
+                        <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 whitespace-nowrap select-none">
+                          <th
+                            onClick={() => handleSortToggle(channelSortKey, channelSortDirection, 'name', setChannelSortKey, setChannelSortDirection)}
+                            className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center gap-1">
+                              <span>Channel</span>
+                              {channelSortKey === 'name' ? (
+                                channelSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(channelSortKey, channelSortDirection, 'createOrders', setChannelSortKey, setChannelSortDirection)}
+                            className="py-3 px-3.5 text-right text-indigo-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Create Orders</span>
+                              {channelSortKey === 'createOrders' ? (
+                                channelSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(channelSortKey, channelSortDirection, 'servedOrders', setChannelSortKey, setChannelSortDirection)}
+                            className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Served Orders</span>
+                              {channelSortKey === 'servedOrders' ? (
+                                channelSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(channelSortKey, channelSortDirection, 'cancelledOrders', setChannelSortKey, setChannelSortDirection)}
+                            className="py-3 px-3.5 text-right text-red-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Cancelled Orders</span>
+                              {channelSortKey === 'cancelledOrders' ? (
+                                channelSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(channelSortKey, channelSortDirection, 'orderValue', setChannelSortKey, setChannelSortDirection)}
+                            className="py-3 px-3.5 text-right cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Order Value</span>
+                              {channelSortKey === 'orderValue' ? (
+                                channelSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(channelSortKey, channelSortDirection, 'deliveredOrderValue', setChannelSortKey, setChannelSortDirection)}
+                            className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Delivered Value</span>
+                              {channelSortKey === 'deliveredOrderValue' ? (
+                                channelSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(channelSortKey, channelSortDirection, 'profit', setChannelSortKey, setChannelSortDirection)}
+                            className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Profit</span>
+                              {channelSortKey === 'profit' ? (
+                                channelSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(channelSortKey, channelSortDirection, 'bucketSize', setChannelSortKey, setChannelSortDirection)}
+                            className="py-3 px-3.5 text-right text-blue-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Bucket Size</span>
+                              {channelSortKey === 'bucketSize' ? (
+                                channelSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(channelSortKey, channelSortDirection, 'deliveredRatio', setChannelSortKey, setChannelSortDirection)}
+                            className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Delivered Ratio</span>
+                              {channelSortKey === 'deliveredRatio' ? (
+                                channelSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(channelSortKey, channelSortDirection, 'cancelledRatio', setChannelSortKey, setChannelSortDirection)}
+                            className="py-3 px-3.5 text-right text-red-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Cancelled Ratio</span>
+                              {channelSortKey === 'cancelledRatio' ? (
+                                channelSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(channelSortKey, channelSortDirection, 'nrRatio', setChannelSortKey, setChannelSortDirection)}
+                            className="py-3 px-3.5 text-right text-purple-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>NR Ratio</span>
+                              {channelSortKey === 'nrRatio' ? (
+                                channelSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {Object.entries(summaryStats.channelMap).map(([k, v]) => (
-                          <tr key={k}>
-                            <td className="py-2 px-3 text-slate-700">{k}</td>
-                            <td className="py-2 px-3 text-right font-bold text-slate-900">{v}</td>
+                      <tbody className="divide-y divide-slate-100 text-slate-800">
+                        {sortedChannelSummary.length === 0 ? (
+                          <tr>
+                            <td colSpan={11} className="text-center py-6 text-slate-400 font-semibold">
+                              No channel data available for the selected date filter.
+                            </td>
                           </tr>
-                        ))}
+                        ) : (
+                          sortedChannelSummary.map((row) => (
+                            <tr key={row.name} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
+                              <td className="py-3 px-3.5 font-bold text-slate-900">{row.name}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-indigo-700">{row.createOrders}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledOrders}</td>
+                              <td className="py-3 px-3.5 text-right font-medium">৳ {row.orderValue.toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">৳ {row.deliveredOrderValue.toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">৳ {row.profit.toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium text-blue-700">৳ {row.bucketSize.toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">{row.deliveredRatio}%</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledRatio}%</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-purple-700">{row.nrRatio}%</td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
+                      {sortedChannelSummary.length > 0 && (
+                        <tfoot className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300">
+                          <tr className="whitespace-nowrap">
+                            <td className="py-3.5 px-3.5 font-black uppercase text-slate-900">Grand Total</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-indigo-700">{summaryStats.channelGrandTotal.createOrders}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.channelGrandTotal.servedOrders}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.channelGrandTotal.cancelledOrders}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black">৳ {summaryStats.channelGrandTotal.orderValue.toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {summaryStats.channelGrandTotal.deliveredOrderValue.toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {summaryStats.channelGrandTotal.profit.toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {summaryStats.channelGrandTotal.bucketSize.toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.channelGrandTotal.deliveredRatio}%</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.channelGrandTotal.cancelledRatio}%</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-purple-700">{summaryStats.channelGrandTotal.nrRatio}%</td>
+                          </tr>
+                        </tfoot>
+                      )}
                     </table>
                   </div>
                 </div>
+              )}
 
-                {/* Category Wise */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col">
-                  <h4 className="font-extrabold text-sm text-slate-900 mb-3 flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-indigo-600" />
-                    <span>Category Wise Summary</span>
-                  </h4>
-                  <div className="overflow-x-auto flex-1 border rounded-xl">
-                    <table className="w-full text-xs">
+              {/* Category Wise Summary */}
+              {(summaryBreakdownTab === 'all' || summaryBreakdownTab === 'category') && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                  <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                    <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-indigo-600" />
+                      <span>Category Wise Summary</span>
+                    </h4>
+                    <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">
+                      {summaryStats.categorySummary.length} Categories
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
                       <thead>
-                        <tr className="bg-slate-100 text-slate-700 font-bold">
-                          <th className="py-2.5 px-3 text-left">Category</th>
-                          <th className="py-2.5 px-3 text-right">Count</th>
+                        <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 whitespace-nowrap select-none">
+                          <th
+                            onClick={() => handleSortToggle(categorySortKey, categorySortDirection, 'name', setCategorySortKey, setCategorySortDirection)}
+                            className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center gap-1">
+                              <span>Category</span>
+                              {categorySortKey === 'name' ? (
+                                categorySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(categorySortKey, categorySortDirection, 'createOrders', setCategorySortKey, setCategorySortDirection)}
+                            className="py-3 px-3.5 text-right text-indigo-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Create Orders</span>
+                              {categorySortKey === 'createOrders' ? (
+                                categorySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(categorySortKey, categorySortDirection, 'servedOrders', setCategorySortKey, setCategorySortDirection)}
+                            className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Served Orders</span>
+                              {categorySortKey === 'servedOrders' ? (
+                                categorySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(categorySortKey, categorySortDirection, 'cancelledOrders', setCategorySortKey, setCategorySortDirection)}
+                            className="py-3 px-3.5 text-right text-red-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Cancelled Orders</span>
+                              {categorySortKey === 'cancelledOrders' ? (
+                                categorySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(categorySortKey, categorySortDirection, 'orderValue', setCategorySortKey, setCategorySortDirection)}
+                            className="py-3 px-3.5 text-right cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Order Value</span>
+                              {categorySortKey === 'orderValue' ? (
+                                categorySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(categorySortKey, categorySortDirection, 'deliveredOrderValue', setCategorySortKey, setCategorySortDirection)}
+                            className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Delivered Value</span>
+                              {categorySortKey === 'deliveredOrderValue' ? (
+                                categorySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(categorySortKey, categorySortDirection, 'profit', setCategorySortKey, setCategorySortDirection)}
+                            className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Profit</span>
+                              {categorySortKey === 'profit' ? (
+                                categorySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(categorySortKey, categorySortDirection, 'bucketSize', setCategorySortKey, setCategorySortDirection)}
+                            className="py-3 px-3.5 text-right text-blue-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Bucket Size</span>
+                              {categorySortKey === 'bucketSize' ? (
+                                categorySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(categorySortKey, categorySortDirection, 'deliveredRatio', setCategorySortKey, setCategorySortDirection)}
+                            className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Delivered Ratio</span>
+                              {categorySortKey === 'deliveredRatio' ? (
+                                categorySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(categorySortKey, categorySortDirection, 'cancelledRatio', setCategorySortKey, setCategorySortDirection)}
+                            className="py-3 px-3.5 text-right text-red-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Cancelled Ratio</span>
+                              {categorySortKey === 'cancelledRatio' ? (
+                                categorySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(categorySortKey, categorySortDirection, 'nrRatio', setCategorySortKey, setCategorySortDirection)}
+                            className="py-3 px-3.5 text-right text-purple-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>NR Ratio</span>
+                              {categorySortKey === 'nrRatio' ? (
+                                categorySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {Object.entries(summaryStats.categoryMap).map(([k, v]) => (
-                          <tr key={k}>
-                            <td className="py-2 px-3 text-slate-700">{k}</td>
-                            <td className="py-2 px-3 text-right font-bold text-slate-900">{v}</td>
+                      <tbody className="divide-y divide-slate-100 text-slate-800">
+                        {sortedCategorySummary.length === 0 ? (
+                          <tr>
+                            <td colSpan={11} className="text-center py-6 text-slate-400 font-semibold">
+                              No category data available for the selected date filter.
+                            </td>
                           </tr>
-                        ))}
+                        ) : (
+                          sortedCategorySummary.map((row) => (
+                            <tr key={row.name} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
+                              <td className="py-3 px-3.5 font-bold text-slate-900">{row.name}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-indigo-700">{row.createOrders}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledOrders}</td>
+                              <td className="py-3 px-3.5 text-right font-medium">৳ {row.orderValue.toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">৳ {row.deliveredOrderValue.toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">৳ {row.profit.toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium text-blue-700">৳ {row.bucketSize.toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">{row.deliveredRatio}%</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledRatio}%</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-purple-700">{row.nrRatio}%</td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
+                      {sortedCategorySummary.length > 0 && (
+                        <tfoot className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300">
+                          <tr className="whitespace-nowrap">
+                            <td className="py-3.5 px-3.5 font-black uppercase text-slate-900">Grand Total</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-indigo-700">{summaryStats.categoryGrandTotal.createOrders}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.categoryGrandTotal.servedOrders}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.categoryGrandTotal.cancelledOrders}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black">৳ {summaryStats.categoryGrandTotal.orderValue.toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {summaryStats.categoryGrandTotal.deliveredOrderValue.toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {summaryStats.categoryGrandTotal.profit.toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {summaryStats.categoryGrandTotal.bucketSize.toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.categoryGrandTotal.deliveredRatio}%</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.categoryGrandTotal.cancelledRatio}%</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-purple-700">{summaryStats.categoryGrandTotal.nrRatio}%</td>
+                          </tr>
+                        </tfoot>
+                      )}
                     </table>
                   </div>
                 </div>
+              )}
 
-                {/* City Wise */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col">
-                  <h4 className="font-extrabold text-sm text-slate-900 mb-3 flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-indigo-600" />
-                    <span>City Wise Summary</span>
-                  </h4>
-                  <div className="overflow-x-auto flex-1 border rounded-xl">
-                    <table className="w-full text-xs">
+              {/* City Wise Summary */}
+              {(summaryBreakdownTab === 'all' || summaryBreakdownTab === 'city') && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                  <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                    <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-indigo-600" />
+                      <span>City Wise Summary</span>
+                    </h4>
+                    <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">
+                      {summaryStats.citySummary.length} Cities
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
                       <thead>
-                        <tr className="bg-slate-100 text-slate-700 font-bold">
-                          <th className="py-2.5 px-3 text-left">City</th>
-                          <th className="py-2.5 px-3 text-right">Count</th>
+                        <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 whitespace-nowrap select-none">
+                          <th
+                            onClick={() => handleSortToggle(citySortKey, citySortDirection, 'name', setCitySortKey, setCitySortDirection)}
+                            className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center gap-1">
+                              <span>City</span>
+                              {citySortKey === 'name' ? (
+                                citySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(citySortKey, citySortDirection, 'createOrders', setCitySortKey, setCitySortDirection)}
+                            className="py-3 px-3.5 text-right text-indigo-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Create Orders</span>
+                              {citySortKey === 'createOrders' ? (
+                                citySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(citySortKey, citySortDirection, 'servedOrders', setCitySortKey, setCitySortDirection)}
+                            className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Served Orders</span>
+                              {citySortKey === 'servedOrders' ? (
+                                citySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(citySortKey, citySortDirection, 'cancelledOrders', setCitySortKey, setCitySortDirection)}
+                            className="py-3 px-3.5 text-right text-red-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Cancelled Orders</span>
+                              {citySortKey === 'cancelledOrders' ? (
+                                citySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(citySortKey, citySortDirection, 'orderValue', setCitySortKey, setCitySortDirection)}
+                            className="py-3 px-3.5 text-right cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Order Value</span>
+                              {citySortKey === 'orderValue' ? (
+                                citySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(citySortKey, citySortDirection, 'deliveredOrderValue', setCitySortKey, setCitySortDirection)}
+                            className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Delivered Value</span>
+                              {citySortKey === 'deliveredOrderValue' ? (
+                                citySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(citySortKey, citySortDirection, 'profit', setCitySortKey, setCitySortDirection)}
+                            className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Profit</span>
+                              {citySortKey === 'profit' ? (
+                                citySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(citySortKey, citySortDirection, 'bucketSize', setCitySortKey, setCitySortDirection)}
+                            className="py-3 px-3.5 text-right text-blue-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Bucket Size</span>
+                              {citySortKey === 'bucketSize' ? (
+                                citySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(citySortKey, citySortDirection, 'deliveredRatio', setCitySortKey, setCitySortDirection)}
+                            className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Delivered Ratio</span>
+                              {citySortKey === 'deliveredRatio' ? (
+                                citySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(citySortKey, citySortDirection, 'cancelledRatio', setCitySortKey, setCitySortDirection)}
+                            className="py-3 px-3.5 text-right text-red-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Cancelled Ratio</span>
+                              {citySortKey === 'cancelledRatio' ? (
+                                citySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(citySortKey, citySortDirection, 'nrRatio', setCitySortKey, setCitySortDirection)}
+                            className="py-3 px-3.5 text-right text-purple-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>NR Ratio</span>
+                              {citySortKey === 'nrRatio' ? (
+                                citySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {Object.entries(summaryStats.cityMap).map(([k, v]) => (
-                          <tr key={k}>
-                            <td className="py-2 px-3 text-slate-700">{k}</td>
-                            <td className="py-2 px-3 text-right font-bold text-slate-900">{v}</td>
+                      <tbody className="divide-y divide-slate-100 text-slate-800">
+                        {sortedCitySummary.length === 0 ? (
+                          <tr>
+                            <td colSpan={11} className="text-center py-6 text-slate-400 font-semibold">
+                              No city data available for the selected date filter.
+                            </td>
                           </tr>
-                        ))}
+                        ) : (
+                          sortedCitySummary.map((row) => (
+                            <tr key={row.name} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
+                              <td className="py-3 px-3.5 font-bold text-slate-900">{row.name}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-indigo-700">{row.createOrders}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledOrders}</td>
+                              <td className="py-3 px-3.5 text-right font-medium">৳ {row.orderValue.toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">৳ {row.deliveredOrderValue.toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">৳ {row.profit.toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium text-blue-700">৳ {row.bucketSize.toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">{row.deliveredRatio}%</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledRatio}%</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-purple-700">{row.nrRatio}%</td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
+                      {sortedCitySummary.length > 0 && (
+                        <tfoot className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300">
+                          <tr className="whitespace-nowrap">
+                            <td className="py-3.5 px-3.5 font-black uppercase text-slate-900">Grand Total</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-indigo-700">{summaryStats.cityGrandTotal.createOrders}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.cityGrandTotal.servedOrders}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.cityGrandTotal.cancelledOrders}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black">৳ {summaryStats.cityGrandTotal.orderValue.toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {summaryStats.cityGrandTotal.deliveredOrderValue.toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {summaryStats.cityGrandTotal.profit.toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {summaryStats.cityGrandTotal.bucketSize.toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.cityGrandTotal.deliveredRatio}%</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.cityGrandTotal.cancelledRatio}%</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-purple-700">{summaryStats.cityGrandTotal.nrRatio}%</td>
+                          </tr>
+                        </tfoot>
+                      )}
                     </table>
                   </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: AGENT PERFORMANCE REPORT */}
+          {activeTab === 'agent-performance' && (
+            <div className="space-y-6">
+              {/* Header & Date Filter Bar */}
+              <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-indigo-600" />
+                    <span>Agent Performance Report</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Agent-wise operational analysis: orders created, served/delivered, cancellations, revenue, and profit.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+                    <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                    <select
+                      value={summaryDateFilter}
+                      onChange={(e) => setSummaryDateFilter(e.target.value as DateFilterType)}
+                      className="text-xs bg-transparent font-bold text-slate-700 focus:outline-hidden cursor-pointer"
+                    >
+                      <option value="all">All Time</option>
+                      <option value="today">Today</option>
+                      <option value="yesterday">Yesterday</option>
+                      <option value="last7">Last 7 Days</option>
+                      <option value="last30">Last 30 Days</option>
+                      <option value="thisMonth">This Month</option>
+                      <option value="lastMonth">Last Month</option>
+                      <option value="lastYear">Last Year</option>
+                      <option value="custom">Custom Range</option>
+                    </select>
+                  </div>
+                  {summaryDateFilter === 'custom' && (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="date"
+                        value={summaryStartDate}
+                        onChange={(e) => setSummaryStartDate(e.target.value)}
+                        className="text-xs p-1.5 border rounded-lg bg-white"
+                      />
+                      <span className="text-xs text-slate-400">to</span>
+                      <input
+                        type="date"
+                        value={summaryEndDate}
+                        onChange={(e) => setSummaryEndDate(e.target.value)}
+                        className="text-xs p-1.5 border rounded-lg bg-white"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* KPI Summary Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Agents</span>
+                  <p className="text-2xl font-black text-slate-900 mt-1">{filteredAgentPerformance.length}</p>
+                  <span className="text-[10px] text-slate-500 font-medium">Filtered Directory</span>
+                </div>
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Created / Assigned</span>
+                  <p className="text-2xl font-black text-indigo-700 mt-1">{filteredAgentGrandTotal.createOrders}</p>
+                  <span className="text-[10px] text-indigo-600 font-medium">৳ {filteredAgentGrandTotal.orderValue.toLocaleString()} value</span>
+                </div>
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Delivered Orders</span>
+                  <p className="text-2xl font-black text-emerald-700 mt-1">{filteredAgentGrandTotal.servedOrders}</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">৳ {filteredAgentGrandTotal.deliveredOrderValue.toLocaleString()} delivered</span>
+                </div>
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Profit</span>
+                  <p className="text-2xl font-black text-emerald-600 mt-1">৳ {filteredAgentGrandTotal.profit.toLocaleString()}</p>
+                  <span className="text-[10px] text-emerald-600 font-medium">NR Ratio: {filteredAgentGrandTotal.nrRatio}%</span>
+                </div>
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs col-span-2 lg:col-span-1">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Delivery Success</span>
+                  <p className="text-2xl font-black text-purple-700 mt-1">{filteredAgentGrandTotal.deliveredRatio}%</p>
+                  <span className="text-[10px] text-red-500 font-medium">Cancel: {filteredAgentGrandTotal.cancelledRatio}%</span>
+                </div>
+              </div>
+
+              {/* Search & Team Filter Bar */}
+              <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="relative flex-1 w-full sm:w-auto">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={agentPerformanceSearch}
+                    onChange={(e) => setAgentPerformanceSearch(e.target.value)}
+                    placeholder="Search by Agent ID or Full Name..."
+                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-hidden focus:border-indigo-600 focus:bg-white"
+                  />
+                </div>
+                <div className="w-full sm:w-auto flex items-center gap-2">
+                  <select
+                    value={agentPerformanceTeamFilter}
+                    onChange={(e) => setAgentPerformanceTeamFilter(e.target.value)}
+                    className="px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white font-semibold text-slate-700 focus:outline-hidden w-full sm:w-auto cursor-pointer"
+                  >
+                    <option value="all">All Teams</option>
+                    {ORDER_CHANNELS.map((ch) => (
+                      <option key={ch} value={ch}>{ch}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Performance Table */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                  <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                    <Award className="w-4 h-4 text-amber-500" />
+                    <span>Agent Performance Breakdown</span>
+                  </h4>
+                  <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2.5 py-0.5 rounded-full">
+                    {filteredAgentPerformance.length} Results
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 whitespace-nowrap">
+                        <th className="py-3 px-3.5">Agent Details</th>
+                        <th className="py-3 px-3.5">Team</th>
+                        <th className="py-3 px-3.5">Role</th>
+                        <th className="py-3 px-3.5 text-right text-indigo-700">Create Orders</th>
+                        <th className="py-3 px-3.5 text-right text-emerald-700">Served Orders</th>
+                        <th className="py-3 px-3.5 text-right text-red-700">Cancelled Orders</th>
+                        <th className="py-3 px-3.5 text-right text-amber-700">Pending Orders</th>
+                        <th className="py-3 px-3.5 text-right">Order Value</th>
+                        <th className="py-3 px-3.5 text-right text-emerald-700">Delivered Value</th>
+                        <th className="py-3 px-3.5 text-right text-emerald-700">Profit</th>
+                        <th className="py-3 px-3.5 text-right text-blue-700">Bucket Size</th>
+                        <th className="py-3 px-3.5 text-right text-emerald-700">Delivered Ratio</th>
+                        <th className="py-3 px-3.5 text-right text-red-700">Cancelled Ratio</th>
+                        <th className="py-3 px-3.5 text-right text-purple-700">NR Ratio</th>
+                        <th className="py-3 px-3.5 text-center">Follow-ups</th>
+                        <th className="py-3 px-3.5 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-800">
+                      {filteredAgentPerformance.length === 0 ? (
+                        <tr>
+                          <td colSpan={16} className="text-center py-6 text-slate-400 font-semibold">
+                            No agent found matching the filters.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredAgentPerformance.map((row) => (
+                          <tr key={row.id} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
+                            <td className="py-3 px-3.5 font-bold text-slate-900">
+                              <div>{row.name}</div>
+                              <div className="text-[10px] text-slate-500 font-mono">@{row.id}</div>
+                            </td>
+                            <td className="py-3 px-3.5">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                                {row.team}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3.5">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${row.role === 'Team Leader' ? 'bg-purple-100 text-purple-800' : 'bg-blue-50 text-blue-700'}`}>
+                                {row.role}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3.5 text-right font-bold text-indigo-700">{row.createOrders}</td>
+                            <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
+                            <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledOrders}</td>
+                            <td className="py-3 px-3.5 text-right font-medium text-amber-600">{row.pendingOrders}</td>
+                            <td className="py-3 px-3.5 text-right font-medium">৳ {row.orderValue.toLocaleString()}</td>
+                            <td className="py-3 px-3.5 text-right font-bold text-emerald-700">৳ {row.deliveredOrderValue.toLocaleString()}</td>
+                            <td className="py-3 px-3.5 text-right font-bold text-emerald-600">৳ {row.profit.toLocaleString()}</td>
+                            <td className="py-3 px-3.5 text-right font-medium text-blue-700">৳ {row.bucketSize.toLocaleString()}</td>
+                            <td className="py-3 px-3.5 text-right font-bold text-emerald-600">{row.deliveredRatio}%</td>
+                            <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledRatio}%</td>
+                            <td className="py-3 px-3.5 text-right font-bold text-purple-700">{row.nrRatio}%</td>
+                            <td className="py-3 px-3.5 text-center font-bold text-slate-700">{row.followupCount}</td>
+                            <td className="py-3 px-3.5 text-center">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${row.status === 'deactivated' ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                {row.status === 'deactivated' ? 'Locked' : 'Active'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    {filteredAgentPerformance.length > 0 && (
+                      <tfoot className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300">
+                        <tr className="whitespace-nowrap">
+                          <td className="py-3.5 px-3.5 font-black uppercase text-slate-900">Grand Total</td>
+                          <td className="py-3.5 px-3.5 font-bold text-slate-500">-</td>
+                          <td className="py-3.5 px-3.5 font-bold text-slate-500">-</td>
+                          <td className="py-3.5 px-3.5 text-right font-black text-indigo-700">{filteredAgentGrandTotal.createOrders}</td>
+                          <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{filteredAgentGrandTotal.servedOrders}</td>
+                          <td className="py-3.5 px-3.5 text-right font-black text-red-700">{filteredAgentGrandTotal.cancelledOrders}</td>
+                          <td className="py-3.5 px-3.5 text-right font-black text-amber-700">{filteredAgentGrandTotal.pendingOrders}</td>
+                          <td className="py-3.5 px-3.5 text-right font-black">৳ {filteredAgentGrandTotal.orderValue.toLocaleString()}</td>
+                          <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {filteredAgentGrandTotal.deliveredOrderValue.toLocaleString()}</td>
+                          <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {filteredAgentGrandTotal.profit.toLocaleString()}</td>
+                          <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {filteredAgentGrandTotal.bucketSize.toLocaleString()}</td>
+                          <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{filteredAgentGrandTotal.deliveredRatio}%</td>
+                          <td className="py-3.5 px-3.5 text-right font-black text-red-700">{filteredAgentGrandTotal.cancelledRatio}%</td>
+                          <td className="py-3.5 px-3.5 text-right font-black text-purple-700">{filteredAgentGrandTotal.nrRatio}%</td>
+                          <td className="py-3.5 px-3.5 text-center font-black text-slate-900">{filteredAgentGrandTotal.followupCount}</td>
+                          <td className="py-3.5 px-3.5 text-center font-bold text-slate-500">-</td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
                 </div>
               </div>
             </div>
@@ -1623,32 +3013,166 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
           {/* TAB: PROFILES */}
           {activeTab === 'profiles' && (
-            <div className="max-w-3xl space-y-6">
+            <div className="max-w-4xl space-y-6">
+              {/* Account Details */}
               <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs">
                 <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
-                  <h3 className="font-extrabold text-slate-900 text-base">Account Details</h3>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center font-bold text-indigo-700">
+                      <User className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-slate-900 text-base">Manager Profile &amp; Account</h3>
+                      <p className="text-xs text-slate-400">Authenticated administrative session credentials</p>
+                    </div>
+                  </div>
                   <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Active
+                    Active Session
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                     <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">
                       Username
                     </p>
-                    <p className="text-xl font-extrabold text-slate-900">
+                    <p className="text-lg font-extrabold text-slate-900 font-mono">
                       {currentManager.user}
                     </p>
                   </div>
-                  <div>
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                     <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">
-                      Role
+                      Role &amp; Privilege
                     </p>
-                    <p className="text-xl font-extrabold text-indigo-700">
+                    <p className="text-lg font-extrabold text-indigo-700">
                       {currentManager.role}
                     </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Google Sheet & Apps Script JavaScript Integration Card */}
+              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center font-bold text-purple-700">
+                      <Code className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-slate-900 text-base">Google Sheets &amp; Apps Script Integration</h3>
+                      <p className="text-xs text-slate-500">Live dual-sheet synchronization: 'Orders' database &amp; 'Followup' audit trail</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(OrderService.getUpdatedAppsScriptCode());
+                        setCopiedScript(true);
+                        setTimeout(() => setCopiedScript(false), 2500);
+                      }}
+                      className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                    >
+                      {copiedScript ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-300" />
+                          <span>Copied Code!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy Apps Script (Code.gs)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Web App URL Configuration */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Google Apps Script Web App Deployment URL
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="url"
+                      value={profileScriptUrl}
+                      onChange={(e) => setProfileScriptUrl(e.target.value)}
+                      placeholder="https://script.google.com/macros/s/.../exec"
+                      className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-medium focus:border-indigo-600 focus:outline-hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        OrderService.setScriptUrl(profileScriptUrl);
+                        setScriptUrlSaved(true);
+                        setTimeout(() => setScriptUrlSaved(false), 3000);
+                        onRefreshOrders();
+                      }}
+                      className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+                    >
+                      {scriptUrlSaved ? (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Saved &amp; Synced!</span>
+                        </>
+                      ) : (
+                        <>
+                          <RotateCw className="w-3.5 h-3.5" />
+                          <span>Save &amp; Test Sync</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Ensure the Web App execution permission is set to <strong>"Execute as: Me"</strong> and <strong>"Who has access: Anyone"</strong>.
+                  </p>
+                </div>
+
+                {/* Google Sheet Schema & Instructions */}
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-700 space-y-2.5">
+                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <span>📋 Google Sheet Dual-Sheet Structure:</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+                    <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1">
+                      <span className="font-bold text-indigo-700 block">1. Sheet: 'Orders' (or Sheet1)</span>
+                      <p className="text-slate-600">
+                        Primary order registry. Contains: Order ID, Customer Name, Contact, Channel, Agent, Category, Value, Schedule Date, Scheduled Time, Status, Followup Status, Profit, Delivered Date, Cancelled Date.
+                      </p>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1">
+                      <span className="font-bold text-purple-700 block">2. Sheet: 'Followup'</span>
+                      <p className="text-slate-600">
+                        Full historical audit log. Headers: <strong>Log Timestamp</strong>, <strong>Followup ID</strong>, <strong>Order ID</strong>, Customer Name, Contact, Previous Status, New Status, Order Status, Order Value, Schedule, Updated By, <strong>Action Name</strong>, Notes.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Apps Script JavaScript Viewer */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>Google Apps Script Source Code (Code.gs)</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(OrderService.getUpdatedAppsScriptCode());
+                        setCopiedScript(true);
+                        setTimeout(() => setCopiedScript(false), 2500);
+                      }}
+                      className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>{copiedScript ? 'Copied to Clipboard' : 'Copy Full Script'}</span>
+                    </button>
+                  </div>
+                  <div className="bg-slate-950 text-slate-200 rounded-xl p-4 font-mono text-[11px] max-h-80 overflow-y-auto leading-relaxed border border-slate-800">
+                    <pre>{OrderService.getUpdatedAppsScriptCode()}</pre>
                   </div>
                 </div>
               </div>
@@ -1746,15 +3270,23 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Scheduled Time
+                    Scheduled Time (Slot)
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={modalScheduledTime}
                     onChange={(e) => setModalScheduledTime(e.target.value)}
-                    placeholder="e.g. 14:00 or 02:00 PM"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-medium focus:outline-hidden focus:border-indigo-600"
-                  />
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-medium focus:outline-hidden focus:border-indigo-600 bg-white cursor-pointer"
+                  >
+                    <option value="">-- Select Time Slot --</option>
+                    {modalScheduledTime && !TIME_SLOTS.includes(modalScheduledTime) && (
+                      <option value={modalScheduledTime}>{modalScheduledTime}</option>
+                    )}
+                    {TIME_SLOTS.map((slot) => (
+                      <option key={slot} value={slot}>
+                        {slot}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -1979,6 +3511,32 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 <span className="font-mono text-slate-700">{selectedAgentDetails.birthday || 'Not set'}</span>
               </div>
               <div className="bg-slate-50 p-2.5 rounded-xl col-span-2">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                  Role &amp; Authorized Permissions
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${selectedAgentDetails.role === 'Team Leader' ? 'bg-purple-100 text-purple-800 border border-purple-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`}>
+                    {selectedAgentDetails.role || 'Agent'}
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${selectedAgentDetails.permissions?.canCreate ?? true ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-400 line-through'}`}>
+                    Create
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${selectedAgentDetails.permissions?.canUpdateStatus ?? true ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-400 line-through'}`}>
+                    Status
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${selectedAgentDetails.permissions?.canChangeValue ?? true ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-400 line-through'}`}>
+                    Value
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${selectedAgentDetails.permissions?.canAddProfit ?? true ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-400 line-through'}`}>
+                    Profit
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${selectedAgentDetails.permissions?.canCancel ?? true ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-400 line-through'}`}>
+                    Cancel
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-2.5 rounded-xl col-span-2">
                 <span className="text-[10px] uppercase font-bold text-slate-400 block flex items-center gap-1">
                   <MapPin className="w-3 h-3" /> Residential Address
                 </span>
@@ -1991,27 +3549,293 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     {selectedAgentDetails.status === 'deactivated' ? 'Deactivated (Locked)' : 'Active (Normal)'}
                   </span>
                 </div>
-                <button
-                  onClick={() => {
-                    const idx = agents.findIndex(a => a.user === selectedAgentDetails.user);
-                    if (idx !== -1) {
-                      handleToggleAgentStatus(idx);
-                      setSelectedAgentDetails(prev => prev ? {
-                        ...prev,
-                        status: prev.status === 'deactivated' ? 'active' : 'deactivated'
-                      } : null);
-                    }
-                  }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                    selectedAgentDetails.status === 'deactivated'
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                      : 'bg-amber-100 hover:bg-amber-200 text-amber-900'
-                  }`}
-                >
-                  {selectedAgentDetails.status === 'deactivated' ? 'Activate Account' : 'Deactivate'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const idx = agents.findIndex(a => a.user === selectedAgentDetails.user);
+                      if (idx !== -1) {
+                        setSelectedAgentDetails(null);
+                        handleEditAgent(idx);
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 cursor-pointer transition-all flex items-center gap-1"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                    <span>Edit Permissions</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      const idx = agents.findIndex(a => a.user === selectedAgentDetails.user);
+                      if (idx !== -1) {
+                        handleToggleAgentStatus(idx);
+                        setSelectedAgentDetails(prev => prev ? {
+                          ...prev,
+                          status: prev.status === 'deactivated' ? 'active' : 'deactivated'
+                        } : null);
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+                      selectedAgentDetails.status === 'deactivated'
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        : 'bg-amber-100 hover:bg-amber-200 text-amber-900'
+                    }`}
+                  >
+                    {selectedAgentDetails.status === 'deactivated' ? 'Activate' : 'Deactivate'}
+                  </button>
+                </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Agent Profile & Permissions Popup */}
+      {editingAgentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-100 overflow-hidden animate-fadeIn my-6">
+            <div className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-white">
+                  <Edit2 className="w-5 h-5 text-indigo-300" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-white text-base">
+                    Edit Agent Profile &amp; Permissions
+                  </h3>
+                  <p className="text-xs text-indigo-200">
+                    Modifying configuration for <span className="font-bold text-white">@{editingAgentModal.user}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingAgentModal(null);
+                  setEditModalIndex(null);
+                }}
+                className="p-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedAgentModal} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Agent Username (ID)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editUser}
+                    onChange={(e) => setEditUser(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-bold bg-slate-50 focus:bg-white focus:outline-hidden focus:border-indigo-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Agent Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Full name"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-hidden focus:border-indigo-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Password
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editPass}
+                    onChange={(e) => setEditPass(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-bold focus:outline-hidden focus:border-indigo-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Role
+                  </label>
+                  <select
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:outline-hidden focus:border-indigo-600 bg-white"
+                  >
+                    <option value="Agent">Agent (Regular)</option>
+                    <option value="Team Leader">Team Leader (Summary Only)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Team Assignment
+                  </label>
+                  <select
+                    value={editTeam}
+                    onChange={(e) => setEditTeam(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-hidden focus:border-indigo-600 bg-white"
+                  >
+                    {ORDER_CHANNELS.map((team) => (
+                      <option key={team} value={team}>
+                        {team}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Account Status
+                  </label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as 'active' | 'deactivated')}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:outline-hidden focus:border-indigo-600 bg-white"
+                  >
+                    <option value="active">Active (Normal Access)</option>
+                    <option value="deactivated">Deactivated (Locked)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Contact Phone
+                  </label>
+                  <input
+                    type="text"
+                    value={editContact}
+                    onChange={(e) => setEditContact(e.target.value)}
+                    placeholder="e.g. 01700000000"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    placeholder="agent@example.com"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Blood Group
+                  </label>
+                  <select
+                    value={editBloodGroup}
+                    onChange={(e) => setEditBloodGroup(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:outline-hidden focus:border-indigo-600 bg-white"
+                  >
+                    <option value="">Select blood group</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Granular Access Controls */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-800 block mb-1">
+                  Individual Action Permissions
+                </span>
+                <p className="text-[11px] text-slate-500 mb-3">
+                  Specify what operations this agent is permitted to perform in their portal.
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${editCanCreate ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900 font-bold' : 'bg-white border-slate-200 text-slate-600'}`}>
+                    <input
+                      type="checkbox"
+                      checked={editCanCreate}
+                      onChange={(e) => setEditCanCreate(e.target.checked)}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                    />
+                    <span className="text-xs">Create Order</span>
+                  </label>
+
+                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${editCanUpdateStatus ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900 font-bold' : 'bg-white border-slate-200 text-slate-600'}`}>
+                    <input
+                      type="checkbox"
+                      checked={editCanUpdateStatus}
+                      onChange={(e) => setEditCanUpdateStatus(e.target.checked)}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                    />
+                    <span className="text-xs">Update Status</span>
+                  </label>
+
+                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${editCanChangeValue ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900 font-bold' : 'bg-white border-slate-200 text-slate-600'}`}>
+                    <input
+                      type="checkbox"
+                      checked={editCanChangeValue}
+                      onChange={(e) => setEditCanChangeValue(e.target.checked)}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                    />
+                    <span className="text-xs">Change Value</span>
+                  </label>
+
+                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${editCanAddProfit ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900 font-bold' : 'bg-white border-slate-200 text-slate-600'}`}>
+                    <input
+                      type="checkbox"
+                      checked={editCanAddProfit}
+                      onChange={(e) => setEditCanAddProfit(e.target.checked)}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                    />
+                    <span className="text-xs">Add Profit</span>
+                  </label>
+
+                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${editCanCancel ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900 font-bold' : 'bg-white border-slate-200 text-slate-600'}`}>
+                    <input
+                      type="checkbox"
+                      checked={editCanCancel}
+                      onChange={(e) => setEditCanCancel(e.target.checked)}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                    />
+                    <span className="text-xs">Cancel Order</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingAgentModal(null);
+                    setEditModalIndex(null);
+                  }}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Save Agent Changes</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
