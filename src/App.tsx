@@ -65,6 +65,16 @@ export default function App() {
     }
   }, [currentSession]);
 
+  // Auto-refresh orders every 30 seconds when agent session is active (My Orders & Performance tabs)
+  useEffect(() => {
+    if (currentSession?.role === 'agent') {
+      const interval = setInterval(() => {
+        loadOrdersData(false);
+      }, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [currentSession]);
+
   const loadOrdersData = async (forceRefresh = false) => {
     setIsRefreshing(true);
     try {
@@ -294,6 +304,7 @@ export default function App() {
                 <DashboardView
                   currentAgent={currentSession.agent}
                   orders={orders}
+                  followupHistory={followupHistory}
                   onRefresh={() => loadOrdersData(true)}
                   isRefreshing={isRefreshing}
                 />

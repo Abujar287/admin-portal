@@ -40,6 +40,8 @@ export interface OrderItem {
   orderStatus: 'Pending' | 'Delivered' | 'In Progress' | 'Cancelled' | string;
   followupStatus: 'Pending' | 'Delivered' | 'Confirmed' | 'Follow-up' | 'Rescheduled' | string;
   profit: number;
+  deliveredDate?: string;
+  cancelledDate?: string;
 }
 
 export type DateFilterType = '' | 'all' | 'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'lastYear' | 'custom';

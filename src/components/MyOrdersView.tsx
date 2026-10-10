@@ -216,13 +216,15 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Order Status</th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Folllowup Status</th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Profit</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Delivered Date</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Cancelled Date</th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-800">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={20} className="text-center py-12 text-slate-400">
+                  <td colSpan={22} className="text-center py-12 text-slate-400">
                     <p className="font-semibold text-sm text-slate-600">No orders found</p>
                     <p className="text-xs mt-1">Use the Create Order button above to book your first order.</p>
                   </td>
@@ -303,6 +305,12 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-bold text-emerald-600">
                         ৳ {ord.profit.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-emerald-700 font-medium">
+                        {ord.deliveredDate ? OrderService.formatDateTime(ord.deliveredDate) : '-'}
+                      </td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-red-700 font-medium">
+                        {ord.cancelledDate ? OrderService.formatDateTime(ord.cancelledDate) : '-'}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-center">
                         <button

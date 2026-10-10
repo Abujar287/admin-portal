@@ -65,8 +65,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   // Status & Details Modal State
   const [statusModalOrder, setStatusModalOrder] = useState<OrderItem | null>(null);
   const [modalFollowupStatus, setModalFollowupStatus] = useState<string>('Delivered');
-  const [modalOrderStatus, setModalOrderStatus] = useState<string>('Delivered');
   const [modalOrderValue, setModalOrderValue] = useState<string>('');
+  const [modalProfit, setModalProfit] = useState<string>('');
   const [modalScheduleDate, setModalScheduleDate] = useState<string>('');
   const [modalScheduledTime, setModalScheduledTime] = useState<string>('');
   const [modalNotes, setModalNotes] = useState<string>('');
@@ -77,8 +77,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   // Followup Tab State
   const [quickUpdateOrderId, setQuickUpdateOrderId] = useState<string>('');
   const [quickUpdateStatus, setQuickUpdateStatus] = useState<string>('Delivered');
-  const [quickUpdateOrderStatus, setQuickUpdateOrderStatus] = useState<string>('Delivered');
   const [quickUpdateOrderValue, setQuickUpdateOrderValue] = useState<string>('');
+  const [quickUpdateProfit, setQuickUpdateProfit] = useState<string>('');
   const [quickUpdateScheduleDate, setQuickUpdateScheduleDate] = useState<string>('');
   const [quickUpdateScheduledTime, setQuickUpdateScheduledTime] = useState<string>('');
   const [quickUpdateNotes, setQuickUpdateNotes] = useState<string>('');
@@ -87,8 +87,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const handleOpenOrderModal = (ord: OrderItem) => {
     setStatusModalOrder(ord);
     setModalFollowupStatus(ord.followupStatus || 'Pending');
-    setModalOrderStatus(ord.orderStatus || 'Pending');
     setModalOrderValue(String(ord.orderValue ?? ''));
+    setModalProfit(String(ord.profit ?? ''));
     setModalScheduleDate(ord.scheduleDate || '');
     setModalScheduledTime(ord.scheduledTime || '');
     setModalNotes('');
@@ -122,6 +122,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [summaryScheduleFilter, setSummaryScheduleFilter] = useState<DateFilterType>('all');
   const [summaryScheduleStart, setSummaryScheduleStart] = useState('');
   const [summaryScheduleEnd, setSummaryScheduleEnd] = useState('');
+
+  const [summaryDeliveredFilter, setSummaryDeliveredFilter] = useState<DateFilterType>('all');
+  const [summaryDeliveredStart, setSummaryDeliveredStart] = useState('');
+  const [summaryDeliveredEnd, setSummaryDeliveredEnd] = useState('');
+
+  const [summaryCancelledFilter, setSummaryCancelledFilter] = useState<DateFilterType>('all');
+  const [summaryCancelledStart, setSummaryCancelledStart] = useState('');
+  const [summaryCancelledEnd, setSummaryCancelledEnd] = useState('');
 
   // Helper date matcher
   const matchDate = (
@@ -304,6 +312,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       if (!matchDate(r.scheduleDate, summaryScheduleFilter, summaryScheduleStart, summaryScheduleEnd)) {
         return false;
       }
+      if (!matchDate(r.deliveredDate || '', summaryDeliveredFilter, summaryDeliveredStart, summaryDeliveredEnd)) {
+        return false;
+      }
+      if (!matchDate(r.cancelledDate || '', summaryCancelledFilter, summaryCancelledStart, summaryCancelledEnd)) {
+        return false;
+      }
       return true;
     });
   }, [
@@ -313,7 +327,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     summaryCreateEnd,
     summaryScheduleFilter,
     summaryScheduleStart,
-    summaryScheduleEnd
+    summaryScheduleEnd,
+    summaryDeliveredFilter,
+    summaryDeliveredStart,
+    summaryDeliveredEnd,
+    summaryCancelledFilter,
+    summaryCancelledStart,
+    summaryCancelledEnd
   ]);
 
   const summaryBreakdowns = useMemo(() => {
@@ -865,12 +885,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <th className="py-3.5 px-3.5 whitespace-nowrap">Order Status</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">Folllowup Status</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">Profit</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap">Delivered Date</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap">Cancelled Date</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-800">
                       {filteredOrders.length === 0 ? (
                         <tr>
-                          <td colSpan={19} className="text-center py-12 text-slate-400 font-semibold">
+                          <td colSpan={21} className="text-center py-12 text-slate-400 font-semibold">
                             No orders found matching filters.
                           </td>
                         </tr>
@@ -983,6 +1005,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               <td className="py-3 px-3.5 whitespace-nowrap font-bold text-emerald-600">
                                 ৳ {ord.profit.toLocaleString()}
                               </td>
+                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-emerald-700 font-medium">
+                                {ord.deliveredDate ? OrderService.formatDateTime(ord.deliveredDate) : '-'}
+                              </td>
+                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-red-700 font-medium">
+                                {ord.cancelledDate ? OrderService.formatDateTime(ord.cancelledDate) : '-'}
+                              </td>
                             </tr>
                           );
                         })
@@ -1078,8 +1106,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         quickUpdateOrderId,
                         {
                           followupStatus: quickUpdateStatus,
-                          orderStatus: quickUpdateStatus === 'Delivered' ? 'Delivered' : quickUpdateOrderStatus,
                           orderValue: quickUpdateOrderValue !== '' ? parseFloat(quickUpdateOrderValue) : undefined,
+                          profit: quickUpdateProfit !== '' ? parseFloat(quickUpdateProfit) : undefined,
                           scheduleDate: quickUpdateScheduleDate,
                           scheduledTime: quickUpdateScheduledTime
                         },
@@ -1106,8 +1134,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           const ord = orders.find((o) => String(o.id) === String(chosenId));
                           if (ord) {
                             setQuickUpdateStatus(ord.followupStatus || 'Pending');
-                            setQuickUpdateOrderStatus(ord.orderStatus || 'Pending');
                             setQuickUpdateOrderValue(String(ord.orderValue ?? ''));
+                            setQuickUpdateProfit(String(ord.profit ?? ''));
                             setQuickUpdateScheduleDate(ord.scheduleDate || '');
                             setQuickUpdateScheduledTime(ord.scheduledTime || '');
                           }
@@ -1125,14 +1153,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     </div>
 
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-[11px] font-bold uppercase tracking-wider text-indigo-200">
-                          Order Value (৳)
-                        </label>
-                        <span className="text-[10px] text-emerald-300 font-bold">
-                          Profit: ৳ {((parseFloat(quickUpdateOrderValue) || 0) * 0.20).toLocaleString()}
-                        </span>
-                      </div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1">
+                        Order Value (৳)
+                      </label>
                       <input
                         type="number"
                         min="0"
@@ -1146,6 +1169,21 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
                     <div>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1">
+                        Profit Amount (৳)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={quickUpdateProfit}
+                        onChange={(e) => setQuickUpdateProfit(e.target.value)}
+                        placeholder="e.g. 300 (0 if cancelled)"
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-400/30 bg-slate-900 text-emerald-400 font-bold focus:border-indigo-400"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1">
                         Followup Status
                       </label>
                       <select
@@ -1153,15 +1191,17 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         onChange={(e) => {
                           const s = e.target.value;
                           setQuickUpdateStatus(s);
-                          if (s === 'Delivered') setQuickUpdateOrderStatus('Delivered');
+                          if (s.toLowerCase() === 'cancelled') {
+                            setQuickUpdateProfit('0');
+                          }
                         }}
                         className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-400/30 bg-slate-900 text-white font-medium focus:border-indigo-400"
                       >
                         <option value="Pending">Pending</option>
                         <option value="Confirmed">Confirmed</option>
                         <option value="Follow-up">Follow-up</option>
-                        <option value="Delivered">Delivered (Auto marks Order Delivered)</option>
-                        <option value="Cancelled">Cancelled</option>
+                        <option value="Delivered">Delivered</option>
+                        <option value="Cancelled">Cancelled (Profit auto 0)</option>
                       </select>
                     </div>
 
@@ -1188,23 +1228,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         placeholder="e.g. 14:00 or 02:00 PM"
                         className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-400/30 bg-slate-900 text-white font-medium focus:border-indigo-400 placeholder:text-slate-500"
                       />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1">
-                        Order Status
-                      </label>
-                      <select
-                        value={quickUpdateOrderStatus}
-                        onChange={(e) => setQuickUpdateOrderStatus(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-400/30 bg-slate-900 text-white font-medium focus:border-indigo-400"
-                      >
-                        <option value="Pending">Pending</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Confirmed">Confirmed</option>
-                        <option value="Delivered">Delivered</option>
-                        <option value="Cancelled">Cancelled</option>
-                      </select>
                     </div>
                   </div>
 
@@ -1447,6 +1470,82 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       </div>
                     )}
                   </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      Delivered Date
+                    </label>
+                    <select
+                      value={summaryDeliveredFilter}
+                      onChange={(e) => setSummaryDeliveredFilter(e.target.value as DateFilterType)}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
+                    >
+                      <option value="all">All Time</option>
+                      <option value="today">Today</option>
+                      <option value="yesterday">Yesterday</option>
+                      <option value="last7">Last 7 Days</option>
+                      <option value="last30">Last 30 Days</option>
+                      <option value="thisMonth">This Month</option>
+                      <option value="lastMonth">Last Month</option>
+                      <option value="lastYear">Last Year</option>
+                      <option value="custom">Custom Date Range</option>
+                    </select>
+                    {summaryDeliveredFilter === 'custom' && (
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <input
+                          type="date"
+                          value={summaryDeliveredStart}
+                          onChange={(e) => setSummaryDeliveredStart(e.target.value)}
+                          className="w-full text-xs p-1 border rounded"
+                        />
+                        <span className="text-xs text-slate-400">to</span>
+                        <input
+                          type="date"
+                          value={summaryDeliveredEnd}
+                          onChange={(e) => setSummaryDeliveredEnd(e.target.value)}
+                          className="w-full text-xs p-1 border rounded"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      Cancelled Date
+                    </label>
+                    <select
+                      value={summaryCancelledFilter}
+                      onChange={(e) => setSummaryCancelledFilter(e.target.value as DateFilterType)}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
+                    >
+                      <option value="all">All Time</option>
+                      <option value="today">Today</option>
+                      <option value="yesterday">Yesterday</option>
+                      <option value="last7">Last 7 Days</option>
+                      <option value="last30">Last 30 Days</option>
+                      <option value="thisMonth">This Month</option>
+                      <option value="lastMonth">Last Month</option>
+                      <option value="lastYear">Last Year</option>
+                      <option value="custom">Custom Date Range</option>
+                    </select>
+                    {summaryCancelledFilter === 'custom' && (
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <input
+                          type="date"
+                          value={summaryCancelledStart}
+                          onChange={(e) => setSummaryCancelledStart(e.target.value)}
+                          className="w-full text-xs p-1 border rounded"
+                        />
+                        <span className="text-xs text-slate-400">to</span>
+                        <input
+                          type="date"
+                          value={summaryCancelledEnd}
+                          onChange={(e) => setSummaryCancelledEnd(e.target.value)}
+                          className="w-full text-xs p-1 border rounded"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1653,24 +1752,35 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               </div>
 
               {/* Editable Order Fields: Order Value & Profit */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-slate-700">
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
                     Order Value (৳)
                   </label>
-                  <span className="text-[11px] font-bold text-emerald-600">
-                    20% Profit: ৳ {((parseFloat(modalOrderValue) || 0) * 0.20).toLocaleString()}
-                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={modalOrderValue}
+                    onChange={(e) => setModalOrderValue(e.target.value)}
+                    placeholder="Enter amount"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-semibold focus:outline-hidden focus:border-indigo-600"
+                  />
                 </div>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={modalOrderValue}
-                  onChange={(e) => setModalOrderValue(e.target.value)}
-                  placeholder="Enter order amount"
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-semibold focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100"
-                />
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Profit Amount (৳)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={modalProfit}
+                    onChange={(e) => setModalProfit(e.target.value)}
+                    placeholder="Enter profit"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-semibold focus:outline-hidden focus:border-indigo-600 text-emerald-700"
+                  />
+                </div>
               </div>
 
               {/* Editable Schedule Date & Time */}
@@ -1700,54 +1810,23 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 </div>
               </div>
 
-              {/* Status Selectors: Followup & Order Status */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Followup Status
-                  </label>
-                  <select
-                    value={modalFollowupStatus}
-                    onChange={(e) => {
-                      const newFollow = e.target.value;
-                      setModalFollowupStatus(newFollow);
-                      if (newFollow === 'Delivered') {
-                        setModalOrderStatus('Delivered');
-                      }
-                    }}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-semibold focus:outline-hidden focus:border-indigo-600"
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="Confirmed">Confirmed</option>
-                    <option value="Follow-up">Follow-up</option>
-                    <option value="Delivered">Delivered</option>
-                    <option value="Cancelled">Cancelled</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Order Status
-                  </label>
-                  <select
-                    value={modalOrderStatus}
-                    onChange={(e) => setModalOrderStatus(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-semibold focus:outline-hidden focus:border-indigo-600"
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Confirmed">Confirmed</option>
-                    <option value="Delivered">Delivered</option>
-                    <option value="Cancelled">Cancelled</option>
-                  </select>
-                </div>
+              {/* Status Selector: Followup Status only */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Followup Status
+                </label>
+                <select
+                  value={modalFollowupStatus}
+                  onChange={(e) => setModalFollowupStatus(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-semibold focus:outline-hidden focus:border-indigo-600"
+                >
+                  <option value="Pending">Pending</option>
+                  <option value="Confirmed">Confirmed</option>
+                  <option value="Follow-up">Follow-up</option>
+                  <option value="Delivered">Delivered</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
               </div>
-
-              {modalFollowupStatus === 'Delivered' && (
-                <p className="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 shrink-0" />
-                  Sheet1 Order Status will automatically update to "Delivered".
-                </p>
-              )}
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1780,8 +1859,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         statusModalOrder.id,
                         {
                           followupStatus: modalFollowupStatus,
-                          orderStatus: modalFollowupStatus === 'Delivered' ? 'Delivered' : modalOrderStatus,
                           orderValue: modalOrderValue !== '' ? parseFloat(modalOrderValue) : undefined,
+                          profit: modalProfit !== '' ? parseFloat(modalProfit) : undefined,
                           scheduleDate: modalScheduleDate,
                           scheduledTime: modalScheduledTime
                         },

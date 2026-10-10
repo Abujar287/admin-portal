@@ -108,14 +108,11 @@ export class OrderService {
           // Sync agents dynamically discovered in the Google Sheet
           this.syncAgentsFromOrders(parsed);
 
-          // Merge any recently placed local orders that might be in transit
-          const existingIds = new Set(parsed.map(p => String(p.id)));
-          const uniqueLocal = localOrders.filter(o => !existingIds.has(String(o.id)));
-          const combined = [...uniqueLocal, ...parsed];
-          this.saveLocalOrders(combined);
+          // Strictly use parsed sheet orders as source of truth
+          this.saveLocalOrders(parsed);
           localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString());
 
-          return { orders: combined, source: 'google_sheets' };
+          return { orders: parsed, source: 'google_sheets' };
         }
       }
       return { orders: localOrders, source: 'local_storage' };
@@ -200,6 +197,8 @@ export class OrderService {
     const idxStatus   = getColIdx(['order status', 'status'], 16);
     const idxFollowup = getColIdx(['followup status', 'folllowup status'], 17);
     const idxProfit   = getColIdx(['profit'], 18);
+    const idxDelivDt  = getColIdx(['delivered date', 'delivered_date'], 19);
+    const idxCancDt   = getColIdx(['cancelled date', 'cancelled_date'], 20);
 
     return rows
       .filter(row => row && row.length > 0 && (row[idxOrder] !== '' || row[idxCustName] !== ''))
@@ -216,7 +215,6 @@ export class OrderService {
         const rawOrderId = valOrEmpty(idxOrder);
         const orderId = rawOrderId || String(1001 + index);
         const orderVal = numOrZero(idxValue);
-        // Profit calculation in Google Apps Script is: orderVal * 0.20
         const profitVal = idxProfit !== -1 && row[idxProfit] !== undefined && row[idxProfit] !== ''
           ? numOrZero(idxProfit)
           : Math.round(orderVal * 0.20);
@@ -240,7 +238,9 @@ export class OrderService {
           orderValue: orderVal,
           orderStatus: valOrEmpty(idxStatus, 'Pending'),
           followupStatus: valOrEmpty(idxFollowup, 'Pending'),
-          profit: profitVal
+          profit: profitVal,
+          deliveredDate: valOrEmpty(idxDelivDt, ''),
+          cancelledDate: valOrEmpty(idxCancDt, '')
         };
       });
   }
@@ -351,33 +351,47 @@ export class OrderService {
     const orders = this.getLocalOrders();
     const existingOrder = orders.find((ord) => String(ord.id) === String(orderId));
 
-    const finalOrderStatus = updates.orderStatus || (updates.followupStatus === 'Delivered' ? 'Delivered' : existingOrder?.orderStatus || 'Pending');
+    const finalOrderStatus = updates.orderStatus || existingOrder?.orderStatus || 'Pending';
+    const currentTimestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+    const isCancelled = updates.followupStatus?.toLowerCase() === 'cancelled';
+    const isDelivered = updates.followupStatus?.toLowerCase() === 'delivered';
+
+    const newDeliveredDate = isDelivered ? currentTimestamp : existingOrder?.deliveredDate;
+    const newCancelledDate = isCancelled ? currentTimestamp : existingOrder?.cancelledDate;
 
     const updated = orders.map((ord) => {
       if (String(ord.id) === String(orderId)) {
         const orderVal = updates.orderValue !== undefined ? Number(updates.orderValue) : ord.orderValue;
-        const profit = updates.orderValue !== undefined ? Number(updates.orderValue) * 0.20 : ord.profit;
+        const profit = isCancelled 
+          ? 0 
+          : (updates.profit !== undefined ? Number(updates.profit) : (updates.orderValue !== undefined ? Number(updates.orderValue) * 0.20 : ord.profit));
         return {
           ...ord,
           ...updates,
           orderValue: orderVal,
           profit: profit,
-          orderStatus: finalOrderStatus
+          orderStatus: finalOrderStatus,
+          deliveredDate: newDeliveredDate || ord.deliveredDate,
+          cancelledDate: newCancelledDate || ord.cancelledDate
         };
       }
       return ord;
     });
     this.saveLocalOrders(updated);
 
-    // Record Historical Log for Followup Sheet
+    // Record Historical Log for Followup Sheet with sequential ID
     let historyItem: FollowupHistoryItem | undefined;
     if (existingOrder) {
       const orderVal = updates.orderValue !== undefined ? Number(updates.orderValue) : existingOrder.orderValue;
       const schedDate = updates.scheduleDate !== undefined ? updates.scheduleDate : existingOrder.scheduleDate;
       const schedTime = updates.scheduledTime !== undefined ? updates.scheduledTime : existingOrder.scheduledTime;
 
+      const existingHistory = this.getFollowupHistory();
+      const nextId = String(existingHistory.length + 1);
+
       historyItem = {
-        id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+        id: nextId,
         orderId: String(orderId),
         customerName: existingOrder.customerName,
         customerContact: existingOrder.customerContact,
@@ -388,11 +402,10 @@ export class OrderService {
         scheduleDate: schedDate,
         scheduledTime: schedTime,
         updatedBy: updatedBy || 'Manager',
-        timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        timestamp: currentTimestamp,
         notes: notes || ''
       };
 
-      const existingHistory = this.getFollowupHistory();
       this.saveFollowupHistory([historyItem, ...existingHistory]);
     }
 
@@ -402,7 +415,6 @@ export class OrderService {
     if (scriptUrl) {
       try {
         const params = new URLSearchParams();
-        // action 'updateFollowup' instructs Google Apps Script to update Sheet1 and log in 'Followup' sheet
         params.append('action', 'updateFollowup');
         params.append('orderId', String(orderId));
         if (updates.followupStatus) {
@@ -411,8 +423,13 @@ export class OrderService {
         params.append('orderStatus', finalOrderStatus);
         if (updates.orderValue !== undefined) {
           params.append('orderValue', String(updates.orderValue));
-          params.append('profit', String(Number(updates.orderValue) * 0.20));
         }
+        const finalProfitParam = isCancelled ? 0 : (updates.profit !== undefined ? updates.profit : (updates.orderValue !== undefined ? Number(updates.orderValue) * 0.20 : undefined));
+        if (finalProfitParam !== undefined) {
+          params.append('profit', String(finalProfitParam));
+        }
+        if (newDeliveredDate) params.append('deliveredDate', newDeliveredDate);
+        if (newCancelledDate) params.append('cancelledDate', newCancelledDate);
         if (updates.scheduleDate !== undefined) {
           params.append('scheduleDate', updates.scheduleDate);
         }
@@ -425,7 +442,7 @@ export class OrderService {
           params.append('customerName', existingOrder.customerName);
           params.append('customerContact', existingOrder.customerContact);
         }
-        params.append('timestamp', new Date().toISOString().replace('T', ' ').slice(0, 19));
+        params.append('timestamp', currentTimestamp);
 
         await fetch(scriptUrl, {
           method: 'POST',
@@ -524,17 +541,31 @@ function doPost(e) {
       if (newOrderStatus) {
         mainSheet.getRange(foundRowIndex, 17).setValue(newOrderStatus);
       }
-      // (c) Update Column 16 (P): Order Value & Column 19 (S): 20% Profit
+      // (c) Update Column 16 (P): Order Value
       if (data.orderValue !== undefined && data.orderValue !== '') {
         var numVal = parseFloat(data.orderValue) || 0;
         mainSheet.getRange(foundRowIndex, 16).setValue(numVal);
-        mainSheet.getRange(foundRowIndex, 19).setValue(numVal * 0.20);
       }
-      // (d) Update Column 14 (N): Schedule Date
+      // (c2) Update Column 19 (S): Profit
+      if (data.profit !== undefined && data.profit !== '') {
+        var profitVal = parseFloat(data.profit) || 0;
+        mainSheet.getRange(foundRowIndex, 19).setValue(profitVal);
+      }
+      // (d) Update Column 20 (T): Delivered Date
+      if (newFollowupStatus === 'Delivered' || data.deliveredDate) {
+        var delivDt = data.deliveredDate || new Date();
+        mainSheet.getRange(foundRowIndex, 20).setValue(delivDt);
+      }
+      // (e) Update Column 21 (U): Cancelled Date
+      if (newFollowupStatus === 'Cancelled' || data.cancelledDate) {
+        var cancDt = data.cancelledDate || new Date();
+        mainSheet.getRange(foundRowIndex, 21).setValue(cancDt);
+      }
+      // (f) Update Column 14 (N): Schedule Date
       if (data.scheduleDate !== undefined && data.scheduleDate !== '') {
         mainSheet.getRange(foundRowIndex, 14).setValue(data.scheduleDate);
       }
-      // (e) Update Column 15 (O): Scheduled Time
+      // (g) Update Column 15 (O): Scheduled Time
       if (data.scheduledTime !== undefined && data.scheduledTime !== '') {
         mainSheet.getRange(foundRowIndex, 15).setValue(data.scheduledTime);
       }
