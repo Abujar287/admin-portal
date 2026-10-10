@@ -125,7 +125,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       orderValue: numValue,
       orderStatus: 'Pending',
       followupStatus: 'Pending',
-      profit: calculatedProfit
+      profit: 0
     };
 
     try {

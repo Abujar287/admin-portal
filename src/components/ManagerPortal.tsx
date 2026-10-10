@@ -102,7 +102,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 }) => {
   const isTeamLeader = currentManager.role === 'Team Leader';
   const [activeTab, setActiveTab] = useState<
-    'profiles' | 'users' | 'orders' | 'followup' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping'
+    'profiles' | 'users' | 'orders' | 'followup' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping'
   >(isTeamLeader ? 'summary' : 'users');
   const [managerToast, setManagerToast] = useState<string | null>(null);
   const showToast = (msg: string) => {
