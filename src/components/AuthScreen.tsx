@@ -74,7 +74,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         user: u,
         pass: p,
         name: 'Manager (Admin)',
-        role: 'System Administrator'
+        role: 'Manager'
       });
       return;
     }

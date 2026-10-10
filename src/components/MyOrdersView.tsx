@@ -1,16 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { AgentUser, DateFilterType, OrderItem } from '../types';
 import { OrderService } from '../services/orderService';
-import { TIME_SLOTS } from '../data/mockOrders';
 import { CreateOrderModal } from './CreateOrderModal';
-import { RotateCw, Search, FilterX, Eye, X, CheckCircle, Clock, Plus } from 'lucide-react';
+import { RotateCw, Search, FilterX, Eye, X, CheckCircle, Clock, Plus, Lock, Calendar, DollarSign, MapPin, Package, User } from 'lucide-react';
 
 interface MyOrdersViewProps {
   currentAgent: AgentUser;
   orders: OrderItem[];
   onRefresh: () => Promise<void>;
   isRefreshing: boolean;
-  onUpdateOrderStatus: (orderId: string, updates: Partial<OrderItem>) => void;
   onOrderCreated: (order: OrderItem) => void;
 }
 
@@ -19,62 +17,19 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
   orders,
   onRefresh,
   isRefreshing,
-  onUpdateOrderStatus,
   onOrderCreated
 }) => {
   const [filterCreateDate, setFilterCreateDate] = useState<DateFilterType>('');
   const [filterScheduleDate, setFilterScheduleDate] = useState<DateFilterType>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
-  const [modalFollowupStatus, setModalFollowupStatus] = useState<string>('Delivered');
-  const [modalOrderValue, setModalOrderValue] = useState<string>('');
-  const [modalProfit, setModalProfit] = useState<string>('');
-  const [modalScheduleDate, setModalScheduleDate] = useState<string>('');
-  const [modalScheduledTime, setModalScheduledTime] = useState<string>('');
-  const [modalNotes, setModalNotes] = useState<string>('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Agent's individual permissions
-  const perms = currentAgent.permissions || {
-    canCreate: true,
-    canUpdateStatus: true,
-    canChangeValue: true,
-    canAddProfit: true,
-    canCancel: true
-  };
+  // Agent permissions check for order creation
+  const perms = currentAgent.permissions || { canCreate: true };
 
   const handleOpenOrder = (ord: OrderItem) => {
     setSelectedOrder(ord);
-    setModalFollowupStatus(ord.followupStatus || 'Pending');
-    setModalOrderValue(String(ord.orderValue ?? ''));
-    setModalProfit(String(ord.profit ?? ''));
-    setModalScheduleDate(ord.scheduleDate || '');
-    setModalScheduledTime(ord.scheduledTime || '');
-    setModalNotes('');
-  };
-
-  const handleSaveOrderUpdate = () => {
-    if (!selectedOrder) return;
-    const isCancelled = modalFollowupStatus.toLowerCase() === 'cancelled';
-    const isDelivered = modalFollowupStatus.toLowerCase() === 'delivered';
-    const numVal = modalOrderValue !== '' ? Number(modalOrderValue) : selectedOrder.orderValue;
-    const numProfit = isCancelled 
-      ? 0 
-      : (modalProfit !== '' ? Number(modalProfit) : (isDelivered ? Math.round(numVal * 0.20) : selectedOrder.profit));
-
-    onUpdateOrderStatus(
-      selectedOrder.id,
-      {
-        followupStatus: modalFollowupStatus,
-        orderStatus: isDelivered ? 'Delivered' : (isCancelled ? 'Cancelled' : selectedOrder.orderStatus),
-        orderValue: numVal,
-        profit: numProfit,
-        scheduleDate: modalScheduleDate,
-        scheduledTime: modalScheduledTime
-      }
-    );
-
-    setSelectedOrder(null);
   };
 
   // STRICTLY only this agent's orders (data isolation for agent portal)
@@ -395,168 +350,165 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
       {/* Order Details & Action Modal */}
       {selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="font-bold text-slate-900 text-base">Order Details #{selectedOrder.id}</h3>
-                <p className="text-xs text-slate-500">Agent: {selectedOrder.agentName} ({selectedOrder.agentId})</p>
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-100 space-y-5 animate-fadeIn">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 flex items-center justify-center font-bold">
+                  #{selectedOrder.id}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-slate-900 text-base">Order Details</h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-amber-600" />
+                      Read-Only (Agent View)
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Booked by {selectedOrder.agentName} (@{selectedOrder.agentId}) • Channel: <span className="font-semibold text-slate-700">{selectedOrder.orderChannel}</span>
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setSelectedOrder(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="bg-slate-50 p-2.5 rounded-lg">
-                <span className="text-slate-500 block text-[10px] font-semibold uppercase">Customer</span>
-                <span className="font-bold text-slate-900">{selectedOrder.customerName}</span>
-                <span className="block text-slate-600 font-mono mt-0.5">{selectedOrder.customerContact}</span>
+            {/* Read-Only Details Grid */}
+            <div className="space-y-3.5 text-xs">
+              {/* Customer Info */}
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
+                  <User className="w-3.5 h-3.5 text-blue-600" /> Customer Information
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  <div>
+                    <span className="text-[11px] text-slate-500 block">Name:</span>
+                    <span className="font-bold text-slate-900">{selectedOrder.customerName}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-slate-500 block">Contact:</span>
+                    <span className="font-mono font-bold text-blue-700">{selectedOrder.customerContact}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-slate-500 block">Gender:</span>
+                    <span className="font-semibold text-slate-700">{selectedOrder.gender || '-'}</span>
+                  </div>
+                </div>
               </div>
-              <div className="bg-slate-50 p-2.5 rounded-lg">
-                <span className="text-slate-500 block text-[10px] font-semibold uppercase">Product</span>
-                <span className="font-bold text-slate-900">{selectedOrder.productName}</span>
-                <span className="block text-slate-600 mt-0.5">{selectedOrder.productCategory}</span>
+
+              {/* Product & Location */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
+                    <Package className="w-3.5 h-3.5 text-indigo-600" /> Product Details
+                  </span>
+                  <div className="space-y-1">
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">Product:</span>
+                      <span className="font-bold text-slate-900">{selectedOrder.productName}</span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">Category:</span>
+                      <span className="font-semibold text-slate-700">{selectedOrder.productCategory}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-red-500" /> Delivery Destination
+                  </span>
+                  <div className="space-y-1">
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">City &amp; Area:</span>
+                      <span className="font-bold text-slate-900">{selectedOrder.city} • {selectedOrder.deliveryArea}</span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">Address:</span>
+                      <span className="font-medium text-slate-700">{selectedOrder.addressDetails || '-'}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="bg-slate-50 p-2.5 rounded-lg col-span-2">
-                <span className="text-slate-500 block text-[10px] font-semibold uppercase">Delivery Location</span>
-                <span className="font-bold text-slate-900">{selectedOrder.city} • {selectedOrder.deliveryArea}</span>
-                <span className="block text-slate-600 mt-0.5">{selectedOrder.addressDetails}</span>
+
+              {/* Schedule Details - Read Only */}
+              <div className="bg-blue-50/60 p-3.5 rounded-2xl border border-blue-100">
+                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5" /> Delivery Schedule (Fixed)
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <span className="text-[11px] text-slate-500 block">Schedule Date:</span>
+                    <span className="font-bold font-mono text-slate-900 text-sm">
+                      {selectedOrder.scheduleDate ? OrderService.formatDateTime(selectedOrder.scheduleDate) : '-'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-slate-500 block">Scheduled Time Slot:</span>
+                    <span className="font-bold text-slate-900 text-sm">
+                      {selectedOrder.scheduledTime || 'Unscheduled'}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="bg-slate-50 p-2.5 rounded-lg">
-                <span className="text-slate-500 block text-[10px] font-semibold uppercase">Schedule</span>
-                <span className="font-bold text-slate-900">{selectedOrder.scheduleDate}</span>
-                <span className="block text-slate-600 mt-0.5">{selectedOrder.scheduledTime}</span>
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-lg">
-                <span className="text-slate-500 block text-[10px] font-semibold uppercase">Current Status</span>
-                <span className="font-bold text-indigo-700">{selectedOrder.followupStatus || 'Pending'}</span>
-                <span className="block text-slate-500 mt-0.5">Value: ৳{selectedOrder.orderValue.toLocaleString()}</span>
+
+              {/* Financials & Status */}
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
+                  <DollarSign className="w-3.5 h-3.5 text-emerald-600" /> Financials &amp; Status
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div>
+                    <span className="text-[11px] text-slate-500 block">Order Value:</span>
+                    <span className="font-extrabold text-slate-900">৳ {selectedOrder.orderValue.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-slate-500 block">Profit:</span>
+                    <span className="font-extrabold text-emerald-600">৳ {selectedOrder.profit.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-slate-500 block">Follow-up Status:</span>
+                    <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                      selectedOrder.followupStatus === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
+                      selectedOrder.followupStatus === 'Cancelled' ? 'bg-red-100 text-red-800' :
+                      'bg-indigo-100 text-indigo-800'
+                    }`}>
+                      {selectedOrder.followupStatus || 'Pending'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-slate-500 block">Order Status:</span>
+                    <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                      selectedOrder.orderStatus === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
+                      selectedOrder.orderStatus === 'Cancelled' ? 'bg-red-100 text-red-800' :
+                      'bg-blue-100 text-blue-800'
+                    }`}>
+                      {selectedOrder.orderStatus || 'Pending'}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Status Update / Action Section with Granular Permission Checks */}
-            {perms.canUpdateStatus ? (
-              <div className="space-y-3 pt-2 border-t border-slate-100">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Follow-up Status
-                  </label>
-                  <select
-                    value={modalFollowupStatus}
-                    onChange={(e) => {
-                      const newStatus = e.target.value;
-                      setModalFollowupStatus(newStatus);
-                      if (newStatus.toLowerCase() === 'cancelled') {
-                        setModalProfit('0');
-                      } else if (modalProfit === '0') {
-                        const v = Number(modalOrderValue) || selectedOrder.orderValue;
-                        setModalProfit(String(Math.round(v * 0.2)));
-                      }
-                    }}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-semibold focus:outline-hidden focus:border-blue-600 bg-white"
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="Delivered">Delivered</option>
-                    {perms.canCancel && <option value="Cancelled">Cancelled</option>}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Schedule Date
-                    </label>
-                    <input
-                      type="date"
-                      value={modalScheduleDate}
-                      onChange={(e) => setModalScheduleDate(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-semibold text-slate-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Scheduled Time (Slot)
-                    </label>
-                    <select
-                      value={modalScheduledTime}
-                      onChange={(e) => setModalScheduledTime(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-semibold text-slate-900 cursor-pointer"
-                    >
-                      <option value="">-- Select Time Slot --</option>
-                      {modalScheduledTime && !TIME_SLOTS.includes(modalScheduledTime) && (
-                        <option value={modalScheduledTime}>{modalScheduledTime}</option>
-                      )}
-                      {TIME_SLOTS.map((slot) => (
-                        <option key={slot} value={slot}>
-                          {slot}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1 flex items-center justify-between">
-                      <span>Order Value (৳)</span>
-                      {!perms.canChangeValue && <span className="text-[10px] text-amber-600 font-normal">Locked</span>}
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      disabled={!perms.canChangeValue}
-                      value={modalOrderValue}
-                      onChange={(e) => setModalOrderValue(e.target.value)}
-                      placeholder="Order value"
-                      className={`w-full px-3 py-2 text-xs rounded-xl border font-semibold ${perms.canChangeValue ? 'border-slate-300 bg-white text-slate-900' : 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1 flex items-center justify-between">
-                      <span>Profit (৳)</span>
-                      {!perms.canAddProfit && <span className="text-[10px] text-amber-600 font-normal">Locked</span>}
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      disabled={!perms.canAddProfit || modalFollowupStatus.toLowerCase() === 'cancelled'}
-                      value={modalFollowupStatus.toLowerCase() === 'cancelled' ? '0' : modalProfit}
-                      onChange={(e) => setModalProfit(e.target.value)}
-                      placeholder="Profit amount"
-                      className={`w-full px-3 py-2 text-xs rounded-xl border font-semibold ${perms.canAddProfit && modalFollowupStatus.toLowerCase() !== 'cancelled' ? 'border-slate-300 bg-white text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed'}`}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedOrder(null)}
-                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveOrderUpdate}
-                    className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold shadow-sm shadow-blue-700/20 cursor-pointer"
-                  >
-                    Update &amp; Save Order
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="pt-2 border-t border-slate-100 text-center py-2">
-                <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 inline-block">
-                  Status update access is not enabled for your agent ID (View Only).
-                </span>
-              </div>
-            )}
+            {/* Read-Only Restriction Notice & Close Button */}
+            <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <p className="text-[11px] text-slate-400 italic flex items-center gap-1">
+                <Lock className="w-3 h-3 text-slate-400 shrink-0" />
+                <span>Order rescheduling and status updates are managed by Follow-up &amp; Manager.</span>
+              </p>
+              <button
+                type="button"
+                onClick={() => setSelectedOrder(null)}
+                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shrink-0"
+              >
+                Close Details
+              </button>
+            </div>
           </div>
         </div>
       )}

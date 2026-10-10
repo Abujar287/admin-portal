@@ -43,7 +43,7 @@ export default function App() {
           user: 'manager',
           pass: 'manager',
           name: 'Manager (Admin)',
-          role: 'System Administrator'
+          role: 'Manager'
         }
       });
     } else if (savedRole === 'agent' && savedUser) {
@@ -162,6 +162,10 @@ export default function App() {
     updatedBy = 'Manager',
     notes = ''
   ) => {
+    if (currentSession?.role !== 'manager') {
+      showToast('Access Denied: Only managers can update orders!');
+      return;
+    }
     const res = await OrderService.updateOrderStatus(orderId, updates, updatedBy, notes);
     setOrders(res.updatedOrders);
     if (res.historyItem) {
@@ -172,6 +176,17 @@ export default function App() {
         ? `Order #${orderId} followup status updated to "${updates.followupStatus}"!`
         : `Order #${orderId} status updated!`
     );
+  };
+
+  const handleRevertFollowup = async (historyId: string, orderId: string, previousStatus: string) => {
+    if (currentSession?.role !== 'manager') {
+      showToast('Access Denied: Only managers can revert followups!');
+      return;
+    }
+    const res = await OrderService.revertFollowup(historyId, orderId, previousStatus);
+    setOrders(res.updatedOrders);
+    setFollowupHistory(res.updatedHistory);
+    showToast(`Order #${orderId} reverted to "${previousStatus || 'Pending'}"! Profit and dates cleared.`);
   };
 
   return (
@@ -201,11 +216,16 @@ export default function App() {
           agents={agents}
           onUpdateAgents={handleUpdateAgentsFromManager}
           orders={orders}
+          onUpdateOrders={(newOrders) => {
+            setOrders(newOrders);
+            OrderService.saveLocalOrders(newOrders);
+          }}
           followupHistory={followupHistory}
           onUpdateFollowupHistory={(newHist) => {
             setFollowupHistory(newHist);
             OrderService.saveFollowupHistory(newHist);
           }}
+          onRevertFollowup={handleRevertFollowup}
           onRefreshOrders={() => loadOrdersData(true)}
           isRefreshing={isRefreshing}
           onLogout={handleLogout}
@@ -314,7 +334,6 @@ export default function App() {
                   orders={orders}
                   onRefresh={() => loadOrdersData(true)}
                   isRefreshing={isRefreshing}
-                  onUpdateOrderStatus={handleUpdateOrderStatus}
                   onOrderCreated={handleOrderCreated}
                 />
               )}

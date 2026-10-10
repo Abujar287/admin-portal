@@ -459,9 +459,9 @@ export class OrderService {
     const updated = orders.map((ord) => {
       if (String(ord.id) === String(orderId)) {
         const orderVal = updates.orderValue !== undefined ? Number(updates.orderValue) : ord.orderValue;
-        const profit = isCancelled 
-          ? 0 
-          : (updates.profit !== undefined ? Number(updates.profit) : (updates.orderValue !== undefined ? Number(updates.orderValue) * 0.20 : ord.profit));
+        const profit = updates.profit !== undefined 
+          ? Number(updates.profit) 
+          : (isDelivered ? (ord.profit || Math.round(orderVal * 0.20)) : 0);
         return {
           ...ord,
           ...updates,
@@ -598,6 +598,63 @@ export class OrderService {
     return { updatedOrders: updated, historyItem, remoteSynced };
   }
 
+  /**
+   * Reverts an order's followup status back to its previous status in Sheet1 (Orders),
+   * clears profit (set to 0), clears delivered and cancelled dates, and removes the log item.
+   */
+  static async revertFollowup(
+    historyId: string,
+    orderId: string,
+    previousStatus: string
+  ): Promise<{ updatedOrders: OrderItem[]; updatedHistory: FollowupHistoryItem[] }> {
+    const orders = this.getLocalOrders();
+    const prevStatus = previousStatus || 'Pending';
+    const isDeliv = prevStatus.toLowerCase() === 'delivered';
+    const isCanc = prevStatus.toLowerCase() === 'cancelled';
+
+    const updatedOrders = orders.map((ord) => {
+      if (String(ord.id) === String(orderId)) {
+        return {
+          ...ord,
+          followupStatus: prevStatus,
+          orderStatus: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : 'Pending'),
+          profit: 0,
+          deliveredDate: '',
+          cancelledDate: ''
+        };
+      }
+      return ord;
+    });
+
+    this.saveLocalOrders(updatedOrders);
+
+    const history = this.getFollowupHistory();
+    const updatedHistory = history.filter((h) => String(h.id) !== String(historyId));
+    this.saveFollowupHistory(updatedHistory);
+
+    // Sync revert to remote Google Sheet if URL configured
+    const scriptUrl = this.getScriptUrl();
+    if (scriptUrl) {
+      try {
+        const params = new URLSearchParams();
+        params.append('action', 'revertFollowup');
+        params.append('orderId', String(orderId));
+        params.append('previousStatus', prevStatus);
+
+        fetch(scriptUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: params.toString()
+        }).catch(() => {});
+      } catch (err) {
+        console.warn('Google Apps Script revert error:', err);
+      }
+    }
+
+    return { updatedOrders, updatedHistory };
+  }
+
   static getUpdatedAppsScriptCode(): string {
     return `// ==========================================
 // Google Apps Script for Agent & Manager Portal
@@ -606,7 +663,8 @@ export class OrderService {
 // 2. Creating orders with 20% profit (doPost - default)
 // 3. Updating Followup Status, Order Status, Order Value,
 //    Schedule Date & Time in Sheet1 (action: 'updateFollowup')
-// 4. Storing complete audit trail in 'Followup' historical sheet
+// 4. Reverting followups: restores previous status, clears profit & dates (action: 'revertFollowup')
+// 5. Storing complete audit trail in 'Followup' historical sheet
 // ==========================================
 
 function doGet(e) {
@@ -635,7 +693,38 @@ function doPost(e) {
 
   var action = data.action;
 
-  // 1. UPDATE FOLLOWUP / ORDER STATUS / ORDER VALUE / SCHEDULE DATE & TIME
+  // 1. REVERT FOLLOWUP: Revert status in Sheet1, clear profit and dates
+  if (action === 'revertFollowup') {
+    var orderIdToFind = String(data.orderId || '').trim();
+    var prevStatus = data.previousStatus || 'Pending';
+    var rows = mainSheet.getDataRange().getValues();
+    var foundRowIndex = -1;
+    for (var i = 1; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === orderIdToFind) {
+        foundRowIndex = i + 1;
+        break;
+      }
+    }
+    if (foundRowIndex > 0) {
+      // Revert Followup Status (Col 18)
+      mainSheet.getRange(foundRowIndex, 18).setValue(prevStatus);
+      // Order Status (Col 17)
+      mainSheet.getRange(foundRowIndex, 17).setValue(prevStatus === 'Delivered' ? 'Delivered' : (prevStatus === 'Cancelled' ? 'Cancelled' : 'Pending'));
+      // Profit cleared (Col 19 - empty/faka)
+      mainSheet.getRange(foundRowIndex, 19).setValue('');
+      // Delivered Date cleared (Col 20 - empty/faka)
+      mainSheet.getRange(foundRowIndex, 20).setValue('');
+      // Cancelled Date cleared (Col 21 - empty/faka)
+      mainSheet.getRange(foundRowIndex, 21).setValue('');
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'success',
+        message: 'Order #' + orderIdToFind + ' reverted to ' + prevStatus + ', profit & dates cleared'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  // 2. UPDATE FOLLOWUP / ORDER STATUS / ORDER VALUE / SCHEDULE DATE & TIME
   // AND LOG HISTORICAL AUDIT ROW TO "Followup" SHEET
   if (action === 'updateFollowup' || action === 'updateStatus' || action === 'updateOrder') {
     var orderIdToFind = String(data.orderId || '').trim();

@@ -119,6 +119,184 @@ export const PRODUCT_CATEGORIES = [
   'Appliance'
 ];
 
+export const getProductCategories = (): string[] => {
+  try {
+    const stored = localStorage.getItem('agent_portal_product_categories');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {
+    // fallback
+  }
+  return PRODUCT_CATEGORIES;
+};
+
+export const addProductCategory = (category: string): string[] => {
+  const cats = getProductCategories();
+  if (!cats.includes(category)) {
+    cats.push(category);
+    localStorage.setItem('agent_portal_product_categories', JSON.stringify(cats));
+  }
+  return cats;
+};
+
+export const removeProductCategory = (category: string): string[] => {
+  const cats = getProductCategories().filter(c => c !== category);
+  localStorage.setItem('agent_portal_product_categories', JSON.stringify(cats));
+  return cats;
+};
+
+export const removeOrderChannel = (channel: string): string[] => {
+  const channels = getOrderChannels().filter((c: string) => c !== channel);
+  localStorage.setItem('agent_portal_order_channels', JSON.stringify(channels));
+  return channels;
+};
+
+export interface CategoryTeamMapping {
+  id: string;
+  category: string;
+  orderStatus: string;
+  team: string;
+  teamLeader: string;
+}
+
+export const ORDER_STATUS_LIST = [
+  'Pending',
+  'In Progress',
+  'Confirmed',
+  'Follow-up',
+  'Delivered',
+  'Cancelled',
+  'Returned'
+];
+
+export const getOrderStatuses = (): string[] => {
+  try {
+    const stored = localStorage.getItem('agent_portal_order_statuses');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {
+    // fallback
+  }
+  return ORDER_STATUS_LIST;
+};
+
+export const addOrderStatus = (status: string): string[] => {
+  const list = getOrderStatuses();
+  if (!list.includes(status)) {
+    list.push(status);
+    localStorage.setItem('agent_portal_order_statuses', JSON.stringify(list));
+  }
+  return list;
+};
+
+export const removeOrderStatus = (status: string): string[] => {
+  const list = getOrderStatuses().filter(s => s !== status);
+  localStorage.setItem('agent_portal_order_statuses', JSON.stringify(list));
+  return list;
+};
+
+export const DEFAULT_TEAMS_LIST = [
+  'Acquisition',
+  'Retention',
+  'KAM',
+  'Call-Center',
+  'Facebook',
+  'Back-Office',
+  'VOC'
+];
+
+export const getTeamsList = (): string[] => {
+  try {
+    const stored = localStorage.getItem('agent_portal_teams_list');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {
+    // fallback
+  }
+  return DEFAULT_TEAMS_LIST;
+};
+
+export const addTeamItem = (team: string): string[] => {
+  const list = getTeamsList();
+  if (!list.includes(team)) {
+    list.push(team);
+    localStorage.setItem('agent_portal_teams_list', JSON.stringify(list));
+  }
+  return list;
+};
+
+export const removeTeamItem = (team: string): string[] => {
+  const list = getTeamsList().filter(t => t !== team);
+  localStorage.setItem('agent_portal_teams_list', JSON.stringify(list));
+  return list;
+};
+
+export const DEFAULT_TEAM_LEADERS = [
+  'MD Abujar',
+  'Manager (Admin)',
+  'TL Rahim',
+  'TL Karim'
+];
+
+export const getTeamLeadersList = (): string[] => {
+  try {
+    const stored = localStorage.getItem('agent_portal_team_leaders');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {
+    // fallback
+  }
+  return DEFAULT_TEAM_LEADERS;
+};
+
+export const addTeamLeaderItem = (leader: string): string[] => {
+  const list = getTeamLeadersList();
+  if (!list.includes(leader)) {
+    list.push(leader);
+    localStorage.setItem('agent_portal_team_leaders', JSON.stringify(list));
+  }
+  return list;
+};
+
+export const removeTeamLeaderItem = (leader: string): string[] => {
+  const list = getTeamLeadersList().filter(l => l !== leader);
+  localStorage.setItem('agent_portal_team_leaders', JSON.stringify(list));
+  return list;
+};
+
+export const DEFAULT_CATEGORY_MAPPINGS: CategoryTeamMapping[] = [
+  { id: '1', category: 'Electronics', orderStatus: 'Pending', team: 'Acquisition', teamLeader: 'MD Abujar' },
+  { id: '2', category: 'Room Accessories', orderStatus: 'Pending', team: 'Retention', teamLeader: 'Manager (Admin)' },
+  { id: '3', category: 'Cloths', orderStatus: 'Pending', team: 'Facebook', teamLeader: 'MD Abujar' },
+  { id: '4', category: 'Medicines', orderStatus: 'In Progress', team: 'Call-Center', teamLeader: 'Manager (Admin)' },
+  { id: '5', category: 'Appliance', orderStatus: 'Pending', team: 'KAM', teamLeader: 'MD Abujar' },
+];
+
+export const getCategoryMappings = (): CategoryTeamMapping[] => {
+  try {
+    const stored = localStorage.getItem('agent_portal_category_mappings');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {
+    // fallback
+  }
+  return DEFAULT_CATEGORY_MAPPINGS;
+};
+
+export const saveCategoryMappings = (mappings: CategoryTeamMapping[]): void => {
+  localStorage.setItem('agent_portal_category_mappings', JSON.stringify(mappings));
+};
+
 // Helper to format date in YYYY-MM-DD
 function getRecentDateStr(daysAgo: number): string {
   const d = new Date();

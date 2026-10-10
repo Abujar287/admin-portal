@@ -41,17 +41,45 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Settings
+  Settings,
+  Tag,
+  Sliders,
+  FolderTree,
+  FileSpreadsheet,
+  CheckCircle
 } from 'lucide-react';
-import { ORDER_CHANNELS, TIME_SLOTS, getOrderChannels, addOrderChannel } from '../data/mockOrders';
+import { 
+  ORDER_CHANNELS, 
+  TIME_SLOTS, 
+  getOrderChannels, 
+  addOrderChannel,
+  removeOrderChannel,
+  getProductCategories,
+  addProductCategory,
+  removeProductCategory,
+  getOrderStatuses,
+  addOrderStatus,
+  removeOrderStatus,
+  getTeamsList,
+  addTeamItem,
+  removeTeamItem,
+  getTeamLeadersList,
+  addTeamLeaderItem,
+  removeTeamLeaderItem,
+  getCategoryMappings,
+  saveCategoryMappings,
+  CategoryTeamMapping
+} from '../data/mockOrders';
 
 interface ManagerPortalProps {
   currentManager: ManagerUser;
   agents: AgentUser[];
   onUpdateAgents: (agents: AgentUser[], notify?: boolean) => void;
   orders: OrderItem[];
+  onUpdateOrders?: (orders: OrderItem[]) => void;
   followupHistory?: FollowupHistoryItem[];
   onUpdateFollowupHistory?: (history: FollowupHistoryItem[]) => void;
+  onRevertFollowup?: (historyId: string, orderId: string, previousStatus: string) => Promise<void>;
   onRefreshOrders: () => Promise<void>;
   isRefreshing: boolean;
   onLogout: () => void;
@@ -63,17 +91,19 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   agents,
   onUpdateAgents,
   orders,
+  onUpdateOrders,
   followupHistory = [],
   onUpdateFollowupHistory,
+  onRevertFollowup,
   onRefreshOrders,
   isRefreshing,
   onLogout,
   onUpdateOrderStatus
 }) => {
   const isTeamLeader = currentManager.role === 'Team Leader';
-  const [activeTab, setActiveTab] = useState<'profiles' | 'users' | 'orders' | 'followup' | 'summary' | 'agent-performance' | 'settings'>(
-    isTeamLeader ? 'summary' : 'users'
-  );
+  const [activeTab, setActiveTab] = useState<
+    'profiles' | 'users' | 'orders' | 'followup' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping'
+  >(isTeamLeader ? 'summary' : 'users');
   const [managerToast, setManagerToast] = useState<string | null>(null);
   const showToast = (msg: string) => {
     setManagerToast(msg);
@@ -232,31 +262,237 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     const updated = teams.filter(t => t.name !== teamName);
     setTeams(updated);
     OrderService.saveTeams(updated);
+    const updatedChannels = removeOrderChannel(teamName);
+    setAvailableChannels([...updatedChannels]);
     showToast(`Team "${teamName}" removed successfully!`);
   };
 
-  const handleUndoFollowup = (historyId: string) => {
+  // 5-Column Category Mapping Master States & Handlers
+  // 1. Category (Product Categories)
+  const [categories, setCategories] = useState<string[]>(() => getProductCategories());
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+
+  // 2. Order Status
+  const [orderStatuses, setOrderStatuses] = useState<string[]>(() => getOrderStatuses());
+  const [newOrderStatusInput, setNewOrderStatusInput] = useState('');
+
+  // 3. Team
+  const [teamsList, setTeamsList] = useState<string[]>(() => getTeamsList());
+  const [newTeamInput, setNewTeamInput] = useState('');
+
+  // 4. Channel (Order Channels)
+  const [channelsList, setChannelsList] = useState<string[]>(() => getOrderChannels());
+  const [newChannelInput, setNewChannelInput] = useState('');
+
+  // 5. Team Leader
+  const [teamLeadersList, setTeamLeadersList] = useState<string[]>(() => getTeamLeadersList());
+  const [newTeamLeaderInput, setNewTeamLeaderInput] = useState('');
+
+  // Matrix mappings
+  const [categoryMappings, setCategoryMappings] = useState<CategoryTeamMapping[]>(() => getCategoryMappings());
+
+  // Mapping Form State
+  const [newMappingCategory, setNewMappingCategory] = useState('');
+  const [newMappingTeam, setNewMappingTeam] = useState('Acquisition');
+  const [newMappingStatus, setNewMappingStatus] = useState('Pending');
+  const [newMappingTeamLeader, setNewMappingTeamLeader] = useState('MD Abujar');
+
+  // 1. Category Handlers
+  const handleAddNewCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    const c = newCategoryInput.trim();
+    if (!c) return;
+    if (categories.some(cat => cat.toLowerCase() === c.toLowerCase())) {
+      showToast(`Category "${c}" already exists!`);
+      return;
+    }
+    const updated = addProductCategory(c);
+    setCategories([...updated]);
+    setNewCategoryInput('');
+    showToast(`Category "${c}" added successfully!`);
+  };
+
+  const handleDeleteCategory = (catName: string) => {
+    const updated = removeProductCategory(catName);
+    setCategories([...updated]);
+    const updatedMappings = categoryMappings.filter(m => m.category !== catName);
+    setCategoryMappings(updatedMappings);
+    saveCategoryMappings(updatedMappings);
+    showToast(`Category "${catName}" removed.`);
+  };
+
+  // 2. Order Status Handlers
+  const handleAddNewOrderStatus = (e: React.FormEvent) => {
+    e.preventDefault();
+    const s = newOrderStatusInput.trim();
+    if (!s) return;
+    if (orderStatuses.some(st => st.toLowerCase() === s.toLowerCase())) {
+      showToast(`Order status "${s}" already exists!`);
+      return;
+    }
+    const updated = addOrderStatus(s);
+    setOrderStatuses([...updated]);
+    setNewOrderStatusInput('');
+    showToast(`Order status "${s}" added!`);
+  };
+
+  const handleDeleteOrderStatus = (statusName: string) => {
+    const updated = removeOrderStatus(statusName);
+    setOrderStatuses([...updated]);
+    showToast(`Order status "${statusName}" removed.`);
+  };
+
+  // 3. Team Handlers
+  const handleAddNewTeamItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    const t = newTeamInput.trim();
+    if (!t) return;
+    if (teamsList.some(item => item.toLowerCase() === t.toLowerCase())) {
+      showToast(`Team "${t}" already exists!`);
+      return;
+    }
+    const updated = addTeamItem(t);
+    setTeamsList([...updated]);
+    // Also add to teams state
+    if (!teams.some(tm => tm.name.toLowerCase() === t.toLowerCase())) {
+      const newTeamObj = { name: t, leader: newTeamLeaderInput.trim() || 'Unassigned', memberCount: 0 };
+      const updatedTeams = [...teams, newTeamObj];
+      setTeams(updatedTeams);
+      OrderService.saveTeams(updatedTeams);
+    }
+    setNewTeamInput('');
+    showToast(`Team "${t}" added!`);
+  };
+
+  const handleDeleteTeamItem = (teamName: string) => {
+    const updated = removeTeamItem(teamName);
+    setTeamsList([...updated]);
+    const updatedTeams = teams.filter(t => t.name !== teamName);
+    setTeams(updatedTeams);
+    OrderService.saveTeams(updatedTeams);
+    showToast(`Team "${teamName}" removed.`);
+  };
+
+  // 4. Channel Handlers
+  const handleAddNewChannel = (e: React.FormEvent) => {
+    e.preventDefault();
+    const ch = newChannelInput.trim();
+    if (!ch) return;
+    if (channelsList.some(item => item.toLowerCase() === ch.toLowerCase())) {
+      showToast(`Channel "${ch}" already exists!`);
+      return;
+    }
+    addOrderChannel(ch);
+    const updated = getOrderChannels();
+    setChannelsList([...updated]);
+    setAvailableChannels([...updated]);
+    setNewChannelInput('');
+    showToast(`Channel "${ch}" added!`);
+  };
+
+  const handleDeleteChannel = (channelName: string) => {
+    const updated = removeOrderChannel(channelName);
+    setChannelsList([...updated]);
+    setAvailableChannels([...updated]);
+    showToast(`Channel "${channelName}" removed.`);
+  };
+
+  // 5. Team Leader Handlers
+  const handleAddNewTeamLeader = (e: React.FormEvent) => {
+    e.preventDefault();
+    const tl = newTeamLeaderInput.trim();
+    if (!tl) return;
+    if (teamLeadersList.some(item => item.toLowerCase() === tl.toLowerCase())) {
+      showToast(`Team Leader "${tl}" already exists!`);
+      return;
+    }
+    const updated = addTeamLeaderItem(tl);
+    setTeamLeadersList([...updated]);
+    setNewTeamLeaderInput('');
+    showToast(`Team Leader "${tl}" added!`);
+  };
+
+  const handleDeleteTeamLeader = (tlName: string) => {
+    const updated = removeTeamLeaderItem(tlName);
+    setTeamLeadersList([...updated]);
+    showToast(`Team Leader "${tlName}" removed.`);
+  };
+
+  // Category Matrix Handlers
+  const handleAddNewMapping = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cat = newMappingCategory.trim();
+    if (!cat) {
+      showToast('Please enter or select a category to map.');
+      return;
+    }
+    if (!categories.some(c => c.toLowerCase() === cat.toLowerCase())) {
+      const updatedCats = addProductCategory(cat);
+      setCategories([...updatedCats]);
+    }
+    const existingIdx = categoryMappings.findIndex(m => m.category.toLowerCase() === cat.toLowerCase());
+    let updated: CategoryTeamMapping[];
+    if (existingIdx !== -1) {
+      updated = categoryMappings.map((m, idx) => 
+        idx === existingIdx ? { ...m, team: newMappingTeam, orderStatus: newMappingStatus, teamLeader: newMappingTeamLeader || 'Unassigned' } : m
+      );
+    } else {
+      updated = [
+        ...categoryMappings,
+        {
+          id: String(Date.now()),
+          category: cat,
+          orderStatus: newMappingStatus,
+          team: newMappingTeam,
+          teamLeader: newMappingTeamLeader || 'Unassigned'
+        }
+      ];
+    }
+    setCategoryMappings(updated);
+    saveCategoryMappings(updated);
+    setNewMappingCategory('');
+    setNewMappingTeamLeader('');
+    showToast(`Category mapping row for "${cat}" saved!`);
+  };
+
+  const handleUpdateMappingField = (id: string, field: 'category' | 'team' | 'orderStatus' | 'teamLeader', value: string) => {
+    const updated = categoryMappings.map(m => m.id === id ? { ...m, [field]: value } : m);
+    setCategoryMappings(updated);
+    saveCategoryMappings(updated);
+    showToast('Mapping rule updated!');
+  };
+
+  const handleDeleteMapping = (id: string) => {
+    const updated = categoryMappings.filter(m => m.id !== id);
+    setCategoryMappings(updated);
+    saveCategoryMappings(updated);
+    showToast('Mapping row removed.');
+  };
+
+  const handleUndoFollowup = async (historyId: string) => {
     const item = followupHistory.find(h => String(h.id) === String(historyId));
     if (!item) return;
-    const isAuth = currentManager.role === 'Manager' || 
+    const isAuth = !isTeamLeader || 
                    item.updatedBy === currentManager.user ||
                    agents.some(a => a.user === item.updatedBy && a.teamLeaderId === currentManager.user);
     if (!isAuth) {
       showToast('Not authorized to remove this follow-up record.');
       return;
     }
-    const ord = orders.find(o => String(o.id) === String(item.orderId));
-    if (ord) {
-      onUpdateOrderStatus?.(ord.id, {
-        followupStatus: item.previousStatus,
-        orderStatus: item.previousStatus === 'Delivered' ? 'Delivered' : ord.orderStatus
-      }, currentManager.user, 'Follow-up removed / reverted');
+
+    const prevStatus = item.previousStatus || 'Pending';
+    if (onRevertFollowup) {
+      await onRevertFollowup(historyId, item.orderId, prevStatus);
+    } else {
+      const res = await OrderService.revertFollowup(historyId, item.orderId, prevStatus);
+      if (onUpdateOrders) {
+        onUpdateOrders(res.updatedOrders);
+      }
+      if (onUpdateFollowupHistory) {
+        onUpdateFollowupHistory(res.updatedHistory);
+      }
     }
-    const updatedHistory = followupHistory.filter(h => String(h.id) !== String(historyId));
-    if (onUpdateFollowupHistory) {
-      onUpdateFollowupHistory(updatedHistory);
-    }
-    showToast('Followup record removed and order status reverted!');
+    showToast(`Followup undone: order #${item.orderId} restored to "${prevStatus}", profit & dates cleared!`);
   };
 
   const handlePreviewCsv = (data: any[], title: string, filename: string) => {
@@ -1035,8 +1271,20 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             </span>
           </button>
 
-          {currentManager.role === 'Manager' && (
+          {!isTeamLeader && (
             <>
+              <button
+                onClick={() => setActiveTab('category-mapping')}
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                  activeTab === 'category-mapping'
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                    : 'text-slate-300 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <Layers className="w-4 h-4 text-purple-300" />
+                <span>Category Mapping</span>
+              </button>
+
               <button
                 onClick={() => setActiveTab('profiles')}
                 className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
@@ -1090,7 +1338,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               {activeTab === 'followup' && 'Followup Status & History'}
               {activeTab === 'summary' && 'Analytics & Summary'}
               {activeTab === 'agent-performance' && 'Agent Performance Report'}
+              {activeTab === 'category-mapping' && 'Category, Team & Status Mapping'}
               {activeTab === 'profiles' && 'Manager Profile & Sheet Integration'}
+              {activeTab === 'settings' && 'System Settings & Data Export Hub'}
             </h1>
           </div>
 
@@ -1900,7 +2150,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                 </div>
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-bold text-emerald-600">
-                                ৳ {ord.profit.toLocaleString()}
+                                {ord.profit && ord.profit > 0 ? `৳ ${ord.profit.toLocaleString()}` : '-'}
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-emerald-700 font-medium">
                                 {ord.deliveredDate ? OrderService.formatDateTime(ord.deliveredDate) : '-'}
@@ -1963,12 +2213,20 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     if (!quickUpdateOrderId) return;
                     setIsSavingStatus(true);
                     try {
+                      const isDeliv = quickUpdateStatus.toLowerCase() === 'delivered';
+                      const isCanc = quickUpdateStatus.toLowerCase() === 'cancelled';
+                      const nowTs = new Date().toISOString().replace('T', ' ').slice(0, 19);
                       await onUpdateOrderStatus?.(
                         quickUpdateOrderId,
                         {
                           followupStatus: quickUpdateStatus,
+                          orderStatus: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : 'Pending'),
                           orderValue: quickUpdateOrderValue !== '' ? parseFloat(quickUpdateOrderValue) : undefined,
-                          profit: quickUpdateProfit !== '' ? parseFloat(quickUpdateProfit) : undefined,
+                          profit: isDeliv 
+                            ? (quickUpdateProfit !== '' ? parseFloat(quickUpdateProfit) : Math.round((parseFloat(quickUpdateOrderValue) || 0) * 0.20)) 
+                            : 0,
+                          deliveredDate: isDeliv ? nowTs : '',
+                          cancelledDate: isCanc ? nowTs : '',
                           scheduleDate: quickUpdateScheduleDate,
                           scheduledTime: quickUpdateScheduledTime
                         },
@@ -3279,156 +3537,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   </div>
                 </div>
               </div>
-
-              {/* CSV Export */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
-                <div className="flex items-center gap-3 pb-2 border-b border-slate-100">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center font-bold text-blue-700">
-                    <Layers className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-slate-900 text-base">Data Export (CSV)</h3>
-                    <p className="text-xs text-slate-500">Download system data for offline analysis</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <button onClick={() => handleExportCsv(orders, 'orders_export.csv')} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold cursor-pointer">Export Orders</button>
-                  <button onClick={() => handleExportCsv(followupHistory, 'followup_history_export.csv')} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold cursor-pointer">Export Followup History</button>
-                  <button onClick={() => {
-                      const blob = new Blob([OrderService.getUpdatedAppsScriptCode()], {type: 'text/plain'});
-                      const url = URL.createObjectURL(blob);
-                      const link = document.createElement("a");
-                      link.href = url;
-                      link.download = 'Code.gs';
-                      link.click();
-                    }} className="px-4 py-2 bg-slate-100 hover:bg-slate-800 text-slate-800 hover:text-white rounded-xl text-xs font-bold cursor-pointer">Export Apps Script (.gs)</button>
-                </div>
-              </div>
-
-              {/* Google Sheet & Apps Script JavaScript Integration Card */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center font-bold text-purple-700">
-                      <Code className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-slate-900 text-base">Google Sheets &amp; Apps Script Integration</h3>
-                      <p className="text-xs text-slate-500">Live dual-sheet synchronization: 'Orders' database &amp; 'Followup' audit trail</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(OrderService.getUpdatedAppsScriptCode());
-                        setCopiedScript(true);
-                        setTimeout(() => setCopiedScript(false), 2500);
-                      }}
-                      className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-                    >
-                      {copiedScript ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-300" />
-                          <span>Copied Code!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Copy Apps Script (Code.gs)</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Web App URL Configuration */}
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Google Apps Script Web App Deployment URL
-                  </label>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <input
-                      type="url"
-                      value={profileScriptUrl}
-                      onChange={(e) => setProfileScriptUrl(e.target.value)}
-                      placeholder="https://script.google.com/macros/s/.../exec"
-                      className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-medium focus:border-indigo-600 focus:outline-hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        OrderService.setScriptUrl(profileScriptUrl);
-                        setScriptUrlSaved(true);
-                        setTimeout(() => setScriptUrlSaved(false), 3000);
-                        onRefreshOrders();
-                      }}
-                      className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
-                    >
-                      {scriptUrlSaved ? (
-                        <>
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Saved &amp; Synced!</span>
-                        </>
-                      ) : (
-                        <>
-                          <RotateCw className="w-3.5 h-3.5" />
-                          <span>Save &amp; Test Sync</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-slate-400">
-                    Ensure the Web App execution permission is set to <strong>"Execute as: Me"</strong> and <strong>"Who has access: Anyone"</strong>.
-                  </p>
-                </div>
-
-                {/* Google Sheet Schema & Instructions */}
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-700 space-y-2.5">
-                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <span>📋 Google Sheet Dual-Sheet Structure:</span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
-                    <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1">
-                      <span className="font-bold text-indigo-700 block">1. Sheet: 'Orders' (or Sheet1)</span>
-                      <p className="text-slate-600">
-                        Primary order registry. Contains: Order ID, Customer Name, Contact, Channel, Agent, Category, Value, Schedule Date, Scheduled Time, Status, Followup Status, Profit, Delivered Date, Cancelled Date.
-                      </p>
-                    </div>
-                    <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1">
-                      <span className="font-bold text-purple-700 block">2. Sheet: 'Followup'</span>
-                      <p className="text-slate-600">
-                        Full historical audit log. Headers: <strong>Log Timestamp</strong>, <strong>Followup ID</strong>, <strong>Order ID</strong>, Customer Name, Contact, Previous Status, New Status, Order Status, Order Value, Schedule, Updated By, <strong>Action Name</strong>, Notes.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Apps Script JavaScript Viewer */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                      <span>Google Apps Script Source Code (Code.gs)</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(OrderService.getUpdatedAppsScriptCode());
-                        setCopiedScript(true);
-                        setTimeout(() => setCopiedScript(false), 2500);
-                      }}
-                      className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>{copiedScript ? 'Copied to Clipboard' : 'Copy Full Script'}</span>
-                    </button>
-                  </div>
-                  <div className="bg-slate-950 text-slate-200 rounded-xl p-4 font-mono text-[11px] max-h-80 overflow-y-auto leading-relaxed border border-slate-800">
-                    <pre>{OrderService.getUpdatedAppsScriptCode()}</pre>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
@@ -3489,32 +3597,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
                 {/* Google Apps Script Integration */}
                 <div className="space-y-4 pt-6 border-t border-slate-100">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-sm">Google Apps Script Web App URL</h4>
-                      <p className="text-xs text-slate-500">Deploy the script below to Google Sheets to enable live dual-sheet sync ('Orders' & 'Followup')</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(OrderService.getUpdatedAppsScriptCode());
-                        setCopiedScript(true);
-                        setTimeout(() => setCopiedScript(false), 2500);
-                      }}
-                      className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-                    >
-                      {copiedScript ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-300" />
-                          <span>Copied Code!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Copy Apps Script (Code.gs)</span>
-                        </>
-                      )}
-                    </button>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <h4 className="font-bold text-slate-900 text-sm">Google Apps Script Web App URL</h4>
+                    <span className="text-[11px] text-slate-400">Live dual-sheet sync ('Sheet1' &amp; 'Followup')</span>
                   </div>
 
                   <div className="flex gap-2">
@@ -3539,14 +3624,360 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     </button>
                   </div>
 
-                  {/* Apps Script Source Code Viewer */}
-                  <div className="space-y-2 pt-2">
-                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                      Google Apps Script Source Code (Code.gs)
+                  {/* Apps Script Action Controls: Copy, View, Download */}
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <span className="text-xs font-bold text-slate-800">
+                      Google Apps Script Code
                     </span>
-                    <div className="bg-slate-950 text-slate-200 rounded-xl p-4 font-mono text-[11px] max-h-80 overflow-y-auto leading-relaxed border border-slate-800">
-                      <pre>{OrderService.getUpdatedAppsScriptCode()}</pre>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(OrderService.getUpdatedAppsScriptCode());
+                          setCopiedScript(true);
+                          setTimeout(() => setCopiedScript(false), 2500);
+                          showToast('Apps Script copied to clipboard!');
+                        }}
+                        className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                      >
+                        {copiedScript ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-300" />
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copy Script Code</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowAppsScriptModal(true)}
+                        className="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                      >
+                        <Code className="w-3.5 h-3.5 text-indigo-300" />
+                        <span>View Script (Pop-up)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const blob = new Blob([OrderService.getUpdatedAppsScriptCode()], { type: 'text/plain' });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = 'Code.gs';
+                          link.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        <span>Download .gs</span>
+                      </button>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: CATEGORY & TEAM MAPPING */}
+          {activeTab === 'category-mapping' && (
+            <div className="max-w-6xl space-y-6">
+              {/* Header Hero */}
+              <div className="bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 shadow-md border border-indigo-800/40">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold text-xl border border-indigo-400/30">
+                      🏷️
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-base text-white">Category, Order Status, Team, Channel &amp; Team Leader</h3>
+                      <p className="text-xs text-indigo-200 mt-0.5">
+                        Manage master configuration lists for Categories, Order Statuses, Teams, Channels, and Team Leaders. Add or remove items dynamically.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs bg-white/10 text-indigo-100 font-bold px-3 py-1.5 rounded-xl border border-white/10">
+                      5 Master Columns
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quick Column Metrics */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-4">
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                    <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider block">Categories</span>
+                    <span className="text-lg font-extrabold text-white mt-0.5 block">{categories.length}</span>
+                  </div>
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                    <span className="text-[10px] text-emerald-300 font-bold uppercase tracking-wider block">Order Statuses</span>
+                    <span className="text-lg font-extrabold text-white mt-0.5 block">{orderStatuses.length}</span>
+                  </div>
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                    <span className="text-[10px] text-purple-300 font-bold uppercase tracking-wider block">Teams</span>
+                    <span className="text-lg font-extrabold text-white mt-0.5 block">{teamsList.length}</span>
+                  </div>
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                    <span className="text-[10px] text-blue-300 font-bold uppercase tracking-wider block">Channels</span>
+                    <span className="text-lg font-extrabold text-white mt-0.5 block">{channelsList.length}</span>
+                  </div>
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-3 col-span-2 sm:col-span-1">
+                    <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider block">Team Leaders</span>
+                    <span className="text-lg font-extrabold text-white mt-0.5 block">{teamLeadersList.length}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 5 MASTER CONFIGURATION COLUMNS SIDE BY SIDE (Category | Order Status | Team | Channel | Team Leader) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                {/* Column 1: Category */}
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🏷️</span>
+                      <span className="font-extrabold text-xs text-slate-900 uppercase tracking-wider">Category</span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      {categories.length}
+                    </span>
+                  </div>
+                  {/* Add form */}
+                  <form onSubmit={handleAddNewCategory} className="flex gap-1.5 mb-3">
+                    <input
+                      type="text"
+                      value={newCategoryInput}
+                      onChange={(e) => setNewCategoryInput(e.target.value)}
+                      placeholder="Add category..."
+                      className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-indigo-600 font-medium"
+                    />
+                    <button
+                      type="submit"
+                      className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer shrink-0"
+                    >
+                      + Add
+                    </button>
+                  </form>
+                  {/* List */}
+                  <div className="flex-1 space-y-1.5 overflow-y-auto max-h-64 pr-1">
+                    {categories.map((cat) => (
+                      <div
+                        key={cat}
+                        className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-200/60 text-xs transition-colors group"
+                      >
+                        <span className="font-semibold text-slate-800 truncate" title={cat}>{cat}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCategory(cat)}
+                          title={`Remove ${cat}`}
+                          className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors cursor-pointer shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Column 2: Order Status */}
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">📊</span>
+                      <span className="font-extrabold text-xs text-slate-900 uppercase tracking-wider">Order Status</span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {orderStatuses.length}
+                    </span>
+                  </div>
+                  {/* Add form */}
+                  <form onSubmit={handleAddNewOrderStatus} className="flex gap-1.5 mb-3">
+                    <input
+                      type="text"
+                      value={newOrderStatusInput}
+                      onChange={(e) => setNewOrderStatusInput(e.target.value)}
+                      placeholder="Add status..."
+                      className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-indigo-600 font-medium"
+                    />
+                    <button
+                      type="submit"
+                      className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer shrink-0"
+                    >
+                      + Add
+                    </button>
+                  </form>
+                  {/* List */}
+                  <div className="flex-1 space-y-1.5 overflow-y-auto max-h-64 pr-1">
+                    {orderStatuses.map((st) => (
+                      <div
+                        key={st}
+                        className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-200/60 text-xs transition-colors group"
+                      >
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold truncate ${
+                          st === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
+                          st === 'Cancelled' ? 'bg-red-100 text-red-800' :
+                          st === 'Confirmed' ? 'bg-blue-100 text-blue-800' :
+                          st === 'In Progress' ? 'bg-amber-100 text-amber-800' :
+                          'bg-slate-200 text-slate-800'
+                        }`} title={st}>{st}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteOrderStatus(st)}
+                          title={`Remove ${st}`}
+                          className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors cursor-pointer shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Column 3: Team */}
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">👥</span>
+                      <span className="font-extrabold text-xs text-slate-900 uppercase tracking-wider">Team</span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                      {teamsList.length}
+                    </span>
+                  </div>
+                  {/* Add form */}
+                  <form onSubmit={handleAddNewTeamItem} className="flex gap-1.5 mb-3">
+                    <input
+                      type="text"
+                      value={newTeamInput}
+                      onChange={(e) => setNewTeamInput(e.target.value)}
+                      placeholder="Add team..."
+                      className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-indigo-600 font-medium"
+                    />
+                    <button
+                      type="submit"
+                      className="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold cursor-pointer shrink-0"
+                    >
+                      + Add
+                    </button>
+                  </form>
+                  {/* List */}
+                  <div className="flex-1 space-y-1.5 overflow-y-auto max-h-64 pr-1">
+                    {teamsList.map((tm) => (
+                      <div
+                        key={tm}
+                        className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-200/60 text-xs transition-colors group"
+                      >
+                        <span className="font-semibold text-slate-800 truncate" title={tm}>{tm}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTeamItem(tm)}
+                          title={`Remove ${tm}`}
+                          className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors cursor-pointer shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Column 4: Channel */}
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🌐</span>
+                      <span className="font-extrabold text-xs text-slate-900 uppercase tracking-wider">Channel</span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                      {channelsList.length}
+                    </span>
+                  </div>
+                  {/* Add form */}
+                  <form onSubmit={handleAddNewChannel} className="flex gap-1.5 mb-3">
+                    <input
+                      type="text"
+                      value={newChannelInput}
+                      onChange={(e) => setNewChannelInput(e.target.value)}
+                      placeholder="Add channel..."
+                      className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-indigo-600 font-medium"
+                    />
+                    <button
+                      type="submit"
+                      className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer shrink-0"
+                    >
+                      + Add
+                    </button>
+                  </form>
+                  {/* List */}
+                  <div className="flex-1 space-y-1.5 overflow-y-auto max-h-64 pr-1">
+                    {channelsList.map((ch) => (
+                      <div
+                        key={ch}
+                        className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-200/60 text-xs transition-colors group"
+                      >
+                        <span className="font-semibold text-slate-800 truncate" title={ch}>{ch}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteChannel(ch)}
+                          title={`Remove ${ch}`}
+                          className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors cursor-pointer shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Column 5: Team Leader */}
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">👔</span>
+                      <span className="font-extrabold text-xs text-slate-900 uppercase tracking-wider">Team Leader</span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                      {teamLeadersList.length}
+                    </span>
+                  </div>
+                  {/* Add form */}
+                  <form onSubmit={handleAddNewTeamLeader} className="flex gap-1.5 mb-3">
+                    <input
+                      type="text"
+                      value={newTeamLeaderInput}
+                      onChange={(e) => setNewTeamLeaderInput(e.target.value)}
+                      placeholder="Add leader..."
+                      className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-indigo-600 font-medium"
+                    />
+                    <button
+                      type="submit"
+                      className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold cursor-pointer shrink-0"
+                    >
+                      + Add
+                    </button>
+                  </form>
+                  {/* List */}
+                  <div className="flex-1 space-y-1.5 overflow-y-auto max-h-64 pr-1">
+                    {teamLeadersList.map((tl) => (
+                      <div
+                        key={tl}
+                        className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-200/60 text-xs transition-colors group"
+                      >
+                        <span className="font-semibold text-slate-800 truncate" title={tl}>{tl}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTeamLeader(tl)}
+                          title={`Remove ${tl}`}
+                          className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors cursor-pointer shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -3776,12 +4207,21 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   onClick={async () => {
                     setIsSavingStatus(true);
                     try {
+                      const isDeliv = modalFollowupStatus.toLowerCase() === 'delivered';
+                      const isCanc = modalFollowupStatus.toLowerCase() === 'cancelled';
+                      const nowTs = new Date().toISOString().replace('T', ' ').slice(0, 19);
+                      const finalVal = modalOrderValue !== '' ? parseFloat(modalOrderValue) : statusModalOrder.orderValue;
                       await onUpdateOrderStatus?.(
                         statusModalOrder.id,
                         {
                           followupStatus: modalFollowupStatus,
+                          orderStatus: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : 'Pending'),
                           orderValue: modalOrderValue !== '' ? parseFloat(modalOrderValue) : undefined,
-                          profit: modalProfit !== '' ? parseFloat(modalProfit) : undefined,
+                          profit: isDeliv 
+                            ? (modalProfit !== '' ? parseFloat(modalProfit) : Math.round(finalVal * 0.20)) 
+                            : 0,
+                          deliveredDate: isDeliv ? nowTs : '',
+                          cancelledDate: isCanc ? nowTs : '',
                           scheduleDate: modalScheduleDate,
                           scheduledTime: modalScheduledTime
                         },
