@@ -40,7 +40,8 @@ import {
   Activity,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Settings
 } from 'lucide-react';
 import { ORDER_CHANNELS, TIME_SLOTS, getOrderChannels, addOrderChannel } from '../data/mockOrders';
 
@@ -50,6 +51,7 @@ interface ManagerPortalProps {
   onUpdateAgents: (agents: AgentUser[], notify?: boolean) => void;
   orders: OrderItem[];
   followupHistory?: FollowupHistoryItem[];
+  onUpdateFollowupHistory?: (history: FollowupHistoryItem[]) => void;
   onRefreshOrders: () => Promise<void>;
   isRefreshing: boolean;
   onLogout: () => void;
@@ -62,15 +64,21 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   onUpdateAgents,
   orders,
   followupHistory = [],
+  onUpdateFollowupHistory,
   onRefreshOrders,
   isRefreshing,
   onLogout,
   onUpdateOrderStatus
 }) => {
   const isTeamLeader = currentManager.role === 'Team Leader';
-  const [activeTab, setActiveTab] = useState<'profiles' | 'users' | 'orders' | 'followup' | 'summary' | 'agent-performance'>(
+  const [activeTab, setActiveTab] = useState<'profiles' | 'users' | 'orders' | 'followup' | 'summary' | 'agent-performance' | 'settings'>(
     isTeamLeader ? 'summary' : 'users'
   );
+  const [managerToast, setManagerToast] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setManagerToast(msg);
+    setTimeout(() => setManagerToast(null), 3000);
+  };
 
   // Status & Details Modal State
   const [statusModalOrder, setStatusModalOrder] = useState<OrderItem | null>(null);
@@ -178,6 +186,82 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [profileScriptUrl, setProfileScriptUrl] = useState<string>(() => OrderService.getScriptUrl());
   const [scriptUrlSaved, setScriptUrlSaved] = useState(false);
   const [availableChannels, setAvailableChannels] = useState<string[]>(getOrderChannels());
+  const [teams, setTeams] = useState(() => OrderService.getTeams());
+  const [newTeamInputName, setNewTeamInputName] = useState('');
+  const [newTeamLeaderInputName, setNewTeamLeaderInputName] = useState('');
+  const [csvPreviewModal, setCsvPreviewModal] = useState<{ title: string; data: any[]; filename: string } | null>(null);
+
+  const handleAddNewTeam = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTeamInputName.trim()) return;
+    const teamName = newTeamInputName.trim();
+    const tlName = newTeamLeaderInputName.trim() || 'Unassigned TL';
+    const existing = teams.find(t => t.name.toLowerCase() === teamName.toLowerCase());
+    let updatedTeams;
+    if (existing) {
+      updatedTeams = teams.map(t => t.name.toLowerCase() === teamName.toLowerCase() ? { ...t, teamLeaderName: tlName } : t);
+    } else {
+      updatedTeams = [...teams, { name: teamName, teamLeaderName: tlName }];
+    }
+    setTeams(updatedTeams);
+    OrderService.saveTeams(updatedTeams);
+    addOrderChannel(teamName);
+    setAvailableChannels(getOrderChannels());
+    setNewTeamInputName('');
+    setNewTeamLeaderInputName('');
+    if (tlName && tlName !== 'Unassigned TL') {
+      const tlUsername = teamName.toLowerCase() + '_tl';
+      const existingAgent = agents.find(a => a.user.toLowerCase() === tlUsername.toLowerCase());
+      if (!existingAgent) {
+        const newAgent: AgentUser = {
+          user: tlUsername,
+          pass: '123456',
+          name: tlName,
+          role: 'Team Leader',
+          team: teamName,
+          email: `${tlUsername}@portal.local`,
+          status: 'active',
+          failedAttempts: 0
+        };
+        onUpdateAgents([...agents, newAgent], false);
+      }
+    }
+  };
+
+  const handleDeleteTeam = (teamName: string) => {
+    const updated = teams.filter(t => t.name !== teamName);
+    setTeams(updated);
+    OrderService.saveTeams(updated);
+    showToast(`Team "${teamName}" removed successfully!`);
+  };
+
+  const handleUndoFollowup = (historyId: string) => {
+    const item = followupHistory.find(h => String(h.id) === String(historyId));
+    if (!item) return;
+    const isAuth = currentManager.role === 'Manager' || 
+                   item.updatedBy === currentManager.user ||
+                   agents.some(a => a.user === item.updatedBy && a.teamLeaderId === currentManager.user);
+    if (!isAuth) {
+      showToast('Not authorized to remove this follow-up record.');
+      return;
+    }
+    const ord = orders.find(o => String(o.id) === String(item.orderId));
+    if (ord) {
+      onUpdateOrderStatus?.(ord.id, {
+        followupStatus: item.previousStatus,
+        orderStatus: item.previousStatus === 'Delivered' ? 'Delivered' : ord.orderStatus
+      }, currentManager.user, 'Follow-up removed / reverted');
+    }
+    const updatedHistory = followupHistory.filter(h => String(h.id) !== String(historyId));
+    if (onUpdateFollowupHistory) {
+      onUpdateFollowupHistory(updatedHistory);
+    }
+    showToast('Followup record removed and order status reverted!');
+  };
+
+  const handlePreviewCsv = (data: any[], title: string, filename: string) => {
+    setCsvPreviewModal({ title, data, filename });
+  };
 
   const handleExportCsv = (data: any[], filename: string) => {
     if (data.length === 0) return;
@@ -854,7 +938,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   }, [filteredAgentPerformance]);
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 font-sans antialiased overflow-hidden">
+    <div className="flex h-screen bg-slate-50 text-slate-900 font-sans antialiased overflow-hidden select-none">
+      {managerToast && (
+        <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xl flex items-center gap-2 border border-slate-700 animate-fadeIn">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{managerToast}</span>
+        </div>
+      )}
       {/* Manager Sidebar */}
       <aside className="w-64 bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col p-5 border-r border-white/10 shrink-0">
         <div className="flex items-center gap-3 pb-6 mb-6 border-b border-white/10">
@@ -946,17 +1036,31 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           </button>
 
           {currentManager.role === 'Manager' && (
-            <button
-              onClick={() => setActiveTab('profiles')}
-              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-                activeTab === 'profiles'
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                  : 'text-slate-300 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <User className="w-4 h-4" />
-              <span>Profiles</span>
-            </button>
+            <>
+              <button
+                onClick={() => setActiveTab('profiles')}
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                  activeTab === 'profiles'
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                    : 'text-slate-300 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <User className="w-4 h-4" />
+                <span>Profiles</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('settings')}
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                  activeTab === 'settings'
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                    : 'text-slate-300 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <Settings className="w-4 h-4 text-indigo-300" />
+                <span>Settings &amp; Export</span>
+              </button>
+            </>
           )}
         </nav>
 
@@ -1007,6 +1111,76 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {/* TAB: USER DETAILS (AGENT DIRECTORY WITH DETAILS STORE) */}
           {activeTab === 'users' && (
             <div className="space-y-6">
+              {/* Professional Team & Team Leader Creator Card */}
+              <div className="bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 shadow-md border border-indigo-800/40">
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold">
+                      🏢
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-sm text-white">Professional Team &amp; Team Leader Management</h3>
+                      <p className="text-[11px] text-indigo-200">
+                        Create a new team and manually assign/input the Team Leader name.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs bg-white/10 text-indigo-200 font-bold px-3 py-1 rounded-full">
+                    {teams.length} Teams Active
+                  </span>
+                </div>
+
+                <form onSubmit={handleAddNewTeam} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1.5">
+                        New Team Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newTeamInputName}
+                        onChange={(e) => setNewTeamInputName(e.target.value)}
+                        placeholder="e.g. Acquisition Pro"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-indigo-400/30 bg-slate-900 text-white text-xs focus:outline-hidden focus:border-indigo-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1.5">
+                        Team Leader Name (Manual Input)
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newTeamLeaderInputName}
+                        onChange={(e) => setNewTeamLeaderInputName(e.target.value)}
+                        placeholder="e.g. MD Abujar"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-indigo-400/30 bg-slate-900 text-white text-xs focus:outline-hidden focus:border-indigo-400"
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <button
+                        type="submit"
+                        className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-900/30 flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Create Team &amp; Assign TL</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap pt-2">
+                    <span className="text-[11px] text-indigo-300 font-bold uppercase">Active Teams:</span>
+                    {teams.map((t) => (
+                      <span key={t.name} className="px-2.5 py-1 bg-white/10 text-indigo-100 rounded-lg text-xs font-semibold border border-white/10 flex items-center gap-1.5">
+                        <span>{t.name}</span>
+                        <span className="text-[10px] bg-indigo-500/40 text-indigo-200 px-1.5 py-0.2 rounded font-mono">TL: {t.teamLeaderName || 'Unassigned'}</span>
+                      </span>
+                    ))}
+                  </div>
+                </form>
+              </div>
+
               {/* Add / Edit Agent Card */}
               <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs">
                 <div className="flex items-center justify-between mb-4">
@@ -1992,9 +2166,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10">
-                        <th className="py-3 px-3.5 whitespace-nowrap">Timestamp</th>
                         <th className="py-3 px-3.5 whitespace-nowrap text-indigo-700">Followup ID</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Order ID</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Timestamp</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Customer Name</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Contact</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Previous Status</th>
@@ -2005,12 +2179,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <th className="py-3 px-3.5 whitespace-nowrap">Updated By</th>
                         <th className="py-3 px-3.5 whitespace-nowrap text-purple-700">Action Name</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Remarks / Notes</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-800">
                       {followupHistory.length === 0 ? (
                         <tr>
-                          <td colSpan={13} className="text-center py-10 text-slate-400 font-semibold">
+                          <td colSpan={14} className="text-center py-10 text-slate-400 font-semibold">
                             No followup history records logged yet. Change any order status above to create the first record!
                           </td>
                         </tr>
@@ -2036,9 +2211,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           })
                           .map((hist) => (
                             <tr key={hist.id} className="hover:bg-slate-50 transition-colors">
-                              <td className="py-3 px-3.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">{hist.timestamp}</td>
                               <td className="py-3 px-3.5 font-mono font-bold text-indigo-800 whitespace-nowrap">#{hist.followupId || hist.id}</td>
                               <td className="py-3 px-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">#{hist.orderId}</td>
+                              <td className="py-3 px-3.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">{hist.timestamp}</td>
                               <td className="py-3 px-3.5 text-slate-700 whitespace-nowrap">{hist.customerName || '-'}</td>
                               <td className="py-3 px-3.5 text-slate-600 font-mono whitespace-nowrap">{hist.customerContact || '-'}</td>
                               <td className="py-3 px-3.5 text-slate-500 whitespace-nowrap">{hist.previousStatus}</td>
@@ -2048,7 +2223,16 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               <td className="py-3 px-3.5 text-slate-600 text-[10px] whitespace-nowrap">{hist.scheduleDate}<br/>{hist.scheduledTime}</td>
                               <td className="py-3 px-3.5 font-bold text-slate-700 whitespace-nowrap">{hist.updatedBy}</td>
                               <td className="py-3 px-3.5 whitespace-nowrap"><span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">{hist.action || 'Follow-up Update'}</span></td>
-                              <td className="py-3 px-3.5 text-slate-600 max-w-[250px] truncate" title={hist.notes}>{hist.notes || '-'}</td>
+                              <td className="py-3 px-3.5 text-slate-600 max-w-[200px] truncate" title={hist.notes}>{hist.notes || '-'}</td>
+                              <td className="py-3 px-3.5 text-center whitespace-nowrap">
+                                <button
+                                  onClick={() => handleUndoFollowup(hist.id)}
+                                  title="Remove Followup & Revert Order Status"
+                                  className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-md font-bold text-[10px] cursor-pointer"
+                                >
+                                  Undo / Remove
+                                </button>
+                              </td>
                             </tr>
                           ))
                       )}
@@ -3247,8 +3431,159 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               </div>
             </div>
           )}
+
+          {/* TAB: SETTINGS & EXPORT HUB */}
+          {activeTab === 'settings' && (
+            <div className="max-w-4xl space-y-6">
+              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-6">
+                <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center font-bold text-indigo-700">
+                      <Settings className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-slate-900 text-base">Manager Settings &amp; Data Export Hub</h3>
+                      <p className="text-xs text-slate-500">Configure Apps Script integration, export CSV with preview, and manage system data.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CSV Export with Preview */}
+                <div className="space-y-4">
+                  <h4 className="font-bold text-slate-900 text-sm">CSV Data Export &amp; Preview</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                      <div>
+                        <h5 className="font-bold text-xs text-slate-800">Order Details CSV</h5>
+                        <p className="text-[11px] text-slate-500">{orders.length} orders loaded</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => handlePreviewCsv(orders, 'Order Details CSV Preview', 'orders_export.csv')} className="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold cursor-pointer">Preview</button>
+                        <button onClick={() => handleExportCsv(orders, 'orders_export.csv')} className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer">Download</button>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                      <div>
+                        <h5 className="font-bold text-xs text-slate-800">Followup History CSV</h5>
+                        <p className="text-[11px] text-slate-500">{followupHistory.length} audit logs</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => handlePreviewCsv(followupHistory, 'Followup History CSV Preview', 'followup_history_export.csv')} className="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold cursor-pointer">Preview</button>
+                        <button onClick={() => handleExportCsv(followupHistory, 'followup_history_export.csv')} className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer">Download</button>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                      <div>
+                        <h5 className="font-bold text-xs text-slate-800">Agent Directory CSV</h5>
+                        <p className="text-[11px] text-slate-500">{agents.length} accounts</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => handlePreviewCsv(agents, 'Agent Directory CSV Preview', 'agents_directory_export.csv')} className="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold cursor-pointer">Preview</button>
+                        <button onClick={() => handleExportCsv(agents, 'agents_directory_export.csv')} className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer">Download</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Google Apps Script Integration */}
+                <div className="space-y-4 pt-4 border-t border-slate-100">
+                  <h4 className="font-bold text-slate-900 text-sm">Google Apps Script Web App URL</h4>
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={profileScriptUrl}
+                      onChange={(e) => setProfileScriptUrl(e.target.value)}
+                      placeholder="https://script.google.com/macros/s/.../exec"
+                      className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-medium focus:border-indigo-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        OrderService.setScriptUrl(profileScriptUrl);
+                        setScriptUrlSaved(true);
+                        setTimeout(() => setScriptUrlSaved(false), 3000);
+                        onRefreshOrders();
+                      }}
+                      className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold cursor-pointer"
+                    >
+                      {scriptUrlSaved ? 'Saved & Synced!' : 'Save & Sync'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </main>
       </div>
+
+      {/* CSV Preview Modal */}
+      {csvPreviewModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 animate-fadeIn">
+            <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-base">{csvPreviewModal.title}</h3>
+                <p className="text-xs text-slate-500">Showing first {Math.min(csvPreviewModal.data.length, 50)} records of {csvPreviewModal.data.length} total rows</p>
+              </div>
+              <button
+                onClick={() => setCsvPreviewModal(null)}
+                className="w-8 h-8 rounded-lg bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-700 font-bold cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              {csvPreviewModal.data.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 font-semibold">No data available to preview.</div>
+              ) : (
+                <div className="overflow-x-auto border rounded-xl border-slate-200">
+                  <table className="w-full text-xs text-left">
+                    <thead>
+                      <tr className="bg-slate-100 font-bold border-b border-slate-200">
+                        {Object.keys(csvPreviewModal.data[0]).map((key) => (
+                          <th key={key} className="py-2.5 px-3 whitespace-nowrap">{key}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {csvPreviewModal.data.slice(0, 50).map((row, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50 whitespace-nowrap">
+                          {Object.values(row).map((val, i) => (
+                            <td key={i} className="py-2.5 px-3 text-slate-700 max-w-[200px] truncate" title={String(val ?? '')}>
+                              {String(val ?? '-')}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
+              <button
+                onClick={() => setCsvPreviewModal(null)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Close Preview
+              </button>
+              <button
+                onClick={() => {
+                  handleExportCsv(csvPreviewModal.data, csvPreviewModal.filename);
+                  setCsvPreviewModal(null);
+                }}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 shadow-md"
+              >
+                <span>Download CSV File</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal: Status & Remarks Update Modal */}
       {statusModalOrder && (

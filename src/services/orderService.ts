@@ -8,6 +8,7 @@ export const DEFAULT_SCRIPT_URL =
 const STORAGE_KEYS = {
   ORDERS: 'agent_portal_orders_v2',
   AGENTS: 'agentUsers',
+  TEAMS: 'agent_portal_teams_v1',
   SCRIPT_URL: 'agent_portal_script_url',
   LAST_SYNC: 'agent_portal_last_sync',
   FOLLOWUP_HISTORY: 'agent_portal_followup_history'
@@ -46,6 +47,29 @@ export class OrderService {
 
   static saveAgents(agents: AgentUser[]): void {
     localStorage.setItem(STORAGE_KEYS.AGENTS, JSON.stringify(agents));
+  }
+
+  static getTeams(): { name: string; teamLeaderName?: string; teamLeaderId?: string }[] {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.TEAMS);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // fallback
+    }
+    const defaultTeams = [
+      { name: 'Acquisition', teamLeaderName: 'Manager (Admin)', teamLeaderId: 'manager' },
+      { name: 'Sales', teamLeaderName: 'Manager (Admin)', teamLeaderId: 'manager' },
+      { name: 'Support', teamLeaderName: 'Manager (Admin)', teamLeaderId: 'manager' }
+    ];
+    localStorage.setItem(STORAGE_KEYS.TEAMS, JSON.stringify(defaultTeams));
+    return defaultTeams;
+  }
+
+  static saveTeams(teams: { name: string; teamLeaderName?: string; teamLeaderId?: string }[]): void {
+    localStorage.setItem(STORAGE_KEYS.TEAMS, JSON.stringify(teams));
   }
 
   static getLocalOrders(): OrderItem[] {
@@ -344,12 +368,49 @@ export class OrderService {
       const stored = localStorage.getItem(STORAGE_KEYS.FOLLOWUP_HISTORY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {
       // fallback
     }
-    return [];
+    const defaultHistory: FollowupHistoryItem[] = [
+      {
+        id: '1',
+        followupId: 1,
+        orderId: '1001',
+        customerName: 'Rahim Ahmed',
+        customerContact: '01712345678',
+        previousStatus: 'Pending',
+        newStatus: 'Confirmed',
+        orderStatus: 'In Progress',
+        orderValue: 1500,
+        scheduleDate: new Date().toISOString().split('T')[0],
+        scheduledTime: '11AM to 12PM',
+        updatedBy: 'agent01',
+        timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        action: 'Status Change',
+        notes: 'Customer confirmed delivery schedule.'
+      },
+      {
+        id: '2',
+        followupId: 2,
+        orderId: '1002',
+        customerName: 'Fatema Begum',
+        customerContact: '01898765432',
+        previousStatus: 'Confirmed',
+        newStatus: 'Delivered',
+        orderStatus: 'Delivered',
+        orderValue: 2400,
+        scheduleDate: new Date().toISOString().split('T')[0],
+        scheduledTime: '2PM to 3PM',
+        updatedBy: 'manager',
+        timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        action: 'Status Change',
+        notes: 'Order successfully delivered & paid.'
+      }
+    ];
+    localStorage.setItem(STORAGE_KEYS.FOLLOWUP_HISTORY, JSON.stringify(defaultHistory));
+    return defaultHistory;
   }
 
   static saveFollowupHistory(history: FollowupHistoryItem[]): void {

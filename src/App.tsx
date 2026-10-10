@@ -202,6 +202,10 @@ export default function App() {
           onUpdateAgents={handleUpdateAgentsFromManager}
           orders={orders}
           followupHistory={followupHistory}
+          onUpdateFollowupHistory={(newHist) => {
+            setFollowupHistory(newHist);
+            OrderService.saveFollowupHistory(newHist);
+          }}
           onRefreshOrders={() => loadOrdersData(true)}
           isRefreshing={isRefreshing}
           onLogout={handleLogout}
