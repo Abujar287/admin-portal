@@ -3488,8 +3488,35 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 </div>
 
                 {/* Google Apps Script Integration */}
-                <div className="space-y-4 pt-4 border-t border-slate-100">
-                  <h4 className="font-bold text-slate-900 text-sm">Google Apps Script Web App URL</h4>
+                <div className="space-y-4 pt-6 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">Google Apps Script Web App URL</h4>
+                      <p className="text-xs text-slate-500">Deploy the script below to Google Sheets to enable live dual-sheet sync ('Orders' & 'Followup')</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(OrderService.getUpdatedAppsScriptCode());
+                        setCopiedScript(true);
+                        setTimeout(() => setCopiedScript(false), 2500);
+                      }}
+                      className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                    >
+                      {copiedScript ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-300" />
+                          <span>Copied Code!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy Apps Script (Code.gs)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
                   <div className="flex gap-2">
                     <input
                       type="url"
@@ -3510,6 +3537,16 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     >
                       {scriptUrlSaved ? 'Saved & Synced!' : 'Save & Sync'}
                     </button>
+                  </div>
+
+                  {/* Apps Script Source Code Viewer */}
+                  <div className="space-y-2 pt-2">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                      Google Apps Script Source Code (Code.gs)
+                    </span>
+                    <div className="bg-slate-950 text-slate-200 rounded-xl p-4 font-mono text-[11px] max-h-80 overflow-y-auto leading-relaxed border border-slate-800">
+                      <pre>{OrderService.getUpdatedAppsScriptCode()}</pre>
+                    </div>
                   </div>
                 </div>
               </div>
