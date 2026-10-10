@@ -21,6 +21,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
 }) => {
   const [filterCreateDate, setFilterCreateDate] = useState<DateFilterType>('');
   const [filterScheduleDate, setFilterScheduleDate] = useState<DateFilterType>('');
+  const [filterFollowupStatus, setFilterFollowupStatus] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -48,6 +49,8 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
       const matchSchedule = OrderService.checkDateMatch(order.scheduleDate, filterScheduleDate);
       if (!matchSchedule) return false;
 
+      if (filterFollowupStatus && order.followupStatus !== filterFollowupStatus) return false;
+
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const searchable = [
@@ -71,6 +74,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
   const handleClearFilters = () => {
     setFilterCreateDate('');
     setFilterScheduleDate('');
+    setFilterFollowupStatus('');
     setSearchQuery('');
   };
 
@@ -182,6 +186,23 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
               <option value="last30">Last 30 Days</option>
               <option value="thisMonth">This Month</option>
               <option value="lastMonth">Last Month</option>
+            </select>
+          </div>
+
+          {/* Filter Followup Status */}
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+              Filter by Followup Status
+            </label>
+            <select
+              value={filterFollowupStatus}
+              onChange={(e) => setFilterFollowupStatus(e.target.value)}
+              className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white"
+            >
+              <option value="">All Statuses</option>
+              {Array.from(new Set(orders.map(o => o.followupStatus || 'Pending'))).map(status => (
+                <option key={status} value={status}>{status}</option>
+              ))}
             </select>
           </div>
 

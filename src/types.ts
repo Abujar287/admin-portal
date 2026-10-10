@@ -30,6 +30,7 @@ export interface ManagerUser {
 
 export interface OrderItem {
   id: string; // Order Id
+  customerId: string; // Customer Id
   customerName: string;
   customerContact: string;
   gender: 'Male' | 'Female' | 'Other' | string;

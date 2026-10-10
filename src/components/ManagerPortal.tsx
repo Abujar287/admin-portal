@@ -101,6 +101,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   onUpdateOrderStatus
 }) => {
   const isTeamLeader = currentManager.role === 'Team Leader';
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<
     'profiles' | 'users' | 'orders' | 'followup' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping'
   >(isTeamLeader ? 'summary' : 'users');
@@ -183,6 +184,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   // Orders Tab Filters
   const [orderCreateFilter, setOrderCreateFilter] = useState<DateFilterType>('all');
+  const [filterFollowupStatus, setFilterFollowupStatus] = useState<string>('all');
   const [orderCreateStart, setOrderCreateStart] = useState('');
   const [orderCreateEnd, setOrderCreateEnd] = useState('');
 
@@ -192,6 +194,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   const [orderIdSearch, setOrderIdSearch] = useState('');
   const [contactSearch, setContactSearch] = useState('');
+  const [searchType, setSearchType] = useState<'orderId' | 'customer' | 'name'>('orderId');
+  const [searchValue, setSearchValue] = useState('');
 
   // Single Summary Date Filter State
   const [summaryDateFilter, setSummaryDateFilter] = useState<DateFilterType>('all');
@@ -787,14 +791,20 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       if (!matchDate(r.scheduleDate, orderScheduleFilter, orderScheduleStart, orderScheduleEnd)) {
         return false;
       }
-      if (orderIdSearch.trim()) {
-        const idStr = String(r.id || '').toLowerCase();
-        if (!idStr.includes(orderIdSearch.trim().toLowerCase())) return false;
+      if (searchValue.trim()) {
+        const val = searchValue.trim().toLowerCase();
+        if (searchType === 'orderId') {
+          const idStr = String(r.id || '').toLowerCase();
+          if (!idStr.includes(val)) return false;
+        } else if (searchType === 'customer') {
+          const cStr = String(r.customerContact || '').toLowerCase();
+          if (!cStr.includes(val)) return false;
+        } else if (searchType === 'name') {
+          const nStr = String(r.customerName || '').toLowerCase();
+          if (!nStr.includes(val)) return false;
+        }
       }
-      if (contactSearch.trim()) {
-        const cStr = String(r.customerContact || '').toLowerCase();
-        if (!cStr.includes(contactSearch.trim().toLowerCase())) return false;
-      }
+      if (filterFollowupStatus !== 'all' && (r.followupStatus || 'Pending') !== filterFollowupStatus) return false;
       return true;
     });
   }, [
@@ -805,8 +815,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     orderScheduleFilter,
     orderScheduleStart,
     orderScheduleEnd,
-    orderIdSearch,
-    contactSearch
+    searchType,
+    searchValue,
+    filterFollowupStatus
   ]);
 
   // Summary Metrics & Aggregations with single date filter
@@ -1182,37 +1193,38 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         </div>
       )}
       {/* Manager Sidebar */}
-      <aside className="w-64 bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col p-5 border-r border-white/10 shrink-0">
-        <div className="flex items-center gap-3 pb-6 mb-6 border-b border-white/10">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white shadow-lg">
-            📊
+      <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col p-5 border-r border-white/10 shrink-0 transition-all duration-300`}>
+        <div className="flex items-center justify-between pb-6 mb-6 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white shadow-lg">
+              📊
+            </div>
+            {isSidebarOpen && (
+              <div>
+                <h2 className="font-extrabold text-sm tracking-tight text-white">Manager Portal</h2>
+                <p className="text-[10px] text-indigo-300 uppercase tracking-widest font-semibold">
+                  Control Hub
+                </p>
+              </div>
+            )}
           </div>
-          <div>
-            <h2 className="font-extrabold text-sm tracking-tight text-white">Manager Portal</h2>
-            <p className="text-[10px] text-indigo-300 uppercase tracking-widest font-semibold">
-              Control Hub
-            </p>
-          </div>
+          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-white/10 rounded-lg">
+            <span className="text-xl">⋮</span>
+          </button>
         </div>
 
         <nav className="flex-1 space-y-1.5">
-          {/* User Details strictly restricted for Team Leader */}
-          {!isTeamLeader && (
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-                activeTab === 'users'
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                  : 'text-slate-300 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span>User Details</span>
-              <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
-                {agents.length}
-              </span>
-            </button>
-          )}
+          <button
+            onClick={() => setActiveTab('summary')}
+            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+              activeTab === 'summary'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                : 'text-slate-300 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <BarChart2 className="w-4 h-4" />
+            {isSidebarOpen && <span>Summary</span>}
+          </button>
 
           <button
             onClick={() => setActiveTab('orders')}
@@ -1223,10 +1235,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             }`}
           >
             <FileText className="w-4 h-4" />
-            <span>Orders</span>
-            <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
-              {orders.length}
-            </span>
+            {isSidebarOpen && <span>Orders</span>}
+            {isSidebarOpen && (
+              <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
+                {orders.length}
+              </span>
+            )}
           </button>
 
           <button
@@ -1238,23 +1252,32 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             }`}
           >
             <History className="w-4 h-4" />
-            <span>Followup</span>
-            <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
-              {followupHistory.length}
-            </span>
+            {isSidebarOpen && <span>Followup</span>}
+            {isSidebarOpen && (
+              <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
+                {followupHistory.length}
+              </span>
+            )}
           </button>
 
-          <button
-            onClick={() => setActiveTab('summary')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-              activeTab === 'summary'
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                : 'text-slate-300 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <BarChart2 className="w-4 h-4" />
-            <span>Summary</span>
-          </button>
+          {!isTeamLeader && (
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                activeTab === 'users'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              {isSidebarOpen && <span>User Details</span>}
+              {isSidebarOpen && (
+                <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
+                  {agents.length}
+                </span>
+              )}
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab('agent-performance')}
@@ -1265,10 +1288,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             }`}
           >
             <TrendingUp className="w-4 h-4 text-amber-400" />
-            <span>Agent Performance</span>
-            <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
-              {summaryStats.agentSummary.length}
-            </span>
+            {isSidebarOpen && <span>Agent Performance</span>}
+            {isSidebarOpen && (
+              <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
+                {summaryStats.agentSummary.length}
+              </span>
+            )}
           </button>
 
           {!isTeamLeader && (
@@ -1282,7 +1307,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 }`}
               >
                 <Layers className="w-4 h-4 text-purple-300" />
-                <span>Category Mapping</span>
+                {isSidebarOpen && <span>Category Mapping</span>}
               </button>
 
               <button
@@ -1294,7 +1319,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 }`}
               >
                 <User className="w-4 h-4" />
-                <span>Profiles</span>
+                {isSidebarOpen && <span>Profiles</span>}
               </button>
 
               <button
@@ -1306,7 +1331,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 }`}
               >
                 <Settings className="w-4 h-4 text-indigo-300" />
-                <span>Settings &amp; Export</span>
+                {isSidebarOpen && <span>Settings &amp; Export</span>}
               </button>
             </>
           )}
@@ -1318,7 +1343,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             className="w-full py-2.5 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/30 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
-            <span>Sign Out</span>
+            {isSidebarOpen && <span>Sign Out</span>}
           </button>
         </div>
       </aside>
@@ -1894,9 +1919,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="flex items-center gap-4">
                   {/* Create Date Filter */}
-                  <div>
+                  <div className="flex-1">
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
                       Create Date
                     </label>
@@ -1913,29 +1938,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       <option value="thisMonth">This Month</option>
                       <option value="lastMonth">Last Month</option>
                       <option value="lastYear">Last Year</option>
-                      <option value="custom">Custom Date Range</option>
                     </select>
-                    {orderCreateFilter === 'custom' && (
-                      <div className="flex items-center gap-1.5 mt-2">
-                        <input
-                          type="date"
-                          value={orderCreateStart}
-                          onChange={(e) => setOrderCreateStart(e.target.value)}
-                          className="w-full text-xs p-1 border rounded"
-                        />
-                        <span className="text-xs text-slate-400">to</span>
-                        <input
-                          type="date"
-                          value={orderCreateEnd}
-                          onChange={(e) => setOrderCreateEnd(e.target.value)}
-                          className="w-full text-xs p-1 border rounded"
-                        />
-                      </div>
-                    )}
                   </div>
 
                   {/* Schedule Date Filter */}
-                  <div>
+                  <div className="flex-1">
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
                       Schedule Date
                     </label>
@@ -1952,53 +1959,47 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       <option value="thisMonth">This Month</option>
                       <option value="lastMonth">Last Month</option>
                       <option value="lastYear">Last Year</option>
-                      <option value="custom">Custom Date Range</option>
                     </select>
-                    {orderScheduleFilter === 'custom' && (
-                      <div className="flex items-center gap-1.5 mt-2">
-                        <input
-                          type="date"
-                          value={orderScheduleStart}
-                          onChange={(e) => setOrderScheduleStart(e.target.value)}
-                          className="w-full text-xs p-1 border rounded"
-                        />
-                        <span className="text-xs text-slate-400">to</span>
-                        <input
-                          type="date"
-                          value={orderScheduleEnd}
-                          onChange={(e) => setOrderScheduleEnd(e.target.value)}
-                          className="w-full text-xs p-1 border rounded"
-                        />
-                      </div>
-                    )}
                   </div>
 
-                  {/* Order ID Search */}
+                  {/* Followup Status Filter */}
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                      Order ID
+                      Followup Status
                     </label>
-                    <input
-                      type="text"
-                      value={orderIdSearch}
-                      onChange={(e) => setOrderIdSearch(e.target.value)}
-                      placeholder="Search order ID..."
+                    <select
+                      value={filterFollowupStatus}
+                      onChange={(e) => setFilterFollowupStatus(e.target.value)}
                       className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
-                    />
+                    >
+                      <option value="all">All Statuses</option>
+                      {orderStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
                   </div>
 
-                  {/* Contact Number Search */}
-                  <div>
+                  {/* Combined Search */}
+                  <div className="flex-2">
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                      Contact Number
+                      Search
                     </label>
-                    <input
-                      type="text"
-                      value={contactSearch}
-                      onChange={(e) => setContactSearch(e.target.value)}
-                      placeholder="Search phone number..."
-                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
-                    />
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={searchType}
+                        onChange={(e) => setSearchType(e.target.value as 'orderId' | 'customer' | 'name')}
+                        className="px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
+                      >
+                        <option value="orderId">Order ID</option>
+                        <option value="customer">Customer #</option>
+                        <option value="name">Name</option>
+                      </select>
+                      <input
+                        type="text"
+                        placeholder={`Search by ${searchType === 'orderId' ? 'ID' : searchType === 'customer' ? 'Customer #' : 'Name'}...`}
+                        value={searchValue}
+                        onChange={(e) => setSearchValue(e.target.value)}
+                        className="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-300"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -2547,56 +2548,55 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               </div>
 
               {/* Summary Metrics Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-6 gap-4">
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Create Orders</span>
-                  <p className="text-3xl font-extrabold text-indigo-700 mt-2">{summaryStats.createOrdersCount}</p>
+                  <p className="text-xl font-extrabold text-indigo-700 mt-1">{summaryStats.createOrdersCount}</p>
                 </div>
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Delivered Orders</span>
-                  <p className="text-3xl font-extrabold text-emerald-700 mt-2">{summaryStats.deliveredOrdersCount}</p>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Served Orders</span>
+                  <p className="text-xl font-extrabold text-emerald-700 mt-1">{summaryStats.deliveredOrdersCount}</p>
                 </div>
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cancelled Orders</span>
-                  <p className="text-3xl font-extrabold text-red-700 mt-2">{summaryStats.cancelledOrdersCount}</p>
+                  <p className="text-xl font-extrabold text-red-700 mt-1">{summaryStats.cancelledOrdersCount}</p>
                 </div>
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Open Orders (Lifetime)</span>
-                  <p className="text-3xl font-extrabold text-amber-700 mt-2">{summaryStats.openOrdersCount}</p>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Open Orders</span>
+                  <p className="text-xl font-extrabold text-amber-700 mt-1">{summaryStats.openOrdersCount}</p>
                 </div>
-
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Open Order Value (Lifetime)</span>
-                  <p className="text-2xl font-extrabold text-amber-700 mt-2">৳ {summaryStats.openOrdersValue.toLocaleString()}</p>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Open Value</span>
+                  <p className="text-lg font-extrabold text-amber-700 mt-1">৳ {summaryStats.openOrdersValue.toLocaleString()}</p>
                 </div>
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Order Value</span>
-                  <p className="text-2xl font-extrabold text-slate-900 mt-2">৳ {summaryStats.totalOrderValue.toLocaleString()}</p>
-                </div>
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Delivered Order Value</span>
-                  <p className="text-2xl font-extrabold text-indigo-700 mt-2">৳ {summaryStats.deliveredOrderValue.toLocaleString()}</p>
-                </div>
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Profit</span>
-                  <p className="text-2xl font-extrabold text-emerald-700 mt-2">৳ {summaryStats.totalProfit.toLocaleString()}</p>
+                  <p className="text-lg font-extrabold text-slate-900 mt-1">৳ {summaryStats.totalOrderValue.toLocaleString()}</p>
                 </div>
 
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Delivered Value</span>
+                  <p className="text-lg font-extrabold text-indigo-700 mt-1">৳ {summaryStats.deliveredOrderValue.toLocaleString()}</p>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Profit</span>
+                  <p className="text-lg font-extrabold text-emerald-700 mt-1">৳ {summaryStats.totalProfit.toLocaleString()}</p>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Bucket Size</span>
-                  <p className="text-2xl font-extrabold text-blue-700 mt-2">৳ {summaryStats.bucketSize.toLocaleString()}</p>
-                </div>
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Delivered Ratio</span>
-                  <p className="text-2xl font-extrabold text-emerald-600 mt-2">{summaryStats.deliveredRatio}%</p>
-                </div>
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cancelled Ratio</span>
-                  <p className="text-2xl font-extrabold text-red-600 mt-2">{summaryStats.cancelledRatio}%</p>
+                  <p className="text-lg font-extrabold text-blue-700 mt-1">৳ {summaryStats.bucketSize.toLocaleString()}</p>
                 </div>
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">NR Ratio</span>
-                  <p className="text-2xl font-extrabold text-purple-600 mt-2">{summaryStats.nrRatio}%</p>
+                  <p className="text-lg font-extrabold text-purple-600 mt-1">{summaryStats.nrRatio}%</p>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Delivered Ratio</span>
+                  <p className="text-lg font-extrabold text-emerald-600 mt-1">{summaryStats.deliveredRatio}%</p>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cancelled Ratio</span>
+                  <p className="text-lg font-extrabold text-red-600 mt-1">{summaryStats.cancelledRatio}%</p>
                 </div>
               </div>
 
@@ -3734,7 +3734,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               </div>
 
               {/* 5 MASTER CONFIGURATION COLUMNS SIDE BY SIDE (Category | Order Status | Team | Channel | Team Leader) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-5 gap-3">
                 {/* Column 1: Category */}
                 <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col">
                   <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">

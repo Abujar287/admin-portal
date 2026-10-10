@@ -206,26 +206,27 @@ export class OrderService {
     };
 
     const idxOrder    = getColIdx(['order id', 'order_id'], 0);
-    const idxCustName = getColIdx(['customer name'], 1);
+    const idxCustId   = getColIdx(['customer id', 'customer_id'], 1);
     const idxCustCont = getColIdx(['customer contact', 'phone', 'contact'], 2);
-    const idxGender   = getColIdx(['gender'], 3);
-    const idxCreateDt = getColIdx(['create date', 'created'], 4);
-    const idxChannel  = getColIdx(['order channel', 'channel'], 5);
-    const idxAgentId  = getColIdx(['agent id', 'agent_id', 'createdbynum'], 6);
-    const idxAgentNm  = getColIdx(['agent name', 'createdbyname'], 7);
-    const idxProdCat  = getColIdx(['product category', 'product catrgory'], 8);
-    const idxProdNm   = getColIdx(['product name'], 9);
-    const idxCity     = getColIdx(['city'], 10);
-    const idxArea     = getColIdx(['delivery area', 'area'], 11);
-    const idxAddress  = getColIdx(['address details', 'address'], 12);
-    const idxSchedDt  = getColIdx(['schedule date'], 13);
-    const idxSchedTm  = getColIdx(['scheduled time', 'time'], 14);
-    const idxValue    = getColIdx(['order value', 'value'], 15);
-    const idxStatus   = getColIdx(['order status', 'status'], 16);
-    const idxFollowup = getColIdx(['followup status', 'folllowup status'], 17);
-    const idxProfit   = getColIdx(['profit'], 18);
-    const idxDelivDt  = getColIdx(['delivered date', 'delivered_date'], 19);
-    const idxCancDt   = getColIdx(['cancelled date', 'cancelled_date'], 20);
+    const idxCustName = getColIdx(['customer name'], 3);
+    const idxGender   = getColIdx(['gender'], 4);
+    const idxCreateDt = getColIdx(['create date', 'created'], 5);
+    const idxChannel  = getColIdx(['order channel', 'channel'], 6);
+    const idxAgentId  = getColIdx(['agent id', 'agent_id', 'createdbynum'], 7);
+    const idxAgentNm  = getColIdx(['agent name', 'createdbyname'], 8);
+    const idxProdCat  = getColIdx(['product category', 'product catrgory'], 9);
+    const idxProdNm   = getColIdx(['product name'], 10);
+    const idxCity     = getColIdx(['city'], 11);
+    const idxArea     = getColIdx(['delivery area', 'area'], 12);
+    const idxAddress  = getColIdx(['address details', 'address'], 13);
+    const idxSchedDt  = getColIdx(['schedule date'], 14);
+    const idxSchedTm  = getColIdx(['scheduled time', 'time'], 15);
+    const idxValue    = getColIdx(['order value', 'value'], 16);
+    const idxStatus   = getColIdx(['order status', 'status'], 17);
+    const idxFollowup = getColIdx(['followup status', 'folllowup status'], 18);
+    const idxProfit   = getColIdx(['profit'], 19);
+    const idxDelivDt  = getColIdx(['delivered date', 'delivered_date'], 20);
+    const idxCancDt   = getColIdx(['cancelled date', 'cancelled_date'], 21);
 
     return rows
       .filter(row => {
@@ -259,6 +260,7 @@ export class OrderService {
 
         return {
           id: orderId,
+          customerId: valOrEmpty(idxCustId, '1'),
           customerName: valOrEmpty(idxCustName, 'Customer'),
           customerContact: valOrEmpty(idxCustCont, '-'),
           gender: valOrEmpty(idxGender, 'Other'),
@@ -304,12 +306,24 @@ export class OrderService {
     }
     const orderId = String(nextNum);
 
+    // Customer Id management
+    const customerMap: Record<string, string> = JSON.parse(localStorage.getItem('customer_id_map') || '{}');
+    let customerId = customerMap[newOrder.customerContact];
+    if (!customerId) {
+        const existingIds = Object.values(customerMap).map(Number);
+        const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
+        customerId = String(maxId + 1);
+        customerMap[newOrder.customerContact] = customerId;
+        localStorage.setItem('customer_id_map', JSON.stringify(customerMap));
+    }
+
     // Profit = 20%
     const calculatedProfit = newOrder.profit !== undefined ? newOrder.profit : Math.round(newOrder.orderValue * 0.20);
 
     let fullOrder: OrderItem = {
       ...newOrder,
       id: orderId,
+      customerId: customerId,
       profit: calculatedProfit
     };
 
@@ -324,6 +338,7 @@ export class OrderService {
     if (scriptUrl) {
       try {
         const params = new URLSearchParams();
+        params.append('customerId', fullOrder.customerId);
         params.append('customerName', fullOrder.customerName);
         params.append('customerContact', fullOrder.customerContact);
         params.append('gender', fullOrder.gender);
@@ -918,24 +933,25 @@ function doPost(e) {
   
   var rowData = [
     newOrderId,                  // 0: Order Id
-    data.customerName || '',     // 1: Customer Name
+    data.customerId || '',       // 1: Customer Id
     data.customerContact || '',  // 2: Customer Contact
-    data.gender || '',           // 3: Gender
-    data.createDate || '',       // 4: Create Date
-    data.orderChannel || '',     // 5: Order Channel
-    data.createdByNum || '',     // 6: Agent ID
-    data.createdByName || '',    // 7: Agent Name
-    data.productCategory || '',  // 8: Product catrgory
-    data.productName || '',      // 9: Product Name
-    data.city || '',             // 10: City
-    data.deliveryArea || '',     // 11: Delivery Area
-    data.addressDetails || '',   // 12: Address Details
-    data.scheduleDate || '',     // 13: Schedule Date
-    data.scheduledTime || '',    // 14: Scheduled Time
-    orderVal,                    // 15: Order Value
-    data.orderStatus || 'Pending',     // 16: Order Status
-    data.followupStatus || 'Pending',  // 17: Folllowup Status
-    calculatedProfit             // 18: Profit
+    data.customerName || '',     // 3: Customer Name
+    data.gender || '',           // 4: Gender
+    data.createDate || '',       // 5: Create Date
+    data.orderChannel || '',     // 6: Order Channel
+    data.createdByNum || '',     // 7: Agent ID
+    data.createdByName || '',    // 8: Agent Name
+    data.productCategory || '',  // 9: Product catrgory
+    data.productName || '',      // 10: Product Name
+    data.city || '',             // 11: City
+    data.deliveryArea || '',     // 12: Delivery Area
+    data.addressDetails || '',   // 13: Address Details
+    data.scheduleDate || '',     // 14: Schedule Date
+    data.scheduledTime || '',    // 15: Scheduled Time
+    orderVal,                    // 16: Order Value
+    data.orderStatus || 'Pending',     // 17: Order Status
+    data.followupStatus || 'Pending',  // 18: Folllowup Status
+    calculatedProfit             // 19: Profit
   ];
   
   mainSheet.appendRow(rowData);
