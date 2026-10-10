@@ -48,7 +48,7 @@ export default function App() {
       });
     } else if (savedRole === 'agent' && savedUser) {
       const allAgents = OrderService.getAgents();
-      const found = allAgents.find((a) => a.user.toLowerCase() === savedUser.toLowerCase());
+      const found = allAgents.find((a) => (a?.user || '').toLowerCase() === String(savedUser).toLowerCase());
       if (found && found.status !== 'deactivated') {
         setCurrentSession({ role: 'agent', agent: found });
       } else {
@@ -247,7 +247,7 @@ export default function App() {
               onLogout={handleLogout}
               ordersCount={
                 orders.filter(
-                  (o) => o.agentId.toLowerCase() === currentSession.agent.user.toLowerCase()
+                  (o) => o && (String(o.agent_id || (o as any).agentId || '')).trim().toLowerCase() === (currentSession.agent?.user || '').trim().toLowerCase()
                 ).length
               }
             />
@@ -273,7 +273,7 @@ export default function App() {
                   onLogout={handleLogout}
                   ordersCount={
                     orders.filter(
-                      (o) => o.agentId.toLowerCase() === currentSession.agent.user.toLowerCase()
+                      (o) => o && (String(o.agent_id || (o as any).agentId || '')).trim().toLowerCase() === (currentSession.agent?.user || '').trim().toLowerCase()
                     ).length
                   }
                 />

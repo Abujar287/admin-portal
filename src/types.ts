@@ -29,10 +29,11 @@ export interface ManagerUser {
 }
 
 export interface OrderItem {
+  // Official Google Sheet 22 Column Names (Sheet1)
   order_id: string;
   customer_id: string;
-  customer_name: string;
   customer_mobile: string;
+  customer_name: string;
   gender: 'Male' | 'Female' | 'Other' | string;
   create_date: string; // YYYY-MM-DD HH:mm:ss
   order_channel: 'Acquisition' | 'Retention' | 'KAM' | 'Call-Center' | 'Facebook' | 'Back-Office' | 'VOC' | string;
@@ -51,6 +52,28 @@ export interface OrderItem {
   profit: number;
   delivered_date?: string;
   cancelled_date?: string;
+
+  // Optional Backwards Compatibility Aliases
+  id?: string;
+  customerId?: string;
+  customerContact?: string;
+  customerName?: string;
+  createDate?: string;
+  createdAt?: string;
+  orderChannel?: string;
+  agentId?: string;
+  agentName?: string;
+  productCategory?: string;
+  productName?: string;
+  deliveryArea?: string;
+  addressDetails?: string;
+  scheduleDate?: string;
+  scheduledTime?: string;
+  orderValue?: number;
+  orderStatus?: string;
+  followupStatus?: string;
+  deliveredDate?: string;
+  cancelledDate?: string;
 }
 
 export type DateFilterType = '' | 'all' | 'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'lastYear' | 'custom';

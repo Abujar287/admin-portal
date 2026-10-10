@@ -69,15 +69,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // STRICTLY filter only for this agent
   const myAgentOrders = useMemo(() => {
     return orders.filter(
-      (o) => o.agent_id.toLowerCase() === currentAgent.user.toLowerCase()
+      (o) => (o.agent_id || o.agentId || '').trim().toLowerCase() === (currentAgent?.user || '').trim().toLowerCase()
     );
-  }, [orders, currentAgent.user]);
+  }, [orders, currentAgent?.user]);
 
   // Helper map for latest Delivered Date and Cancelled Date from followup history or order item
   const orderDeliveredDateMap = useMemo(() => {
     const map = new Map<string, string>();
     myAgentOrders.forEach(o => {
-      if (o.delivered_date) map.set(String(o.order_id), o.delivered_date);
+      const oId = String(o.order_id || o.id || '');
+      const dDt = o.delivered_date || o.deliveredDate;
+      if (dDt) map.set(oId, dDt);
     });
     followupHistory.forEach(h => {
       if (h.newStatus?.toLowerCase() === 'delivered' && h.timestamp) {
@@ -90,7 +92,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const orderCancelledDateMap = useMemo(() => {
     const map = new Map<string, string>();
     myAgentOrders.forEach(o => {
-      if (o.cancelled_date) map.set(String(o.order_id), o.cancelled_date);
+      const oId = String(o.order_id || o.id || '');
+      const cDt = o.cancelled_date || o.cancelledDate;
+      if (cDt) map.set(oId, cDt);
     });
     followupHistory.forEach(h => {
       if (h.newStatus?.toLowerCase() === 'cancelled' && h.timestamp) {
@@ -113,23 +117,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const categoryMap: Record<string, number> = {};
 
     myAgentOrders.forEach((o) => {
-      const val = Number(o.order_value) || 0;
-      const profit = Number(o.profit) || 0;
-      const fStatus = (o.followup_status || '').toLowerCase();
-      const delivDate = orderDeliveredDateMap.get(String(o.order_id)) || o.delivered_date || '';
-      const cancDate = orderCancelledDateMap.get(String(o.order_id)) || o.cancelled_date || '';
+      const val = Number(o.order_value ?? o.orderValue ?? 0);
+      const profit = Number(o.profit ?? 0);
+      const fStatus = (o.followup_status || o.followupStatus || '').toLowerCase();
+      const oIdStr = String(o.order_id || o.id || '');
+      const crDate = o.create_date || o.createDate || '';
+      const delivDate = orderDeliveredDateMap.get(oIdStr) || o.delivered_date || o.deliveredDate || '';
+      const cancDate = orderCancelledDateMap.get(oIdStr) || o.cancelled_date || o.cancelledDate || '';
+      const oChannel = o.order_channel || o.orderChannel || 'Acquisition';
+      const pCat = o.product_category || o.productCategory || 'Electronics';
 
       // 1. Create Orders count & Total Order Value (Filtered by Create Date)
-      if (matchDate(o.create_date, dateFilter, startDate, endDate)) {
+      if (matchDate(crDate, dateFilter, startDate, endDate)) {
         totalCreated++;
         totalVal += val;
-        channelMap[o.order_channel] = (channelMap[o.order_channel] || 0) + 1;
-        categoryMap[o.product_category] = (categoryMap[o.product_category] || 0) + 1;
+        channelMap[oChannel] = (channelMap[oChannel] || 0) + 1;
+        categoryMap[pCat] = (categoryMap[pCat] || 0) + 1;
       }
 
       // 2. Delivered Orders, Delivered Value, Delivered Profit (Filtered by Delivered Date)
       if (fStatus === 'delivered' || delivDate) {
-        if (matchDate(delivDate || o.create_date, dateFilter, startDate, endDate)) {
+        if (matchDate(delivDate || crDate, dateFilter, startDate, endDate)) {
           deliveredCount++;
           deliveredVal += val;
           deliveredProfit += profit;
@@ -138,14 +146,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       // 3. Cancelled Orders (Filtered by Cancelled Date)
       if (fStatus === 'cancelled' || cancDate) {
-        if (matchDate(cancDate || o.create_date, dateFilter, startDate, endDate)) {
+        if (matchDate(cancDate || crDate, dateFilter, startDate, endDate)) {
           cancelledCount++;
         }
       }
 
       // 4. Open Orders (Followup Status not in Delivered, Cancelled)
       if (fStatus !== 'delivered' && fStatus !== 'cancelled') {
-        if (matchDate(o.create_date, dateFilter, startDate, endDate)) {
+        if (matchDate(crDate, dateFilter, startDate, endDate)) {
           openCount++;
         }
       }
@@ -155,7 +163,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const cancelledRate = totalCreated > 0 ? Math.round((cancelledCount / totalCreated) * 100) : 0;
     
     // Bucket Size: Distinct customers
-    const bucketSize = new Set(myAgentOrders.map(o => o.customer_mobile)).size;
+    const bucketSize = new Set(myAgentOrders.map(o => o.customer_mobile || o.customerContact)).size;
     
     // NR Ratio = Profit / Delivered Value * 100
     const nrRatio = deliveredVal > 0 ? Number(((deliveredProfit / deliveredVal) * 100).toFixed(1)) : 0;
@@ -259,21 +267,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
         <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
           <span className="text-[10px] font-bold text-slate-400 uppercase">Open Order Val</span>
-          <div className="text-xl font-bold text-slate-800 mt-1">৳ {(stats.totalVal - stats.deliveredVal - 0).toLocaleString()}</div>
+          <div className="text-xl font-bold text-slate-800 mt-1">৳ {((stats.totalVal - stats.deliveredVal) || 0).toLocaleString()}</div>
         </div>
         <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
           <span className="text-[10px] font-bold text-slate-400 uppercase">Order Value</span>
-          <div className="text-xl font-bold text-slate-800 mt-1">৳ {stats.totalVal.toLocaleString()}</div>
+          <div className="text-xl font-bold text-slate-800 mt-1">৳ {(stats.totalVal || 0).toLocaleString()}</div>
         </div>
 
         {/* Row 2 */}
         <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
           <span className="text-[10px] font-bold text-slate-400 uppercase">Deliv. Order Val</span>
-          <div className="text-xl font-bold text-emerald-700 mt-1">৳ {stats.deliveredVal.toLocaleString()}</div>
+          <div className="text-xl font-bold text-emerald-700 mt-1">৳ {(stats.deliveredVal || 0).toLocaleString()}</div>
         </div>
         <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
           <span className="text-[10px] font-bold text-slate-400 uppercase">Profit</span>
-          <div className="text-xl font-bold text-emerald-700 mt-1">৳ {stats.deliveredProfit.toLocaleString()}</div>
+          <div className="text-xl font-bold text-emerald-700 mt-1">৳ {(stats.deliveredProfit || 0).toLocaleString()}</div>
         </div>
         <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
           <span className="text-[10px] font-bold text-slate-400 uppercase">Bucket Size</span>

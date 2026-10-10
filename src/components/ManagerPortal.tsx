@@ -157,11 +157,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   const handleOpenOrderModal = (ord: OrderItem) => {
     setStatusModalOrder(ord);
-    setModalFollowupStatus(ord.followupStatus || 'Pending');
-    setModalOrderValue(String(ord.orderValue ?? ''));
+    setModalFollowupStatus(ord.followup_status || ord.followupStatus || 'Pending');
+    setModalOrderValue(String(ord.order_value ?? ord.orderValue ?? ''));
     setModalProfit(String(ord.profit ?? ''));
-    setModalScheduleDate(ord.scheduleDate || '');
-    setModalScheduledTime(ord.scheduledTime || '');
+    setModalScheduleDate(ord.schedule_date || ord.scheduleDate || '');
+    setModalScheduledTime(ord.schedule_time || ord.scheduledTime || '');
     setModalNotes('');
   };
 
@@ -194,7 +194,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   const [orderIdSearch, setOrderIdSearch] = useState('');
   const [contactSearch, setContactSearch] = useState('');
-  const [searchType, setSearchType] = useState<'order_id' | 'customer_id' | 'customer_mobile' | 'customer_name'>('order_id');
+  const [searchType, setSearchType] = useState<string>('order_id');
   const [searchValue, setSearchValue] = useState('');
 
   // Single Summary Date Filter State
@@ -795,17 +795,71 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       if (searchValue.trim()) {
         const val = searchValue.trim().toLowerCase();
         if (searchType === 'order_id') {
-          const idStr = String(r.order_id || '').toLowerCase();
-          if (idStr !== val) return false;
+          const idStr = String(r.order_id || r.id || '').toLowerCase();
+          if (!idStr.includes(val)) return false;
         } else if (searchType === 'customer_id') {
-          const cIdStr = String(r.customer_id || '').trim().toLowerCase();
-          if (cIdStr !== val) return false;
+          const cIdStr = String(r.customer_id || r.customerId || '').trim().toLowerCase();
+          if (!cIdStr.includes(val)) return false;
         } else if (searchType === 'customer_mobile') {
-          const cStr = String(r.customer_mobile || '').toLowerCase();
-          if (cStr !== val) return false;
+          const cStr = String(r.customer_mobile || r.customerContact || '').toLowerCase();
+          if (!cStr.includes(val)) return false;
         } else if (searchType === 'customer_name') {
-          const nStr = String(r.customer_name || '').toLowerCase();
+          const nStr = String(r.customer_name || r.customerName || '').toLowerCase();
           if (!nStr.includes(val)) return false;
+        } else if (searchType === 'gender') {
+          const gStr = String(r.gender || '').toLowerCase();
+          if (!gStr.includes(val)) return false;
+        } else if (searchType === 'create_date') {
+          const crStr = String(r.create_date || r.createDate || '').toLowerCase();
+          if (!crStr.includes(val)) return false;
+        } else if (searchType === 'agent_id') {
+          const aIdStr = String(r.agent_id || r.agentId || '').toLowerCase();
+          if (!aIdStr.includes(val)) return false;
+        } else if (searchType === 'agent_name') {
+          const aNmStr = String(r.agent_name || r.agentName || '').toLowerCase();
+          if (!aNmStr.includes(val)) return false;
+        } else if (searchType === 'product_category') {
+          const catStr = String(r.product_category || r.productCategory || '').toLowerCase();
+          if (!catStr.includes(val)) return false;
+        } else if (searchType === 'product_name') {
+          const prodStr = String(r.product_name || r.productName || '').toLowerCase();
+          if (!prodStr.includes(val)) return false;
+        } else if (searchType === 'city') {
+          const cityStr = String(r.city || '').toLowerCase();
+          if (!cityStr.includes(val)) return false;
+        } else if (searchType === 'delivery_area') {
+          const areaStr = String(r.delivery_area || r.deliveryArea || '').toLowerCase();
+          if (!areaStr.includes(val)) return false;
+        } else if (searchType === 'address_details') {
+          const addrStr = String(r.address_details || r.addressDetails || '').toLowerCase();
+          if (!addrStr.includes(val)) return false;
+        } else if (searchType === 'schedule_date') {
+          const scDtStr = String(r.schedule_date || r.scheduleDate || '').toLowerCase();
+          if (!scDtStr.includes(val)) return false;
+        } else if (searchType === 'schedule_time') {
+          const scTmStr = String(r.schedule_time || r.scheduledTime || '').toLowerCase();
+          if (!scTmStr.includes(val)) return false;
+        } else if (searchType === 'order_value') {
+          const ovStr = String(r.order_value ?? r.orderValue ?? '').toLowerCase();
+          if (!ovStr.includes(val)) return false;
+        } else if (searchType === 'order_channel') {
+          const chanStr = String(r.order_channel || r.orderChannel || '').toLowerCase();
+          if (!chanStr.includes(val)) return false;
+        } else if (searchType === 'order_status') {
+          const ostStr = String(r.order_status || r.orderStatus || '').toLowerCase();
+          if (!ostStr.includes(val)) return false;
+        } else if (searchType === 'followup_status') {
+          const fstStr = String(r.followup_status || r.followupStatus || '').toLowerCase();
+          if (!fstStr.includes(val)) return false;
+        } else if (searchType === 'profit') {
+          const prStr = String(r.profit ?? '').toLowerCase();
+          if (!prStr.includes(val)) return false;
+        } else if (searchType === 'delivered_date') {
+          const delStr = String(r.delivered_date || r.deliveredDate || '').toLowerCase();
+          if (!delStr.includes(val)) return false;
+        } else if (searchType === 'cancelled_date') {
+          const canStr = String(r.cancelled_date || r.cancelledDate || '').toLowerCase();
+          if (!canStr.includes(val)) return false;
         }
       }
       if (filterFollowupStatus !== 'all' && (r.followup_status || 'Pending') !== filterFollowupStatus) return false;
@@ -1146,11 +1200,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
       const matchSearch =
         !agentPerformanceSearch ||
-        ag.name.toLowerCase().includes(agentPerformanceSearch.toLowerCase()) ||
-        ag.id.toLowerCase().includes(agentPerformanceSearch.toLowerCase());
+        String(ag.name || '').toLowerCase().includes(agentPerformanceSearch.toLowerCase()) ||
+        String(ag.id || '').toLowerCase().includes(agentPerformanceSearch.toLowerCase());
       const matchTeam =
         agentPerformanceTeamFilter === 'all' ||
-        ag.team.toLowerCase() === agentPerformanceTeamFilter.toLowerCase();
+        String(ag.team || '').toLowerCase() === agentPerformanceTeamFilter.toLowerCase();
       return matchSearch && matchTeam;
     });
     return sortItems(list, agentSortKey, agentSortDirection);
@@ -1546,8 +1600,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           onChange={(e) => setNewAgentTeam(e.target.value)}
                           className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
                         >
-                          {availableChannels.map((team: string) => (
-                            <option key={team} value={team}>
+                          {availableChannels.map((team: string, idx: number) => (
+                            <option key={`team-avail-${team}-${idx}`} value={team}>
                               {team}
                             </option>
                           ))}
@@ -1589,9 +1643,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         onChange={(e) => setNewAgentTeamLeader(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
                       >
-                        <option value="">-- No TL Assigned --</option>
-                        {agents.filter(a => a.role === 'Team Leader').map((tl) => (
-                          <option key={tl.user} value={tl.user}>
+                        <option key="no-tl" value="">-- No TL Assigned --</option>
+                        {agents.filter(a => a.role === 'Team Leader').map((tl, idx) => (
+                          <option key={`tl-opt-${tl.user}-${idx}`} value={tl.user}>
                             {tl.name} (@{tl.user})
                           </option>
                         ))}
@@ -1927,7 +1981,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   {/* Create Date Filter */}
                   <div className="flex-1">
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                      Create Date
+                      create_date
                     </label>
                     <select
                       value={orderCreateFilter}
@@ -1948,7 +2002,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   {/* Schedule Date Filter */}
                   <div className="flex-1">
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                      Schedule Date
+                      schedule_date
                     </label>
                     <select
                       value={orderScheduleFilter}
@@ -1969,15 +2023,17 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   {/* Followup Status Filter */}
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                      Followup Status
+                      followup_status
                     </label>
                     <select
                       value={filterFollowupStatus}
                       onChange={(e) => setFilterFollowupStatus(e.target.value)}
                       className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
                     >
-                      <option value="all">All Statuses</option>
-                      {orderStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+                      <option key="mgr-status-all" value="all">All Statuses</option>
+                      {orderStatuses.map((s, idx) => (
+                        <option key={`mgr-status-${s}-${idx}`} value={s}>{s}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -1989,13 +2045,31 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <div className="flex items-center gap-2">
                       <select
                         value={searchType}
-                        onChange={(e) => setSearchType(e.target.value as 'order_id' | 'customer_id' | 'customer_mobile' | 'customer_name')}
+                        onChange={(e) => setSearchType(e.target.value)}
                         className="px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
                       >
-                        <option value="order_id">order_id</option>
-                        <option value="customer_id">customer_id</option>
-                        <option value="customer_mobile">customer_mobile</option>
-                        <option value="customer_name">customer_name</option>
+                        <option key="mgr-search-order_id" value="order_id">order_id</option>
+                        <option key="mgr-search-customer_id" value="customer_id">customer_id</option>
+                        <option key="mgr-search-customer_mobile" value="customer_mobile">customer_mobile</option>
+                        <option key="mgr-search-customer_name" value="customer_name">customer_name</option>
+                        <option key="mgr-search-gender" value="gender">gender</option>
+                        <option key="mgr-search-create_date" value="create_date">create_date</option>
+                        <option key="mgr-search-order_channel" value="order_channel">order_channel</option>
+                        <option key="mgr-search-agent_id" value="agent_id">agent_id</option>
+                        <option key="mgr-search-agent_name" value="agent_name">agent_name</option>
+                        <option key="mgr-search-product_category" value="product_category">product_category</option>
+                        <option key="mgr-search-product_name" value="product_name">product_name</option>
+                        <option key="mgr-search-city" value="city">city</option>
+                        <option key="mgr-search-delivery_area" value="delivery_area">delivery_area</option>
+                        <option key="mgr-search-address_details" value="address_details">address_details</option>
+                        <option key="mgr-search-schedule_date" value="schedule_date">schedule_date</option>
+                        <option key="mgr-search-schedule_time" value="schedule_time">schedule_time</option>
+                        <option key="mgr-search-order_value" value="order_value">order_value</option>
+                        <option key="mgr-search-order_status" value="order_status">order_status</option>
+                        <option key="mgr-search-followup_status" value="followup_status">followup_status</option>
+                        <option key="mgr-search-profit" value="profit">profit</option>
+                        <option key="mgr-search-delivered_date" value="delivered_date">delivered_date</option>
+                        <option key="mgr-search-cancelled_date" value="cancelled_date">cancelled_date</option>
                       </select>
                       <input
                         type="text"
@@ -2021,8 +2095,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       <tr className="bg-gradient-to-r from-indigo-700 to-purple-800 text-white sticky top-0 z-10 font-bold">
                         <th className="py-3.5 px-3.5 whitespace-nowrap">order_id</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">customer_id</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">customer_name</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">customer_mobile</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap">customer_name</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">gender</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">create_date</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">order_channel</th>
@@ -2051,21 +2125,21 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           </td>
                         </tr>
                       ) : (
-                        filteredOrders.map((ord) => {
-                          const isDelivered = ord.followup_status.toLowerCase() === 'delivered';
+                        filteredOrders.map((ord, idx) => {
+                          const isDelivered = (ord.followup_status || ord.followupStatus || '').toLowerCase() === 'delivered';
                           return (
-                            <tr key={ord.order_id} className="hover:bg-indigo-50/40 transition-colors">
+                            <tr key={`manager-ord-${ord.order_id || ord.id || idx}-${idx}`} className="hover:bg-indigo-50/40 transition-colors">
                               <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-indigo-700">
-                                #{ord.order_id}
+                                #{ord.order_id || ord.id}
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-800">
-                                {ord.customer_id}
-                              </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">
-                                {ord.customer_name}
+                                {ord.customer_id || ord.customerId}
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600">
-                                {ord.customer_mobile}
+                                {ord.customer_mobile || ord.customerContact}
+                              </td>
+                              <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">
+                                {ord.customer_name || ord.customerName}
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">
                                 {ord.gender}
@@ -2230,15 +2304,22 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         quickUpdateOrderId,
                         {
                           followupStatus: quickUpdateStatus,
+                          followup_status: quickUpdateStatus,
                           orderStatus: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : 'Pending'),
+                          order_status: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : 'Pending'),
                           orderValue: quickUpdateOrderValue !== '' ? parseFloat(quickUpdateOrderValue) : undefined,
+                          order_value: quickUpdateOrderValue !== '' ? parseFloat(quickUpdateOrderValue) : undefined,
                           profit: isDeliv 
                             ? (quickUpdateProfit !== '' ? parseFloat(quickUpdateProfit) : Math.round((parseFloat(quickUpdateOrderValue) || 0) * 0.20)) 
                             : 0,
                           deliveredDate: isDeliv ? nowTs : '',
+                          delivered_date: isDeliv ? nowTs : '',
                           cancelledDate: isCanc ? nowTs : '',
+                          cancelled_date: isCanc ? nowTs : '',
                           scheduleDate: quickUpdateScheduleDate,
-                          scheduledTime: quickUpdateScheduledTime
+                          schedule_date: quickUpdateScheduleDate,
+                          scheduledTime: quickUpdateScheduledTime,
+                          schedule_time: quickUpdateScheduledTime
                         },
                         'Manager',
                         quickUpdateNotes
@@ -2260,24 +2341,30 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         onChange={(e) => {
                           const chosenId = e.target.value;
                           setQuickUpdateOrderId(chosenId);
-                          const ord = orders.find((o) => String(o.id) === String(chosenId));
+                          const ord = orders.find((o) => String(o.order_id || o.id) === String(chosenId));
                           if (ord) {
-                            setQuickUpdateStatus(ord.followupStatus || 'Pending');
-                            setQuickUpdateOrderValue(String(ord.orderValue ?? ''));
+                            setQuickUpdateStatus(ord.followup_status || ord.followupStatus || 'Pending');
+                            setQuickUpdateOrderValue(String(ord.order_value ?? ord.orderValue ?? ''));
                             setQuickUpdateProfit(String(ord.profit ?? ''));
-                            setQuickUpdateScheduleDate(ord.scheduleDate || '');
-                            setQuickUpdateScheduledTime(ord.scheduledTime || '');
+                            setQuickUpdateScheduleDate(ord.schedule_date || ord.scheduleDate || '');
+                            setQuickUpdateScheduledTime(ord.schedule_time || ord.scheduledTime || '');
                           }
                         }}
                         required
                         className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-400/30 bg-slate-900 text-white font-medium focus:border-indigo-400"
                       >
-                        <option value="">-- Choose Order ID --</option>
-                        {orders.map((ord) => (
-                          <option key={ord.id} value={ord.id}>
-                            #{ord.id} - {ord.customerName} (৳{(ord.orderValue || 0).toLocaleString()}) [{ord.followupStatus || 'Pending'}]
-                          </option>
-                        ))}
+                        <option key="opt-quick-choose" value="">-- Choose Order ID --</option>
+                        {orders.map((ord, idx) => {
+                          const oId = String(ord.order_id || ord.id || idx);
+                          const cName = ord.customer_name || ord.customerName || 'Customer';
+                          const val = Number(ord.order_value ?? ord.orderValue ?? 0);
+                          const fStatus = ord.followup_status || ord.followupStatus || 'Pending';
+                          return (
+                            <option key={`opt-quick-ord-${oId}-${idx}`} value={oId}>
+                              #{oId} - {cName} (৳{val.toLocaleString()}) [{fStatus}]
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
 
@@ -2355,12 +2442,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         onChange={(e) => setQuickUpdateScheduledTime(e.target.value)}
                         className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-400/30 bg-slate-900 text-white font-medium focus:border-indigo-400 cursor-pointer"
                       >
-                        <option value="">-- Select Time Slot --</option>
+                        <option key="quick-slot-default" value="">-- Select Time Slot --</option>
                         {quickUpdateScheduledTime && !TIME_SLOTS.includes(quickUpdateScheduledTime) && (
-                          <option value={quickUpdateScheduledTime}>{quickUpdateScheduledTime}</option>
+                          <option key="quick-slot-custom" value={quickUpdateScheduledTime}>{quickUpdateScheduledTime}</option>
                         )}
-                        {TIME_SLOTS.map((slot) => (
-                          <option key={slot} value={slot}>
+                        {TIME_SLOTS.map((slot, idx) => (
+                          <option key={`quick-slot-${slot}-${idx}`} value={slot}>
                             {slot}
                           </option>
                         ))}
@@ -2470,15 +2557,15 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             const q = followupSearch.toLowerCase();
                             return (
                               String(h.followupId || '').toLowerCase().includes(q) ||
-                              h.orderId.toLowerCase().includes(q) ||
-                              (h.customerName || '').toLowerCase().includes(q) ||
-                              (h.newStatus || '').toLowerCase().includes(q) ||
-                              (h.action || '').toLowerCase().includes(q) ||
-                              (h.notes || '').toLowerCase().includes(q)
+                              String(h.orderId || (h as any).order_id || '').toLowerCase().includes(q) ||
+                              String(h.customerName || (h as any).customer_name || '').toLowerCase().includes(q) ||
+                              String(h.newStatus || (h as any).new_status || '').toLowerCase().includes(q) ||
+                              String(h.action || '').toLowerCase().includes(q) ||
+                              String(h.notes || '').toLowerCase().includes(q)
                             );
                           })
-                          .map((hist) => (
-                            <tr key={hist.id} className="hover:bg-slate-50 transition-colors">
+                          .map((hist, histIdx) => (
+                            <tr key={`followup-hist-${hist.id || hist.followupId || histIdx}-${histIdx}`} className="hover:bg-slate-50 transition-colors">
                               <td className="py-3 px-3.5 font-mono font-bold text-indigo-800 whitespace-nowrap">#{hist.followupId || hist.id}</td>
                               <td className="py-3 px-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">#{hist.orderId}</td>
                               <td className="py-3 px-3.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">{hist.timestamp}</td>
@@ -2487,7 +2574,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               <td className="py-3 px-3.5 text-slate-500 whitespace-nowrap">{hist.previousStatus}</td>
                               <td className="py-3 px-3.5 font-bold text-indigo-700 whitespace-nowrap">{hist.newStatus}</td>
                               <td className="py-3 px-3.5 text-slate-600 whitespace-nowrap">{hist.orderStatus}</td>
-                              <td className="py-3 px-3.5 text-slate-700 font-medium whitespace-nowrap">৳ {hist.orderValue?.toLocaleString() || '-'}</td>
+                              <td className="py-3 px-3.5 text-slate-700 font-medium whitespace-nowrap">৳ {hist.orderValue != null ? Number(hist.orderValue).toLocaleString() : '-'}</td>
                               <td className="py-3 px-3.5 text-slate-600 text-[10px] whitespace-nowrap">{hist.scheduleDate}<br/>{hist.scheduledTime}</td>
                               <td className="py-3 px-3.5 font-bold text-slate-700 whitespace-nowrap">{hist.updatedBy}</td>
                               <td className="py-3 px-3.5 whitespace-nowrap"><span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">{hist.action || 'Follow-up Update'}</span></td>
@@ -2840,10 +2927,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               <td className="py-3 px-3.5 text-right font-bold text-indigo-700">{row.createOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledOrders}</td>
-                              <td className="py-3 px-3.5 text-right font-medium">৳ {row.orderValue.toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">৳ {row.deliveredOrderValue.toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">৳ {row.profit.toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-medium text-blue-700">৳ {row.bucketSize.toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium">৳ {(row.orderValue || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">৳ {(row.deliveredOrderValue || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">৳ {(row.profit || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium text-blue-700">৳ {(row.bucketSize || 0).toLocaleString()}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-600">{row.deliveredRatio}%</td>
                               <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledRatio}%</td>
                               <td className="py-3 px-3.5 text-right font-bold text-purple-700">{row.nrRatio}%</td>
@@ -2858,10 +2945,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             <td className="py-3.5 px-3.5 text-right font-black text-indigo-700">{summaryStats.channelGrandTotal.createOrders}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.channelGrandTotal.servedOrders}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.channelGrandTotal.cancelledOrders}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black">৳ {summaryStats.channelGrandTotal.orderValue.toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {summaryStats.channelGrandTotal.deliveredOrderValue.toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {summaryStats.channelGrandTotal.profit.toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {summaryStats.channelGrandTotal.bucketSize.toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black">৳ {(summaryStats.channelGrandTotal.orderValue || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {(summaryStats.channelGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {(summaryStats.channelGrandTotal.profit || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {(summaryStats.channelGrandTotal.bucketSize || 0).toLocaleString()}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.channelGrandTotal.deliveredRatio}%</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.channelGrandTotal.cancelledRatio}%</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-purple-700">{summaryStats.channelGrandTotal.nrRatio}%</td>
@@ -3048,10 +3135,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               <td className="py-3 px-3.5 text-right font-bold text-indigo-700">{row.createOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledOrders}</td>
-                              <td className="py-3 px-3.5 text-right font-medium">৳ {row.orderValue.toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">৳ {row.deliveredOrderValue.toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">৳ {row.profit.toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-medium text-blue-700">৳ {row.bucketSize.toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium">৳ {(row.orderValue || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">৳ {(row.deliveredOrderValue || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">৳ {(row.profit || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium text-blue-700">৳ {(row.bucketSize || 0).toLocaleString()}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-600">{row.deliveredRatio}%</td>
                               <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledRatio}%</td>
                               <td className="py-3 px-3.5 text-right font-bold text-purple-700">{row.nrRatio}%</td>
@@ -3066,10 +3153,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             <td className="py-3.5 px-3.5 text-right font-black text-indigo-700">{summaryStats.categoryGrandTotal.createOrders}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.categoryGrandTotal.servedOrders}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.categoryGrandTotal.cancelledOrders}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black">৳ {summaryStats.categoryGrandTotal.orderValue.toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {summaryStats.categoryGrandTotal.deliveredOrderValue.toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {summaryStats.categoryGrandTotal.profit.toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {summaryStats.categoryGrandTotal.bucketSize.toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black">৳ {(summaryStats.categoryGrandTotal.orderValue || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {(summaryStats.categoryGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {(summaryStats.categoryGrandTotal.profit || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {(summaryStats.categoryGrandTotal.bucketSize || 0).toLocaleString()}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.categoryGrandTotal.deliveredRatio}%</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.categoryGrandTotal.cancelledRatio}%</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-purple-700">{summaryStats.categoryGrandTotal.nrRatio}%</td>
@@ -3256,10 +3343,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               <td className="py-3 px-3.5 text-right font-bold text-indigo-700">{row.createOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledOrders}</td>
-                              <td className="py-3 px-3.5 text-right font-medium">৳ {row.orderValue.toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">৳ {row.deliveredOrderValue.toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">৳ {row.profit.toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-medium text-blue-700">৳ {row.bucketSize.toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium">৳ {(row.orderValue || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">৳ {(row.deliveredOrderValue || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">৳ {(row.profit || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium text-blue-700">৳ {(row.bucketSize || 0).toLocaleString()}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-600">{row.deliveredRatio}%</td>
                               <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledRatio}%</td>
                               <td className="py-3 px-3.5 text-right font-bold text-purple-700">{row.nrRatio}%</td>
@@ -3274,10 +3361,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             <td className="py-3.5 px-3.5 text-right font-black text-indigo-700">{summaryStats.cityGrandTotal.createOrders}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.cityGrandTotal.servedOrders}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.cityGrandTotal.cancelledOrders}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black">৳ {summaryStats.cityGrandTotal.orderValue.toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {summaryStats.cityGrandTotal.deliveredOrderValue.toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {summaryStats.cityGrandTotal.profit.toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {summaryStats.cityGrandTotal.bucketSize.toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black">৳ {(summaryStats.cityGrandTotal.orderValue || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {(summaryStats.cityGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {(summaryStats.cityGrandTotal.profit || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {(summaryStats.cityGrandTotal.bucketSize || 0).toLocaleString()}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.cityGrandTotal.deliveredRatio}%</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.cityGrandTotal.cancelledRatio}%</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-purple-700">{summaryStats.cityGrandTotal.nrRatio}%</td>
@@ -3354,16 +3441,16 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Created / Assigned</span>
                   <p className="text-2xl font-black text-indigo-700 mt-1">{filteredAgentGrandTotal.createOrders}</p>
-                  <span className="text-[10px] text-indigo-600 font-medium">৳ {filteredAgentGrandTotal.orderValue.toLocaleString()} value</span>
+                  <span className="text-[10px] text-indigo-600 font-medium">৳ {(filteredAgentGrandTotal.orderValue || 0).toLocaleString()} value</span>
                 </div>
                 <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Delivered Orders</span>
                   <p className="text-2xl font-black text-emerald-700 mt-1">{filteredAgentGrandTotal.servedOrders}</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">৳ {filteredAgentGrandTotal.deliveredOrderValue.toLocaleString()} delivered</span>
+                  <span className="text-[10px] text-emerald-600 font-medium">৳ {(filteredAgentGrandTotal.deliveredOrderValue || 0).toLocaleString()} delivered</span>
                 </div>
                 <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Profit</span>
-                  <p className="text-2xl font-black text-emerald-600 mt-1">৳ {filteredAgentGrandTotal.profit.toLocaleString()}</p>
+                  <p className="text-2xl font-black text-emerald-600 mt-1">৳ {(filteredAgentGrandTotal.profit || 0).toLocaleString()}</p>
                   <span className="text-[10px] text-emerald-600 font-medium">NR Ratio: {filteredAgentGrandTotal.nrRatio}%</span>
                 </div>
                 <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs col-span-2 lg:col-span-1">
@@ -3391,9 +3478,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     onChange={(e) => setAgentPerformanceTeamFilter(e.target.value)}
                     className="px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white font-semibold text-slate-700 focus:outline-hidden w-full sm:w-auto cursor-pointer"
                   >
-                    <option value="all">All Teams</option>
-                    {ORDER_CHANNELS.map((ch) => (
-                      <option key={ch} value={ch}>{ch}</option>
+                    <option key="perf-team-all" value="all">All Teams</option>
+                    {ORDER_CHANNELS.map((ch, idx) => (
+                      <option key={`perf-team-ch-${ch}-${idx}`} value={ch}>{ch}</option>
                     ))}
                   </select>
                 </div>
@@ -3488,10 +3575,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{filteredAgentGrandTotal.servedOrders}</td>
                           <td className="py-3.5 px-3.5 text-right font-black text-red-700">{filteredAgentGrandTotal.cancelledOrders}</td>
                           <td className="py-3.5 px-3.5 text-right font-black text-amber-700">{filteredAgentGrandTotal.pendingOrders}</td>
-                          <td className="py-3.5 px-3.5 text-right font-black">৳ {filteredAgentGrandTotal.orderValue.toLocaleString()}</td>
-                          <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {filteredAgentGrandTotal.deliveredOrderValue.toLocaleString()}</td>
-                          <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {filteredAgentGrandTotal.profit.toLocaleString()}</td>
-                          <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {filteredAgentGrandTotal.bucketSize.toLocaleString()}</td>
+                          <td className="py-3.5 px-3.5 text-right font-black">৳ {(filteredAgentGrandTotal.orderValue || 0).toLocaleString()}</td>
+                          <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {(filteredAgentGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
+                          <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {(filteredAgentGrandTotal.profit || 0).toLocaleString()}</td>
+                          <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {(filteredAgentGrandTotal.bucketSize || 0).toLocaleString()}</td>
                           <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{filteredAgentGrandTotal.deliveredRatio}%</td>
                           <td className="py-3.5 px-3.5 text-right font-black text-red-700">{filteredAgentGrandTotal.cancelledRatio}%</td>
                           <td className="py-3.5 px-3.5 text-right font-black text-purple-700">{filteredAgentGrandTotal.nrRatio}%</td>
@@ -4158,12 +4245,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     onChange={(e) => setModalScheduledTime(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-medium focus:outline-hidden focus:border-indigo-600 bg-white cursor-pointer"
                   >
-                    <option value="">-- Select Time Slot --</option>
+                    <option key="opt-modal-time-empty" value="">-- Select Time Slot --</option>
                     {modalScheduledTime && !TIME_SLOTS.includes(modalScheduledTime) && (
-                      <option value={modalScheduledTime}>{modalScheduledTime}</option>
+                      <option key="opt-modal-time-custom" value={modalScheduledTime}>{modalScheduledTime}</option>
                     )}
-                    {TIME_SLOTS.map((slot) => (
-                      <option key={slot} value={slot}>
+                    {TIME_SLOTS.map((slot, idx) => (
+                      <option key={`modal-slot-${slot}-${idx}`} value={slot}>
                         {slot}
                       </option>
                     ))}
@@ -4219,19 +4306,27 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       const isDeliv = modalFollowupStatus.toLowerCase() === 'delivered';
                       const isCanc = modalFollowupStatus.toLowerCase() === 'cancelled';
                       const nowTs = new Date().toISOString().replace('T', ' ').slice(0, 19);
-                      const finalVal = modalOrderValue !== '' ? parseFloat(modalOrderValue) : statusModalOrder.orderValue;
+                      const finalVal = modalOrderValue !== '' ? parseFloat(modalOrderValue) : Number(statusModalOrder.order_value ?? statusModalOrder.orderValue ?? 0);
+                      const targetOrderId = String(statusModalOrder.order_id || statusModalOrder.id || '');
                       await onUpdateOrderStatus?.(
-                        statusModalOrder.id,
+                        targetOrderId,
                         {
+                          followup_status: modalFollowupStatus,
                           followupStatus: modalFollowupStatus,
+                          order_status: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : 'Pending'),
                           orderStatus: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : 'Pending'),
+                          order_value: modalOrderValue !== '' ? parseFloat(modalOrderValue) : undefined,
                           orderValue: modalOrderValue !== '' ? parseFloat(modalOrderValue) : undefined,
                           profit: isDeliv 
                             ? (modalProfit !== '' ? parseFloat(modalProfit) : Math.round(finalVal * 0.20)) 
                             : 0,
+                          delivered_date: isDeliv ? nowTs : '',
                           deliveredDate: isDeliv ? nowTs : '',
+                          cancelled_date: isCanc ? nowTs : '',
                           cancelledDate: isCanc ? nowTs : '',
+                          schedule_date: modalScheduleDate,
                           scheduleDate: modalScheduleDate,
+                          schedule_time: modalScheduledTime,
                           scheduledTime: modalScheduledTime
                         },
                         'Manager',
@@ -4573,8 +4668,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     onChange={(e) => setEditTeam(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-hidden focus:border-indigo-600 bg-white"
                   >
-                    {ORDER_CHANNELS.map((team) => (
-                      <option key={team} value={team}>
+                    {ORDER_CHANNELS.map((team, idx) => (
+                      <option key={`team-edit-${team}-${idx}`} value={team}>
                         {team}
                       </option>
                     ))}

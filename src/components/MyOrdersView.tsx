@@ -22,7 +22,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
   const [filterCreateDate, setFilterCreateDate] = useState<DateFilterType>('');
   const [filterScheduleDate, setFilterScheduleDate] = useState<DateFilterType>('');
   const [filterFollowupStatus, setFilterFollowupStatus] = useState<string>('all');
-  const [searchType, setSearchType] = useState<'orderId' | 'customerId' | 'customer' | 'name'>('orderId');
+  const [searchType, setSearchType] = useState<string>('order_id');
   const [searchValue, setSearchValue] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -37,27 +37,45 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
   // STRICTLY only this agent's orders (data isolation for agent portal)
   const myAgentOrders = useMemo(() => {
     return orders.filter(
-      (o) => o.agent_id.toLowerCase() === currentAgent.user.toLowerCase()
+      (o) => (o.agent_id || o.agentId || '').trim().toLowerCase() === (currentAgent?.user || '').trim().toLowerCase()
     );
-  }, [orders, currentAgent.user]);
+  }, [orders, currentAgent?.user]);
 
   // Apply search and date filters
   const filteredOrders = useMemo(() => {
     return myAgentOrders.filter((order) => {
-      const matchCreate = OrderService.checkDateMatch(order.create_date, filterCreateDate);
+      const matchCreate = OrderService.checkDateMatch(order.create_date || order.createDate, filterCreateDate);
       if (!matchCreate) return false;
 
-      const matchSchedule = OrderService.checkDateMatch(order.schedule_date, filterScheduleDate);
+      const matchSchedule = OrderService.checkDateMatch(order.schedule_date || order.scheduleDate, filterScheduleDate);
       if (!matchSchedule) return false;
 
-      if (filterFollowupStatus !== 'all' && (order.followup_status || 'Pending') !== filterFollowupStatus) return false;
+      if (filterFollowupStatus !== 'all' && (order.followup_status || order.followupStatus || 'Pending') !== filterFollowupStatus) return false;
 
       if (searchValue.trim()) {
         const q = searchValue.trim().toLowerCase();
-        if (searchType === 'order_id' && String(order.order_id || '').trim().toLowerCase() !== q) return false;
-        if (searchType === 'customer_id' && String(order.customer_id || '').trim().toLowerCase() !== q) return false;
-        if (searchType === 'customer_mobile' && String(order.customer_mobile || '').trim().toLowerCase() !== q) return false;
-        if (searchType === 'customer_name' && !String(order.customer_name || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'order_id' && !String(order.order_id || order.id || '').trim().toLowerCase().includes(q)) return false;
+        if (searchType === 'customer_id' && !String(order.customer_id || order.customerId || '').trim().toLowerCase().includes(q)) return false;
+        if (searchType === 'customer_mobile' && !String(order.customer_mobile || order.customerContact || '').trim().toLowerCase().includes(q)) return false;
+        if (searchType === 'customer_name' && !String(order.customer_name || order.customerName || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'gender' && !String(order.gender || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'create_date' && !String(order.create_date || order.createDate || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'order_channel' && !String(order.order_channel || order.orderChannel || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'agent_id' && !String(order.agent_id || order.agentId || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'agent_name' && !String(order.agent_name || order.agentName || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'product_category' && !String(order.product_category || order.productCategory || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'product_name' && !String(order.product_name || order.productName || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'city' && !String(order.city || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'delivery_area' && !String(order.delivery_area || order.deliveryArea || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'address_details' && !String(order.address_details || order.addressDetails || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'schedule_date' && !String(order.schedule_date || order.scheduleDate || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'schedule_time' && !String(order.schedule_time || order.scheduledTime || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'order_value' && !String(order.order_value ?? order.orderValue ?? '').toLowerCase().includes(q)) return false;
+        if (searchType === 'order_status' && !String(order.order_status || order.orderStatus || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'followup_status' && !String(order.followup_status || order.followupStatus || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'profit' && !String(order.profit ?? '').toLowerCase().includes(q)) return false;
+        if (searchType === 'delivered_date' && !String(order.delivered_date || order.deliveredDate || '').toLowerCase().includes(q)) return false;
+        if (searchType === 'cancelled_date' && !String(order.cancelled_date || order.cancelledDate || '').toLowerCase().includes(q)) return false;
       }
 
       return true;
@@ -68,7 +86,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
     setFilterCreateDate('');
     setFilterScheduleDate('');
     setFilterFollowupStatus('all');
-    setSearchType('orderId');
+    setSearchType('order_id');
     setSearchValue('');
   };
 
@@ -176,9 +194,9 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
               onChange={(e) => setFilterFollowupStatus(e.target.value)}
               className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white"
             >
-              <option value="all">All</option>
-              {Array.from(new Set(orders.map(o => o.followup_status || 'Pending'))).map(status => (
-                <option key={status} value={status}>{status}</option>
+              <option key="my-status-all" value="all">All</option>
+              {Array.from(new Set(orders.map(o => o.followup_status || o.followupStatus || 'Pending').filter(Boolean))).map((status, idx) => (
+                <option key={`my-status-${status}-${idx}`} value={status}>{status}</option>
               ))}
             </select>
           </div>
@@ -191,13 +209,31 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
             <div className="flex items-center gap-2">
               <select
                 value={searchType}
-                onChange={(e) => setSearchType(e.target.value as 'order_id' | 'customer_id' | 'customer_mobile' | 'customer_name')}
+                onChange={(e) => setSearchType(e.target.value)}
                 className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white"
               >
-                <option value="order_id">order_id</option>
-                <option value="customer_id">customer_id</option>
-                <option value="customer_mobile">customer_mobile</option>
-                <option value="customer_name">customer_name</option>
+                <option key="my-search-order_id" value="order_id">order_id</option>
+                <option key="my-search-customer_id" value="customer_id">customer_id</option>
+                <option key="my-search-customer_mobile" value="customer_mobile">customer_mobile</option>
+                <option key="my-search-customer_name" value="customer_name">customer_name</option>
+                <option key="my-search-gender" value="gender">gender</option>
+                <option key="my-search-create_date" value="create_date">create_date</option>
+                <option key="my-search-order_channel" value="order_channel">order_channel</option>
+                <option key="my-search-agent_id" value="agent_id">agent_id</option>
+                <option key="my-search-agent_name" value="agent_name">agent_name</option>
+                <option key="my-search-product_category" value="product_category">product_category</option>
+                <option key="my-search-product_name" value="product_name">product_name</option>
+                <option key="my-search-city" value="city">city</option>
+                <option key="my-search-delivery_area" value="delivery_area">delivery_area</option>
+                <option key="my-search-address_details" value="address_details">address_details</option>
+                <option key="my-search-schedule_date" value="schedule_date">schedule_date</option>
+                <option key="my-search-schedule_time" value="schedule_time">schedule_time</option>
+                <option key="my-search-order_value" value="order_value">order_value</option>
+                <option key="my-search-order_status" value="order_status">order_status</option>
+                <option key="my-search-followup_status" value="followup_status">followup_status</option>
+                <option key="my-search-profit" value="profit">profit</option>
+                <option key="my-search-delivered_date" value="delivered_date">delivered_date</option>
+                <option key="my-search-cancelled_date" value="cancelled_date">cancelled_date</option>
               </select>
               <input
                 type="text"
@@ -240,8 +276,8 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
               <tr className="bg-slate-100/90 text-slate-700 sticky top-0 z-10 font-bold border-b border-slate-200">
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">order_id</th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">customer_id</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">customer_name</th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">customer_mobile</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">customer_name</th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">gender</th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">create_date</th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">order_channel</th>
@@ -272,63 +308,63 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredOrders.map((ord) => {
-                  const isDelivered = ord.followupStatus.toLowerCase() === 'delivered';
+                filteredOrders.map((ord, idx) => {
+                  const isDelivered = (ord.followup_status || ord.followupStatus || '').toLowerCase() === 'delivered';
 
                   return (
-                    <tr key={ord.order_id} className="hover:bg-blue-50/40 transition-colors">
+                    <tr key={`agent-ord-${ord.order_id || ord.id || idx}-${idx}`} className="hover:bg-blue-50/40 transition-colors">
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-blue-700">
-                        #{ord.order_id}
+                        #{ord.order_id || ord.id}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">
-                        {ord.customer_id}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">
-                        {ord.customer_name}
+                        {ord.customer_id || ord.customerId}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600">
-                        {ord.customer_mobile}
+                        {ord.customer_mobile || ord.customerContact}
+                      </td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">
+                        {ord.customer_name || ord.customerName}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">
                         {ord.gender}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-slate-600 font-mono text-[11px]">
-                        {OrderService.formatDateTime(ord.create_date)}
+                        {OrderService.formatDateTime(ord.create_date || ord.createDate)}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap">
                         <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700">
-                          {ord.order_channel}
+                          {ord.order_channel || ord.orderChannel}
                         </span>
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600">
-                        {ord.agent_id}
+                        {ord.agent_id || ord.agentId}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">
-                        {ord.agent_name}
+                        {ord.agent_name || ord.agentName}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">
-                        {ord.product_category}
+                        {ord.product_category || ord.productCategory}
                       </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-800 max-w-[200px] truncate" title={ord.product_name}>
-                        {ord.product_name}
+                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-800 max-w-[200px] truncate" title={ord.product_name || ord.productName}>
+                        {ord.product_name || ord.productName}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">
                         {ord.city}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">
-                        {ord.delivery_area}
+                        {ord.delivery_area || ord.deliveryArea}
                       </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-500 max-w-[220px] truncate" title={ord.address_details}>
-                        {ord.address_details}
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-500 max-w-[220px] truncate" title={ord.address_details || ord.addressDetails}>
+                        {ord.address_details || ord.addressDetails}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-slate-700">
-                        {OrderService.formatDateTime(ord.schedule_date)}
+                        {OrderService.formatDateTime(ord.schedule_date || ord.scheduleDate)}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">
-                        {ord.schedule_time}
+                        {ord.schedule_time || ord.scheduledTime}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-bold text-slate-900">
-                        ৳ {ord.order_value.toLocaleString()}
+                        ৳ {((ord.order_value ?? ord.orderValue) || 0).toLocaleString()}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap">
                         <span
@@ -336,7 +372,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                             isDelivered ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                           }`}
                         >
-                          {ord.order_status}
+                          {ord.order_status || ord.orderStatus}
                         </span>
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap">
@@ -345,17 +381,17 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                             isDelivered ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                           }`}
                         >
-                          {ord.followup_status}
+                          {ord.followup_status || ord.followupStatus}
                         </span>
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-bold text-emerald-600">
-                        ৳ {ord.profit.toLocaleString()}
+                        ৳ {((ord.profit ?? 0) || 0).toLocaleString()}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-emerald-700 font-medium">
-                        {ord.delivered_date ? OrderService.formatDateTime(ord.delivered_date) : '-'}
+                        {ord.delivered_date || ord.deliveredDate ? OrderService.formatDateTime(ord.delivered_date || ord.deliveredDate) : '-'}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-red-700 font-medium">
-                        {ord.cancelled_date ? OrderService.formatDateTime(ord.cancelled_date) : '-'}
+                        {ord.cancelled_date || ord.cancelledDate ? OrderService.formatDateTime(ord.cancelled_date || ord.cancelledDate) : '-'}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-center">
                         <button
@@ -384,7 +420,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 flex items-center justify-center font-bold">
-                  #{selectedOrder.id}
+                  #{selectedOrder.order_id || selectedOrder.id}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -395,7 +431,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Booked by {selectedOrder.agent_name} (@{selectedOrder.agent_id}) • Channel: <span className="font-semibold text-slate-700">{selectedOrder.order_channel}</span>
+                    Booked by {selectedOrder.agent_name || selectedOrder.agentName} (@{selectedOrder.agent_id || selectedOrder.agentId}) • Channel: <span className="font-semibold text-slate-700">{selectedOrder.order_channel || selectedOrder.orderChannel}</span>
                   </p>
                 </div>
               </div>
@@ -417,11 +453,11 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   <div>
                     <span className="text-[11px] text-slate-500 block">Name:</span>
-                    <span className="font-bold text-slate-900">{selectedOrder.customer_name}</span>
+                    <span className="font-bold text-slate-900">{selectedOrder.customer_name || selectedOrder.customerName}</span>
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-500 block">Contact:</span>
-                    <span className="font-mono font-bold text-blue-700">{selectedOrder.customer_mobile}</span>
+                    <span className="font-mono font-bold text-blue-700">{selectedOrder.customer_mobile || selectedOrder.customerContact}</span>
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-500 block">Gender:</span>
@@ -439,11 +475,11 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                   <div className="space-y-1">
                     <div>
                       <span className="text-[11px] text-slate-500 block">Product:</span>
-                      <span className="font-bold text-slate-900">{selectedOrder.product_name}</span>
+                      <span className="font-bold text-slate-900">{selectedOrder.product_name || selectedOrder.productName}</span>
                     </div>
                     <div>
                       <span className="text-[11px] text-slate-500 block">Category:</span>
-                      <span className="font-semibold text-slate-700">{selectedOrder.product_category}</span>
+                      <span className="font-semibold text-slate-700">{selectedOrder.product_category || selectedOrder.productCategory}</span>
                     </div>
                   </div>
                 </div>
@@ -455,11 +491,11 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                   <div className="space-y-1">
                     <div>
                       <span className="text-[11px] text-slate-500 block">City &amp; Area:</span>
-                      <span className="font-bold text-slate-900">{selectedOrder.city} • {selectedOrder.delivery_area}</span>
+                      <span className="font-bold text-slate-900">{selectedOrder.city} • {selectedOrder.delivery_area || selectedOrder.deliveryArea}</span>
                     </div>
                     <div>
                       <span className="text-[11px] text-slate-500 block">Address:</span>
-                      <span className="font-medium text-slate-700">{selectedOrder.address_details || '-'}</span>
+                      <span className="font-medium text-slate-700">{selectedOrder.address_details || selectedOrder.addressDetails || '-'}</span>
                     </div>
                   </div>
                 </div>
@@ -474,13 +510,13 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                   <div>
                     <span className="text-[11px] text-slate-500 block">Schedule Date:</span>
                     <span className="font-bold font-mono text-slate-900 text-sm">
-                      {selectedOrder.schedule_date ? OrderService.formatDateTime(selectedOrder.schedule_date) : '-'}
+                      {selectedOrder.schedule_date || selectedOrder.scheduleDate ? OrderService.formatDateTime((selectedOrder.schedule_date || selectedOrder.scheduleDate)!) : '-'}
                     </span>
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-500 block">Scheduled Time Slot:</span>
                     <span className="font-bold text-slate-900 text-sm">
-                      {selectedOrder.scheduledTime || 'Unscheduled'}
+                      {selectedOrder.schedule_time || selectedOrder.scheduledTime || 'Unscheduled'}
                     </span>
                   </div>
                 </div>
@@ -494,30 +530,30 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   <div>
                     <span className="text-[11px] text-slate-500 block">Order Value:</span>
-                    <span className="font-extrabold text-slate-900">৳ {selectedOrder.order_value.toLocaleString()}</span>
+                    <span className="font-extrabold text-slate-900">৳ {((selectedOrder.order_value ?? selectedOrder.orderValue) || 0).toLocaleString()}</span>
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-500 block">Profit:</span>
-                    <span className="font-extrabold text-emerald-600">৳ {selectedOrder.profit.toLocaleString()}</span>
+                    <span className="font-extrabold text-emerald-600">৳ {((selectedOrder.profit ?? 0) || 0).toLocaleString()}</span>
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-500 block">Follow-up Status:</span>
                     <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                      selectedOrder.followup_status === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
-                      selectedOrder.followup_status === 'Cancelled' ? 'bg-red-100 text-red-800' :
+                      (selectedOrder.followup_status || selectedOrder.followupStatus) === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
+                      (selectedOrder.followup_status || selectedOrder.followupStatus) === 'Cancelled' ? 'bg-red-100 text-red-800' :
                       'bg-indigo-100 text-indigo-800'
                     }`}>
-                      {selectedOrder.followup_status || 'Pending'}
+                      {selectedOrder.followup_status || selectedOrder.followupStatus || 'Pending'}
                     </span>
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-500 block">Order Status:</span>
                     <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                      selectedOrder.order_status === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
-                      selectedOrder.order_status === 'Cancelled' ? 'bg-red-100 text-red-800' :
+                      (selectedOrder.order_status || selectedOrder.orderStatus) === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
+                      (selectedOrder.order_status || selectedOrder.orderStatus) === 'Cancelled' ? 'bg-red-100 text-red-800' :
                       'bg-blue-100 text-blue-800'
                     }`}>
-                      {selectedOrder.order_status || 'Pending'}
+                      {selectedOrder.order_status || selectedOrder.orderStatus || 'Pending'}
                     </span>
                   </div>
                 </div>

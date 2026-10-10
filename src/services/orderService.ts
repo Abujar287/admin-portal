@@ -78,9 +78,79 @@ export class OrderService {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Filter out any legacy dummy mock orders (1001-1008)
-          const filtered = parsed.filter(o => !['1001', '1002', '1003', '1004', '1005', '1006', '1007', '1008'].includes(String(o.id)));
-          return filtered;
+          // Normalize every order to include all 22 official sheet properties + compatibility aliases
+          const normalized = parsed
+            .map((o: any) => {
+              const oId = String(o.order_id || o.id || '');
+              const cId = String(o.customer_id || o.customerId || '1');
+              const cMobile = String(o.customer_mobile || o.customerContact || '-');
+              const cName = String(o.customer_name || o.customerName || 'Customer');
+              const gen = String(o.gender || 'Other');
+              const crDt = String(o.create_date || o.createDate || '');
+              const ch = String(o.order_channel || o.orderChannel || 'Acquisition');
+              const aId = String(o.agent_id || o.agentId || 'agent01');
+              const aNm = String(o.agent_name || o.agentName || 'Agent');
+              const pCat = String(o.product_category || o.productCategory || 'Electronics');
+              const pNm = String(o.product_name || o.productName || 'Product Item');
+              const ct = String(o.city || 'Dhaka');
+              const dArea = String(o.delivery_area || o.deliveryArea || 'Gulshan');
+              const addr = String(o.address_details || o.addressDetails || '-');
+              const scDt = String(o.schedule_date || o.scheduleDate || '');
+              const scTm = String(o.schedule_time || o.scheduledTime || '11AM to 12PM');
+              const oVal = Number(o.order_value ?? o.orderValue ?? 0);
+              const oSt = String(o.order_status || o.orderStatus || 'Pending');
+              const foSt = String(o.followup_status || o.followupStatus || 'Pending');
+              const pr = Number(o.profit ?? 0);
+              const dDt = String(o.delivered_date || o.deliveredDate || '');
+              const caDt = String(o.cancelled_date || o.cancelledDate || '');
+
+              return {
+                ...o,
+                order_id: oId,
+                id: oId,
+                customer_id: cId,
+                customerId: cId,
+                customer_mobile: cMobile,
+                customerContact: cMobile,
+                customer_name: cName,
+                customerName: cName,
+                gender: gen,
+                create_date: crDt,
+                createDate: crDt,
+                order_channel: ch,
+                orderChannel: ch,
+                agent_id: aId,
+                agentId: aId,
+                agent_name: aNm,
+                agentName: aNm,
+                product_category: pCat,
+                productCategory: pCat,
+                product_name: pNm,
+                productName: pNm,
+                city: ct,
+                delivery_area: dArea,
+                deliveryArea: dArea,
+                address_details: addr,
+                addressDetails: addr,
+                schedule_date: scDt,
+                scheduleDate: scDt,
+                schedule_time: scTm,
+                scheduledTime: scTm,
+                order_value: oVal,
+                orderValue: oVal,
+                order_status: oSt,
+                orderStatus: oSt,
+                followup_status: foSt,
+                followupStatus: foSt,
+                profit: pr,
+                delivered_date: dDt,
+                deliveredDate: dDt,
+                cancelled_date: caDt,
+                cancelledDate: caDt
+              };
+            })
+            .filter((o: any) => !['1001', '1002', '1003', '1004', '1005', '1006', '1007', '1008'].includes(String(o.order_id)));
+          return normalized;
         }
       }
     } catch {
@@ -162,13 +232,13 @@ export class OrderService {
 
     // Extract from sheet orders
     orders.forEach(o => {
-      const cleanId = (o.agentId || '').trim();
+      const cleanId = (o.agent_id || (o as any).agentId || '').trim();
       if (cleanId && !agentMap.has(cleanId.toLowerCase())) {
         agentMap.set(cleanId.toLowerCase(), {
           user: cleanId,
           pass: cleanId, // default pass same as user id
-          name: o.agentName || `Agent ${cleanId}`,
-          team: o.orderChannel || 'Acquisition',
+          name: o.agent_name || (o as any).agentName || `Agent ${cleanId}`,
+          team: o.order_channel || (o as any).orderChannel || 'Acquisition',
           email: `${cleanId.toLowerCase()}@portal.local`
         });
       }
@@ -248,29 +318,68 @@ export class OrderService {
           ? numOrZero(idxProfit)
           : Math.round(orderVal * 0.20);
 
+        const cId = valOrEmpty(idxCustId, '1');
+        const cName = valOrEmpty(idxCustName, 'Customer');
+        const cMobile = valOrEmpty(idxCustCont, '-');
+        const gen = valOrEmpty(idxGender, 'Other');
+        const crDt = valOrEmpty(idxCreateDt, new Date().toISOString().replace('T', ' ').slice(0, 19));
+        const ch = valOrEmpty(idxChannel, 'Acquisition');
+        const aId = valOrEmpty(idxAgentId, 'agent01');
+        const aNm = valOrEmpty(idxAgentNm, 'Agent 01');
+        const pCat = valOrEmpty(idxProdCat, 'Electronics');
+        const pNm = valOrEmpty(idxProdNm, 'Product Item');
+        const ct = valOrEmpty(idxCity, 'Dhaka');
+        const dArea = valOrEmpty(idxArea, 'Gulshan');
+        const addr = valOrEmpty(idxAddress, '-');
+        const scDt = valOrEmpty(idxSchedDt, new Date().toISOString().split('T')[0]);
+        const scTm = valOrEmpty(idxSchedTm, '11AM to 12PM');
+        const oSt = valOrEmpty(idxStatus, 'Pending');
+        const foSt = valOrEmpty(idxFollowup, 'Pending');
+        const delivDt = valOrEmpty(idxDelivDt, '');
+        const cancDt = valOrEmpty(idxCancDt, '');
+
         return {
           order_id: orderId,
-          customer_id: valOrEmpty(idxCustId, '1'),
-          customer_name: valOrEmpty(idxCustName, 'Customer'),
-          customer_mobile: valOrEmpty(idxCustCont, '-'),
-          gender: valOrEmpty(idxGender, 'Other'),
-          create_date: valOrEmpty(idxCreateDt, new Date().toISOString().replace('T', ' ').slice(0, 19)),
-          order_channel: valOrEmpty(idxChannel, 'Acquisition'),
-          agent_id: valOrEmpty(idxAgentId, 'agent01'),
-          agent_name: valOrEmpty(idxAgentNm, 'Agent 01'),
-          product_category: valOrEmpty(idxProdCat, 'Electronics'),
-          product_name: valOrEmpty(idxProdNm, 'Product Item'),
-          city: valOrEmpty(idxCity, 'Dhaka'),
-          delivery_area: valOrEmpty(idxArea, 'Gulshan'),
-          address_details: valOrEmpty(idxAddress, '-'),
-          schedule_date: valOrEmpty(idxSchedDt, new Date().toISOString().split('T')[0]),
-          schedule_time: valOrEmpty(idxSchedTm, '11AM to 12PM'),
+          id: orderId,
+          customer_id: cId,
+          customerId: cId,
+          customer_mobile: cMobile,
+          customerContact: cMobile,
+          customer_name: cName,
+          customerName: cName,
+          gender: gen,
+          create_date: crDt,
+          createDate: crDt,
+          order_channel: ch,
+          orderChannel: ch,
+          agent_id: aId,
+          agentId: aId,
+          agent_name: aNm,
+          agentName: aNm,
+          product_category: pCat,
+          productCategory: pCat,
+          product_name: pNm,
+          productName: pNm,
+          city: ct,
+          delivery_area: dArea,
+          deliveryArea: dArea,
+          address_details: addr,
+          addressDetails: addr,
+          schedule_date: scDt,
+          scheduleDate: scDt,
+          schedule_time: scTm,
+          scheduledTime: scTm,
           order_value: orderVal,
-          order_status: valOrEmpty(idxStatus, 'Pending'),
-          followup_status: valOrEmpty(idxFollowup, 'Pending'),
+          orderValue: orderVal,
+          order_status: oSt,
+          orderStatus: oSt,
+          followup_status: foSt,
+          followupStatus: foSt,
           profit: profitVal,
-          delivered_date: valOrEmpty(idxDelivDt, ''),
-          cancelled_date: valOrEmpty(idxCancDt, '')
+          delivered_date: delivDt,
+          deliveredDate: delivDt,
+          cancelled_date: cancDt,
+          cancelledDate: cancDt
         };
       });
   }
@@ -280,13 +389,13 @@ export class OrderService {
    * Dispatches to Google Apps Script doPost(e) and saves locally.
    */
   static async createOrder(
-    newOrder: Omit<OrderItem, 'id' | 'profit'> & { profit?: number }
+    newOrder: any
   ): Promise<{ success: boolean; order: OrderItem; remoteSynced: boolean }> {
     const localOrders = this.getLocalOrders();
 
     let nextNum = 1001;
     if (localOrders.length > 0) {
-      const topId = localOrders[0].id.replace(/[^0-9]/g, '');
+      const topId = String(localOrders[0].order_id || localOrders[0].id || '').replace(/[^0-9]/g, '');
       const parsedNum = parseInt(topId, 10);
       if (!isNaN(parsedNum)) {
         nextNum = parsedNum + 1;
@@ -294,27 +403,84 @@ export class OrderService {
         nextNum = 1001 + localOrders.length;
       }
     }
-    const orderId = String(nextNum);
+    const orderId = String(newOrder.order_id || newOrder.id || nextNum);
 
     // Customer Id management
     const customerMap: Record<string, string> = JSON.parse(localStorage.getItem('customer_id_map') || '{}');
-    let customerId = customerMap[newOrder.customerContact];
-    if (!customerId) {
-        const existingIds = Object.values(customerMap).map(Number);
+    const contactPhone = String(newOrder.customer_mobile || newOrder.customerContact || '').trim();
+    let customerId = String(newOrder.customer_id || newOrder.customerId || '');
+    if (!customerId && contactPhone) {
+      customerId = customerMap[contactPhone] || '';
+      if (!customerId) {
+        const existingIds = Object.values(customerMap).map(Number).filter(n => !isNaN(n));
         const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
         customerId = String(maxId + 1);
-        customerMap[newOrder.customerContact] = customerId;
+        customerMap[contactPhone] = customerId;
         localStorage.setItem('customer_id_map', JSON.stringify(customerMap));
+      }
     }
+    if (!customerId) customerId = '1';
 
-    // Profit = 20%
-    const calculatedProfit = newOrder.profit !== undefined ? newOrder.profit : Math.round(newOrder.orderValue * 0.20);
+    const numOrderValue = Number(newOrder.order_value ?? newOrder.orderValue ?? 0);
+    const calculatedProfit = newOrder.profit !== undefined ? Number(newOrder.profit) : Math.round(numOrderValue * 0.20);
+    const cName = String(newOrder.customer_name || newOrder.customerName || 'Customer');
+    const gen = String(newOrder.gender || 'Other');
+    const crDate = String(newOrder.create_date || newOrder.createDate || new Date().toISOString().replace('T', ' ').slice(0, 19));
+    const ch = String(newOrder.order_channel || newOrder.orderChannel || 'Acquisition');
+    const agId = String(newOrder.agent_id || newOrder.agentId || 'agent01');
+    const agNm = String(newOrder.agent_name || newOrder.agentName || 'Agent');
+    const pCat = String(newOrder.product_category || newOrder.productCategory || 'Electronics');
+    const pNm = String(newOrder.product_name || newOrder.productName || 'Product Item');
+    const ct = String(newOrder.city || 'Dhaka');
+    const dArea = String(newOrder.delivery_area || newOrder.deliveryArea || 'Gulshan');
+    const addr = String(newOrder.address_details || newOrder.addressDetails || '-');
+    const scDate = String(newOrder.schedule_date || newOrder.scheduleDate || new Date().toISOString().split('T')[0]);
+    const scTime = String(newOrder.schedule_time || newOrder.scheduledTime || '11AM to 12PM');
+    const ordStatus = String(newOrder.order_status || newOrder.orderStatus || 'Pending');
+    const folStatus = String(newOrder.followup_status || newOrder.followupStatus || 'Pending');
 
     let fullOrder: OrderItem = {
-      ...newOrder,
+      order_id: orderId,
       id: orderId,
+      customer_id: customerId,
       customerId: customerId,
-      profit: calculatedProfit
+      customer_mobile: contactPhone || '-',
+      customerContact: contactPhone || '-',
+      customer_name: cName,
+      customerName: cName,
+      gender: gen,
+      create_date: crDate,
+      createDate: crDate,
+      order_channel: ch,
+      orderChannel: ch,
+      agent_id: agId,
+      agentId: agId,
+      agent_name: agNm,
+      agentName: agNm,
+      product_category: pCat,
+      productCategory: pCat,
+      product_name: pNm,
+      productName: pNm,
+      city: ct,
+      delivery_area: dArea,
+      deliveryArea: dArea,
+      address_details: addr,
+      addressDetails: addr,
+      schedule_date: scDate,
+      scheduleDate: scDate,
+      schedule_time: scTime,
+      scheduledTime: scTime,
+      order_value: numOrderValue,
+      orderValue: numOrderValue,
+      order_status: ordStatus,
+      orderStatus: ordStatus,
+      followup_status: folStatus,
+      followupStatus: folStatus,
+      profit: calculatedProfit,
+      delivered_date: '',
+      deliveredDate: '',
+      cancelled_date: '',
+      cancelledDate: ''
     };
 
     // Save locally immediately
@@ -328,26 +494,28 @@ export class OrderService {
     if (scriptUrl) {
       try {
         const params = new URLSearchParams();
-        params.append('order_id', fullOrder.id);
-        params.append('customer_id', fullOrder.customerId);
-        params.append('customer_mobile', fullOrder.customerContact);
-        params.append('customer_name', fullOrder.customerName);
+        params.append('order_id', fullOrder.order_id);
+        params.append('customer_id', fullOrder.customer_id);
+        params.append('customer_mobile', fullOrder.customer_mobile);
+        params.append('customer_name', fullOrder.customer_name);
         params.append('gender', fullOrder.gender);
-        params.append('create_date', fullOrder.createDate);
-        params.append('order_channel', fullOrder.orderChannel);
-        params.append('agent_id', fullOrder.agentId);
-        params.append('agent_name', fullOrder.agentName);
-        params.append('product_category', fullOrder.productCategory);
-        params.append('product_name', fullOrder.productName);
+        params.append('create_date', fullOrder.create_date);
+        params.append('order_channel', fullOrder.order_channel);
+        params.append('agent_id', fullOrder.agent_id);
+        params.append('agent_name', fullOrder.agent_name);
+        params.append('product_category', fullOrder.product_category);
+        params.append('product_name', fullOrder.product_name);
         params.append('city', fullOrder.city);
-        params.append('delivery_area', fullOrder.deliveryArea);
-        params.append('address_details', fullOrder.addressDetails);
-        params.append('schedule_date', fullOrder.scheduleDate);
-        params.append('schedule_time', fullOrder.scheduledTime);
-        params.append('order_value', String(fullOrder.orderValue));
-        params.append('order_status', fullOrder.orderStatus);
-        params.append('followup_status', fullOrder.followupStatus);
+        params.append('delivery_area', fullOrder.delivery_area);
+        params.append('address_details', fullOrder.address_details);
+        params.append('schedule_date', fullOrder.schedule_date);
+        params.append('schedule_time', fullOrder.schedule_time);
+        params.append('order_value', String(fullOrder.order_value));
+        params.append('order_status', fullOrder.order_status);
+        params.append('followup_status', fullOrder.followup_status);
         params.append('profit', String(fullOrder.profit));
+        params.append('delivered_date', fullOrder.delivered_date || '');
+        params.append('cancelled_date', fullOrder.cancelled_date || '');
 
         await fetch(scriptUrl, {
           method: 'POST',
@@ -431,51 +599,70 @@ export class OrderService {
     notes: string = ''
   ): Promise<{ updatedOrders: OrderItem[]; historyItem?: FollowupHistoryItem; remoteSynced: boolean }> {
     const orders = this.getLocalOrders();
-    const existingOrder = orders.find((ord) => String(ord.id) === String(orderId));
+    const existingOrder = orders.find((ord) => String(ord.order_id || ord.id) === String(orderId));
 
-    const finalOrderStatus = updates.orderStatus || existingOrder?.orderStatus || 'Pending';
+    const finalOrderStatus = updates.order_status || updates.orderStatus || existingOrder?.order_status || existingOrder?.orderStatus || 'Pending';
+    const finalFollowupStatus = updates.followup_status || updates.followupStatus;
     const currentTimestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
-    const isCancelled = updates.followupStatus?.toLowerCase() === 'cancelled';
-    const isDelivered = updates.followupStatus?.toLowerCase() === 'delivered';
+    const isCancelled = (finalFollowupStatus || '').toLowerCase() === 'cancelled';
+    const isDelivered = (finalFollowupStatus || '').toLowerCase() === 'delivered';
 
     // Clear delivered date when transitioning away from Delivered (e.g. to Pending)
-    let newDeliveredDate = existingOrder?.deliveredDate || '';
-    if (updates.followupStatus !== undefined) {
+    let newDeliveredDate = existingOrder?.delivered_date || existingOrder?.deliveredDate || '';
+    if (finalFollowupStatus !== undefined) {
       if (isDelivered) {
-        newDeliveredDate = updates.deliveredDate || currentTimestamp;
+        newDeliveredDate = updates.delivered_date || updates.deliveredDate || currentTimestamp;
       } else {
         newDeliveredDate = '';
       }
-    } else if (updates.deliveredDate !== undefined) {
-      newDeliveredDate = updates.deliveredDate;
+    } else if (updates.delivered_date !== undefined || updates.deliveredDate !== undefined) {
+      newDeliveredDate = (updates.delivered_date || updates.deliveredDate)!;
     }
 
     // Clear cancelled date when transitioning away from Cancelled
-    let newCancelledDate = existingOrder?.cancelledDate || '';
-    if (updates.followupStatus !== undefined) {
+    let newCancelledDate = existingOrder?.cancelled_date || existingOrder?.cancelledDate || '';
+    if (finalFollowupStatus !== undefined) {
       if (isCancelled) {
-        newCancelledDate = updates.cancelledDate || currentTimestamp;
+        newCancelledDate = updates.cancelled_date || updates.cancelledDate || currentTimestamp;
       } else {
         newCancelledDate = '';
       }
-    } else if (updates.cancelledDate !== undefined) {
-      newCancelledDate = updates.cancelledDate;
+    } else if (updates.cancelled_date !== undefined || updates.cancelledDate !== undefined) {
+      newCancelledDate = (updates.cancelled_date || updates.cancelledDate)!;
     }
 
     const updated = orders.map((ord) => {
-      if (String(ord.id) === String(orderId)) {
-        const orderVal = updates.orderValue !== undefined ? Number(updates.orderValue) : ord.orderValue;
+      if (String(ord.order_id || ord.id) === String(orderId)) {
+        const orderVal = updates.order_value !== undefined 
+          ? Number(updates.order_value) 
+          : (updates.orderValue !== undefined ? Number(updates.orderValue) : Number(ord.order_value || ord.orderValue || 0));
         const profit = updates.profit !== undefined 
           ? Number(updates.profit) 
           : (isDelivered ? (ord.profit || Math.round(orderVal * 0.20)) : 0);
+        const schedDate = updates.schedule_date !== undefined ? updates.schedule_date : (updates.scheduleDate !== undefined ? updates.scheduleDate : (ord.schedule_date || ord.scheduleDate || ''));
+        const schedTime = updates.schedule_time !== undefined ? updates.schedule_time : (updates.scheduledTime !== undefined ? updates.scheduledTime : (ord.schedule_time || ord.scheduledTime || ''));
+        const fStatus = finalFollowupStatus || ord.followup_status || ord.followupStatus || 'Pending';
+
         return {
           ...ord,
           ...updates,
+          order_id: ord.order_id || ord.id,
+          id: ord.order_id || ord.id,
+          order_value: orderVal,
           orderValue: orderVal,
           profit: profit,
+          order_status: finalOrderStatus,
           orderStatus: finalOrderStatus,
+          followup_status: fStatus,
+          followupStatus: fStatus,
+          schedule_date: schedDate,
+          scheduleDate: schedDate,
+          schedule_time: schedTime,
+          scheduledTime: schedTime,
+          delivered_date: newDeliveredDate,
           deliveredDate: newDeliveredDate,
+          cancelled_date: newCancelledDate,
           cancelledDate: newCancelledDate
         };
       }
@@ -489,20 +676,26 @@ export class OrderService {
     let nextFollowupId = 1;
 
     if (existingOrder) {
-      const orderVal = updates.orderValue !== undefined ? Number(updates.orderValue) : existingOrder.orderValue;
-      const schedDate = updates.scheduleDate !== undefined ? updates.scheduleDate : existingOrder.scheduleDate;
-      const schedTime = updates.scheduledTime !== undefined ? updates.scheduledTime : existingOrder.scheduledTime;
+      const orderVal = updates.order_value !== undefined 
+        ? Number(updates.order_value) 
+        : (updates.orderValue !== undefined ? Number(updates.orderValue) : Number(existingOrder.order_value || existingOrder.orderValue || 0));
+      const schedDate = updates.schedule_date !== undefined ? updates.schedule_date : (updates.scheduleDate !== undefined ? updates.scheduleDate : (existingOrder.schedule_date || existingOrder.scheduleDate || ''));
+      const schedTime = updates.schedule_time !== undefined ? updates.schedule_time : (updates.scheduledTime !== undefined ? updates.scheduledTime : (existingOrder.schedule_time || existingOrder.scheduledTime || ''));
 
       const existingHistory = this.getFollowupHistory();
       nextFollowupId = existingHistory.length + 1;
       const nextId = String(nextFollowupId);
 
       // Detect changes to generate Action name
-      const statusChanged = updates.followupStatus !== undefined && updates.followupStatus !== existingOrder.followupStatus;
-      const priceChanged = updates.orderValue !== undefined && Number(updates.orderValue) !== Number(existingOrder.orderValue);
+      const prevFo = existingOrder.followup_status || existingOrder.followupStatus || 'Pending';
+      const statusChanged = finalFollowupStatus !== undefined && finalFollowupStatus !== prevFo;
+      const prevVal = Number(existingOrder.order_value || existingOrder.orderValue || 0);
+      const priceChanged = (updates.order_value !== undefined || updates.orderValue !== undefined) && orderVal !== prevVal;
       const profitChanged = updates.profit !== undefined && Number(updates.profit) !== Number(existingOrder.profit);
-      const schedDateChanged = updates.scheduleDate !== undefined && updates.scheduleDate !== existingOrder.scheduleDate;
-      const schedTimeChanged = updates.scheduledTime !== undefined && updates.scheduledTime !== existingOrder.scheduledTime;
+      const prevScDate = existingOrder.schedule_date || existingOrder.scheduleDate || '';
+      const prevScTime = existingOrder.schedule_time || existingOrder.scheduledTime || '';
+      const schedDateChanged = schedDate !== prevScDate;
+      const schedTimeChanged = schedTime !== prevScTime;
 
       const changedParts: string[] = [];
       if (priceChanged) changedParts.push('price');
@@ -534,10 +727,10 @@ export class OrderService {
         id: nextId,
         followupId: nextFollowupId,
         orderId: String(orderId),
-        customerName: existingOrder.customerName,
-        customerContact: existingOrder.customerContact,
-        previousStatus: existingOrder.followupStatus || 'Pending',
-        newStatus: updates.followupStatus || existingOrder.followupStatus || 'Pending',
+        customerName: existingOrder.customer_name || existingOrder.customerName,
+        customerContact: existingOrder.customer_mobile || existingOrder.customerContact,
+        previousStatus: prevFo,
+        newStatus: finalFollowupStatus || prevFo,
         orderStatus: finalOrderStatus,
         orderValue: orderVal,
         scheduleDate: schedDate,
@@ -561,30 +754,33 @@ export class OrderService {
         params.append('order_id', String(orderId));
         params.append('followup_id', String(nextFollowupId));
         params.append('action_name', actionStr);
-        if (updates.followupStatus) {
-          params.append('followup_status', updates.followupStatus);
+        if (finalFollowupStatus) {
+          params.append('followup_status', finalFollowupStatus);
         }
         params.append('order_status', finalOrderStatus);
-        if (updates.orderValue !== undefined) {
-          params.append('order_value', String(updates.orderValue));
+        const orderValToSync = updates.order_value !== undefined ? updates.order_value : updates.orderValue;
+        if (orderValToSync !== undefined) {
+          params.append('order_value', String(orderValToSync));
         }
-        const finalProfitParam = isCancelled ? 0 : (updates.profit !== undefined ? updates.profit : (updates.orderValue !== undefined ? Number(updates.orderValue) * 0.20 : undefined));
+        const finalProfitParam = isCancelled ? 0 : (updates.profit !== undefined ? updates.profit : (orderValToSync !== undefined ? Number(orderValToSync) * 0.20 : undefined));
         if (finalProfitParam !== undefined) {
           params.append('profit', String(finalProfitParam));
         }
         params.append('delivered_date', newDeliveredDate || '');
         params.append('cancelled_date', newCancelledDate || '');
-        if (updates.scheduleDate !== undefined) {
-          params.append('schedule_date', updates.scheduleDate);
+        const scDtToSync = updates.schedule_date !== undefined ? updates.schedule_date : updates.scheduleDate;
+        if (scDtToSync !== undefined) {
+          params.append('schedule_date', scDtToSync);
         }
-        if (updates.scheduledTime !== undefined) {
-          params.append('schedule_time', updates.scheduledTime);
+        const scTmToSync = updates.schedule_time !== undefined ? updates.schedule_time : updates.scheduledTime;
+        if (scTmToSync !== undefined) {
+          params.append('schedule_time', scTmToSync);
         }
         params.append('updated_by', updatedBy);
         params.append('notes', notes);
         if (existingOrder) {
-          params.append('customer_name', existingOrder.customerName);
-          params.append('customer_mobile', existingOrder.customerContact);
+          params.append('customer_name', existingOrder.customer_name || existingOrder.customerName || '');
+          params.append('customer_mobile', existingOrder.customer_mobile || existingOrder.customerContact || '');
         }
         params.append('timestamp', currentTimestamp);
 
@@ -620,13 +816,17 @@ export class OrderService {
     const isCanc = prevStatus.toLowerCase() === 'cancelled';
 
     const updatedOrders = orders.map((ord) => {
-      if (String(ord.id) === String(orderId)) {
+      if (String(ord.order_id || ord.id) === String(orderId)) {
         return {
           ...ord,
+          followup_status: prevStatus,
           followupStatus: prevStatus,
+          order_status: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : 'Pending'),
           orderStatus: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : 'Pending'),
           profit: 0,
+          delivered_date: '',
           deliveredDate: '',
+          cancelled_date: '',
           cancelledDate: ''
         };
       }
@@ -645,6 +845,7 @@ export class OrderService {
       try {
         const params = new URLSearchParams();
         params.append('action', 'revertFollowup');
+        params.append('order_id', String(orderId));
         params.append('orderId', String(orderId));
         params.append('previousStatus', prevStatus);
 

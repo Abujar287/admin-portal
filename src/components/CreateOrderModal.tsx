@@ -18,17 +18,17 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   onOrderCreated
 }) => {
   // Form States
-  const [customer_name, setCustomerName] = useState('');
-  const [customer_mobile, setCustomerMobile] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerContact, setCustomerContact] = useState('');
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other' | ''>('');
 
-  const [order_channel, setOrderChannel] = useState(currentAgent.team || 'Acquisition');
-  const [product_category, setProductCategory] = useState('');
-  const [product_name, setProductName] = useState('');
+  const [orderChannel, setOrderChannel] = useState(currentAgent.team || 'Acquisition');
+  const [productCategory, setProductCategory] = useState('');
+  const [productName, setProductName] = useState('');
 
   const [city, setCity] = useState('');
   const [customCity, setCustomCity] = useState('');
-  const [delivery_area, setDeliveryArea] = useState('');
+  const [deliveryArea, setDeliveryArea] = useState('');
   const [customArea, setCustomArea] = useState('');
 
   const [flat, setFlat] = useState('');
@@ -36,10 +36,23 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [road, setRoad] = useState('');
   const [block, setBlock] = useState('');
 
-  const [create_date, setCreateDate] = useState('');
-  const [schedule_date, setScheduleDate] = useState('');
-  const [schedule_time, setScheduledTime] = useState('');
-  const [order_value, setOrderValue] = useState<string>('');
+  const [createDate, setCreateDate] = useState('');
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduledTime, setScheduledTime] = useState('');
+  const [orderValue, setOrderValue] = useState<string>('');
+
+  // Compatibility aliases
+  const customer_name = customerName;
+  const customer_mobile = customerContact;
+  const setCustomerMobile = setCustomerContact;
+  const order_channel = orderChannel;
+  const product_category = productCategory;
+  const product_name = productName;
+  const delivery_area = deliveryArea;
+  const create_date = createDate;
+  const schedule_date = scheduleDate;
+  const schedule_time = scheduledTime;
+  const order_value = orderValue;
 
   const [submitting, setSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
