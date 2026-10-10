@@ -216,24 +216,6 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                 <option key="my-search-customer_id" value="customer_id">customer_id</option>
                 <option key="my-search-customer_mobile" value="customer_mobile">customer_mobile</option>
                 <option key="my-search-customer_name" value="customer_name">customer_name</option>
-                <option key="my-search-gender" value="gender">gender</option>
-                <option key="my-search-create_date" value="create_date">create_date</option>
-                <option key="my-search-order_channel" value="order_channel">order_channel</option>
-                <option key="my-search-agent_id" value="agent_id">agent_id</option>
-                <option key="my-search-agent_name" value="agent_name">agent_name</option>
-                <option key="my-search-product_category" value="product_category">product_category</option>
-                <option key="my-search-product_name" value="product_name">product_name</option>
-                <option key="my-search-city" value="city">city</option>
-                <option key="my-search-delivery_area" value="delivery_area">delivery_area</option>
-                <option key="my-search-address_details" value="address_details">address_details</option>
-                <option key="my-search-schedule_date" value="schedule_date">schedule_date</option>
-                <option key="my-search-schedule_time" value="schedule_time">schedule_time</option>
-                <option key="my-search-order_value" value="order_value">order_value</option>
-                <option key="my-search-order_status" value="order_status">order_status</option>
-                <option key="my-search-followup_status" value="followup_status">followup_status</option>
-                <option key="my-search-profit" value="profit">profit</option>
-                <option key="my-search-delivered_date" value="delivered_date">delivered_date</option>
-                <option key="my-search-cancelled_date" value="cancelled_date">cancelled_date</option>
               </select>
               <input
                 type="text"

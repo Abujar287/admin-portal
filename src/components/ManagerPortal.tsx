@@ -2052,24 +2052,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <option key="mgr-search-customer_id" value="customer_id">customer_id</option>
                         <option key="mgr-search-customer_mobile" value="customer_mobile">customer_mobile</option>
                         <option key="mgr-search-customer_name" value="customer_name">customer_name</option>
-                        <option key="mgr-search-gender" value="gender">gender</option>
-                        <option key="mgr-search-create_date" value="create_date">create_date</option>
-                        <option key="mgr-search-order_channel" value="order_channel">order_channel</option>
-                        <option key="mgr-search-agent_id" value="agent_id">agent_id</option>
-                        <option key="mgr-search-agent_name" value="agent_name">agent_name</option>
-                        <option key="mgr-search-product_category" value="product_category">product_category</option>
-                        <option key="mgr-search-product_name" value="product_name">product_name</option>
-                        <option key="mgr-search-city" value="city">city</option>
-                        <option key="mgr-search-delivery_area" value="delivery_area">delivery_area</option>
-                        <option key="mgr-search-address_details" value="address_details">address_details</option>
-                        <option key="mgr-search-schedule_date" value="schedule_date">schedule_date</option>
-                        <option key="mgr-search-schedule_time" value="schedule_time">schedule_time</option>
-                        <option key="mgr-search-order_value" value="order_value">order_value</option>
-                        <option key="mgr-search-order_status" value="order_status">order_status</option>
-                        <option key="mgr-search-followup_status" value="followup_status">followup_status</option>
-                        <option key="mgr-search-profit" value="profit">profit</option>
-                        <option key="mgr-search-delivered_date" value="delivered_date">delivered_date</option>
-                        <option key="mgr-search-cancelled_date" value="cancelled_date">cancelled_date</option>
                       </select>
                       <input
                         type="text"
