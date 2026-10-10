@@ -195,38 +195,28 @@ export class OrderService {
     const headers = hasHeader ? firstRow : [];
     const rows = hasHeader ? data.slice(1) : data;
 
-    const getColIdx = (keywords: string[], fallbackIdx: number): number => {
-      if (hasHeader) {
-        for (const kw of keywords) {
-          const idx = headers.findIndex(h => h.includes(kw.toLowerCase()));
-          if (idx !== -1) return idx;
-        }
-      }
-      return fallbackIdx;
-    };
-
-    const idxOrder    = getColIdx(['order id', 'order_id'], 0);
-    const idxCustId   = getColIdx(['customer id', 'customer_id'], 1);
-    const idxCustCont = getColIdx(['customer contact', 'phone', 'contact'], 2);
-    const idxCustName = getColIdx(['customer name'], 3);
-    const idxGender   = getColIdx(['gender'], 4);
-    const idxCreateDt = getColIdx(['create date', 'created'], 5);
-    const idxChannel  = getColIdx(['order channel', 'channel'], 6);
-    const idxAgentId  = getColIdx(['agent id', 'agent_id', 'createdbynum'], 7);
-    const idxAgentNm  = getColIdx(['agent name', 'createdbyname'], 8);
-    const idxProdCat  = getColIdx(['product category', 'product catrgory'], 9);
-    const idxProdNm   = getColIdx(['product name'], 10);
-    const idxCity     = getColIdx(['city'], 11);
-    const idxArea     = getColIdx(['delivery area', 'area'], 12);
-    const idxAddress  = getColIdx(['address details', 'address'], 13);
-    const idxSchedDt  = getColIdx(['schedule date'], 14);
-    const idxSchedTm  = getColIdx(['scheduled time', 'time'], 15);
-    const idxValue    = getColIdx(['order value', 'value'], 16);
-    const idxStatus   = getColIdx(['order status', 'status'], 17);
-    const idxFollowup = getColIdx(['followup status', 'folllowup status'], 18);
-    const idxProfit   = getColIdx(['profit'], 19);
-    const idxDelivDt  = getColIdx(['delivered date', 'delivered_date'], 20);
-    const idxCancDt   = getColIdx(['cancelled date', 'cancelled_date'], 21);
+    const idxOrder    = headers.indexOf('order_id');
+    const idxCustId   = headers.indexOf('customer_id');
+    const idxCustCont = headers.indexOf('customer_mobile');
+    const idxCustName = headers.indexOf('customer_name');
+    const idxGender   = headers.indexOf('gender');
+    const idxCreateDt = headers.indexOf('create_date');
+    const idxChannel  = headers.indexOf('order_channel');
+    const idxAgentId  = headers.indexOf('agent_id');
+    const idxAgentNm  = headers.indexOf('agent_name');
+    const idxProdCat  = headers.indexOf('product_category');
+    const idxProdNm   = headers.indexOf('product_name');
+    const idxCity     = headers.indexOf('city');
+    const idxArea     = headers.indexOf('delivery_area');
+    const idxAddress  = headers.indexOf('address_details');
+    const idxSchedDt  = headers.indexOf('schedule_date');
+    const idxSchedTm  = headers.indexOf('schedule_time');
+    const idxValue    = headers.indexOf('order_value');
+    const idxStatus   = headers.indexOf('order_status');
+    const idxFollowup = headers.indexOf('followup_status');
+    const idxProfit   = headers.indexOf('profit');
+    const idxDelivDt  = headers.indexOf('delivered_date');
+    const idxCancDt   = headers.indexOf('cancelled_date');
 
     return rows
       .filter(row => {
@@ -259,28 +249,28 @@ export class OrderService {
           : Math.round(orderVal * 0.20);
 
         return {
-          id: orderId,
-          customerId: valOrEmpty(idxCustId, '1'),
-          customerName: valOrEmpty(idxCustName, 'Customer'),
-          customerContact: valOrEmpty(idxCustCont, '-'),
+          order_id: orderId,
+          customer_id: valOrEmpty(idxCustId, '1'),
+          customer_name: valOrEmpty(idxCustName, 'Customer'),
+          customer_mobile: valOrEmpty(idxCustCont, '-'),
           gender: valOrEmpty(idxGender, 'Other'),
-          createDate: valOrEmpty(idxCreateDt, new Date().toISOString().replace('T', ' ').slice(0, 19)),
-          orderChannel: valOrEmpty(idxChannel, 'Acquisition'),
-          agentId: valOrEmpty(idxAgentId, 'agent01'),
-          agentName: valOrEmpty(idxAgentNm, 'Agent 01'),
-          productCategory: valOrEmpty(idxProdCat, 'Electronics'),
-          productName: valOrEmpty(idxProdNm, 'Product Item'),
+          create_date: valOrEmpty(idxCreateDt, new Date().toISOString().replace('T', ' ').slice(0, 19)),
+          order_channel: valOrEmpty(idxChannel, 'Acquisition'),
+          agent_id: valOrEmpty(idxAgentId, 'agent01'),
+          agent_name: valOrEmpty(idxAgentNm, 'Agent 01'),
+          product_category: valOrEmpty(idxProdCat, 'Electronics'),
+          product_name: valOrEmpty(idxProdNm, 'Product Item'),
           city: valOrEmpty(idxCity, 'Dhaka'),
-          deliveryArea: valOrEmpty(idxArea, 'Gulshan'),
-          addressDetails: valOrEmpty(idxAddress, '-'),
-          scheduleDate: valOrEmpty(idxSchedDt, new Date().toISOString().split('T')[0]),
-          scheduledTime: valOrEmpty(idxSchedTm, '11AM to 12PM'),
-          orderValue: orderVal,
-          orderStatus: valOrEmpty(idxStatus, 'Pending'),
-          followupStatus: valOrEmpty(idxFollowup, 'Pending'),
+          delivery_area: valOrEmpty(idxArea, 'Gulshan'),
+          address_details: valOrEmpty(idxAddress, '-'),
+          schedule_date: valOrEmpty(idxSchedDt, new Date().toISOString().split('T')[0]),
+          schedule_time: valOrEmpty(idxSchedTm, '11AM to 12PM'),
+          order_value: orderVal,
+          order_status: valOrEmpty(idxStatus, 'Pending'),
+          followup_status: valOrEmpty(idxFollowup, 'Pending'),
           profit: profitVal,
-          deliveredDate: valOrEmpty(idxDelivDt, ''),
-          cancelledDate: valOrEmpty(idxCancDt, '')
+          delivered_date: valOrEmpty(idxDelivDt, ''),
+          cancelled_date: valOrEmpty(idxCancDt, '')
         };
       });
   }
@@ -338,24 +328,26 @@ export class OrderService {
     if (scriptUrl) {
       try {
         const params = new URLSearchParams();
-        params.append('customerId', fullOrder.customerId);
-        params.append('customerName', fullOrder.customerName);
-        params.append('customerContact', fullOrder.customerContact);
+        params.append('order_id', fullOrder.id);
+        params.append('customer_id', fullOrder.customerId);
+        params.append('customer_mobile', fullOrder.customerContact);
+        params.append('customer_name', fullOrder.customerName);
         params.append('gender', fullOrder.gender);
-        params.append('createDate', fullOrder.createDate);
-        params.append('orderChannel', fullOrder.orderChannel);
-        params.append('createdByNum', fullOrder.agentId);
-        params.append('createdByName', fullOrder.agentName);
-        params.append('productCategory', fullOrder.productCategory);
-        params.append('productName', fullOrder.productName);
+        params.append('create_date', fullOrder.createDate);
+        params.append('order_channel', fullOrder.orderChannel);
+        params.append('agent_id', fullOrder.agentId);
+        params.append('agent_name', fullOrder.agentName);
+        params.append('product_category', fullOrder.productCategory);
+        params.append('product_name', fullOrder.productName);
         params.append('city', fullOrder.city);
-        params.append('deliveryArea', fullOrder.deliveryArea);
-        params.append('addressDetails', fullOrder.addressDetails);
-        params.append('scheduleDate', fullOrder.scheduleDate);
-        params.append('scheduledTime', fullOrder.scheduledTime);
-        params.append('orderValue', String(fullOrder.orderValue));
-        params.append('orderStatus', fullOrder.orderStatus);
-        params.append('followupStatus', fullOrder.followupStatus);
+        params.append('delivery_area', fullOrder.deliveryArea);
+        params.append('address_details', fullOrder.addressDetails);
+        params.append('schedule_date', fullOrder.scheduleDate);
+        params.append('schedule_time', fullOrder.scheduledTime);
+        params.append('order_value', String(fullOrder.orderValue));
+        params.append('order_status', fullOrder.orderStatus);
+        params.append('followup_status', fullOrder.followupStatus);
+        params.append('profit', String(fullOrder.profit));
 
         await fetch(scriptUrl, {
           method: 'POST',
@@ -566,33 +558,33 @@ export class OrderService {
       try {
         const params = new URLSearchParams();
         params.append('action', 'updateFollowup');
-        params.append('orderId', String(orderId));
-        params.append('followupId', String(nextFollowupId));
-        params.append('actionName', actionStr);
+        params.append('order_id', String(orderId));
+        params.append('followup_id', String(nextFollowupId));
+        params.append('action_name', actionStr);
         if (updates.followupStatus) {
-          params.append('followupStatus', updates.followupStatus);
+          params.append('followup_status', updates.followupStatus);
         }
-        params.append('orderStatus', finalOrderStatus);
+        params.append('order_status', finalOrderStatus);
         if (updates.orderValue !== undefined) {
-          params.append('orderValue', String(updates.orderValue));
+          params.append('order_value', String(updates.orderValue));
         }
         const finalProfitParam = isCancelled ? 0 : (updates.profit !== undefined ? updates.profit : (updates.orderValue !== undefined ? Number(updates.orderValue) * 0.20 : undefined));
         if (finalProfitParam !== undefined) {
           params.append('profit', String(finalProfitParam));
         }
-        params.append('deliveredDate', newDeliveredDate || '');
-        params.append('cancelledDate', newCancelledDate || '');
+        params.append('delivered_date', newDeliveredDate || '');
+        params.append('cancelled_date', newCancelledDate || '');
         if (updates.scheduleDate !== undefined) {
-          params.append('scheduleDate', updates.scheduleDate);
+          params.append('schedule_date', updates.scheduleDate);
         }
         if (updates.scheduledTime !== undefined) {
-          params.append('scheduledTime', updates.scheduledTime);
+          params.append('schedule_time', updates.scheduledTime);
         }
-        params.append('updatedBy', updatedBy);
+        params.append('updated_by', updatedBy);
         params.append('notes', notes);
         if (existingOrder) {
-          params.append('customerName', existingOrder.customerName);
-          params.append('customerContact', existingOrder.customerContact);
+          params.append('customer_name', existingOrder.customerName);
+          params.append('customer_mobile', existingOrder.customerContact);
         }
         params.append('timestamp', currentTimestamp);
 
@@ -928,29 +920,29 @@ function doPost(e) {
     if (isNaN(newOrderId)) newOrderId = lastRow + 1000;
   }
   
-  var orderVal = parseFloat(data.orderValue) || 0;
+  var orderVal = parseFloat(data.order_value) || 0;
   var calculatedProfit = orderVal * 0.20; // 20% profit calculation
   
   var rowData = [
     newOrderId,                  // 0: Order Id
-    data.customerId || '',       // 1: Customer Id
-    data.customerContact || '',  // 2: Customer Contact
-    data.customerName || '',     // 3: Customer Name
+    data.customer_id || '',       // 1: Customer Id
+    data.customer_mobile || '',  // 2: Customer Mobile
+    data.customer_name || '',     // 3: Customer Name
     data.gender || '',           // 4: Gender
-    data.createDate || '',       // 5: Create Date
-    data.orderChannel || '',     // 6: Order Channel
-    data.createdByNum || '',     // 7: Agent ID
-    data.createdByName || '',    // 8: Agent Name
-    data.productCategory || '',  // 9: Product catrgory
-    data.productName || '',      // 10: Product Name
+    data.create_date || '',       // 5: Create Date
+    data.order_channel || '',     // 6: Order Channel
+    data.agent_id || '',     // 7: Agent ID
+    data.agent_name || '',    // 8: Agent Name
+    data.product_category || '',  // 9: Product category
+    data.product_name || '',      // 10: Product Name
     data.city || '',             // 11: City
-    data.deliveryArea || '',     // 12: Delivery Area
-    data.addressDetails || '',   // 13: Address Details
-    data.scheduleDate || '',     // 14: Schedule Date
-    data.scheduledTime || '',    // 15: Scheduled Time
+    data.delivery_area || '',     // 12: Delivery Area
+    data.address_details || '',   // 13: Address Details
+    data.schedule_date || '',     // 14: Schedule Date
+    data.schedule_time || '',    // 15: Scheduled Time
     orderVal,                    // 16: Order Value
-    data.orderStatus || 'Pending',     // 17: Order Status
-    data.followupStatus || 'Pending',  // 18: Folllowup Status
+    data.order_status || 'Pending',     // 17: Order Status
+    data.followup_status || 'Pending',  // 18: Followup Status
     calculatedProfit             // 19: Profit
   ];
   

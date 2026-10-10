@@ -29,28 +29,28 @@ export interface ManagerUser {
 }
 
 export interface OrderItem {
-  id: string; // Order Id
-  customerId: string; // Customer Id
-  customerName: string;
-  customerContact: string;
+  order_id: string;
+  customer_id: string;
+  customer_name: string;
+  customer_mobile: string;
   gender: 'Male' | 'Female' | 'Other' | string;
-  createDate: string; // YYYY-MM-DD HH:mm:ss
-  orderChannel: 'Acquisition' | 'Retention' | 'KAM' | 'Call-Center' | 'Facebook' | 'Back-Office' | 'VOC' | string;
-  agentId: string;
-  agentName: string;
-  productCategory: 'Electronics' | 'Room Accessories' | 'Cloths' | 'Medicines' | 'Appliance' | string;
-  productName: string;
+  create_date: string; // YYYY-MM-DD HH:mm:ss
+  order_channel: 'Acquisition' | 'Retention' | 'KAM' | 'Call-Center' | 'Facebook' | 'Back-Office' | 'VOC' | string;
+  agent_id: string;
+  agent_name: string;
+  product_category: 'Electronics' | 'Room Accessories' | 'Cloths' | 'Medicines' | 'Appliance' | string;
+  product_name: string;
   city: string;
-  deliveryArea: string;
-  addressDetails: string;
-  scheduleDate: string; // YYYY-MM-DD
-  scheduledTime: string;
-  orderValue: number;
-  orderStatus: 'Pending' | 'Delivered' | 'In Progress' | 'Cancelled' | string;
-  followupStatus: 'Pending' | 'Delivered' | 'Confirmed' | 'Follow-up' | 'Rescheduled' | string;
+  delivery_area: string;
+  address_details: string;
+  schedule_date: string; // YYYY-MM-DD
+  schedule_time: string;
+  order_value: number;
+  order_status: 'Pending' | 'Delivered' | 'In Progress' | 'Cancelled' | string;
+  followup_status: 'Pending' | 'Delivered' | 'Confirmed' | 'Follow-up' | 'Rescheduled' | string;
   profit: number;
-  deliveredDate?: string;
-  cancelledDate?: string;
+  delivered_date?: string;
+  cancelled_date?: string;
 }
 
 export type DateFilterType = '' | 'all' | 'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'lastYear' | 'custom';

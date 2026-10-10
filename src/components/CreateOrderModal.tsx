@@ -18,17 +18,17 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   onOrderCreated
 }) => {
   // Form States
-  const [customerName, setCustomerName] = useState('');
-  const [customerContact, setCustomerContact] = useState('');
+  const [customer_name, setCustomerName] = useState('');
+  const [customer_mobile, setCustomerMobile] = useState('');
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other' | ''>('');
 
-  const [orderChannel, setOrderChannel] = useState(currentAgent.team || 'Acquisition');
-  const [productCategory, setProductCategory] = useState('');
-  const [productName, setProductName] = useState('');
+  const [order_channel, setOrderChannel] = useState(currentAgent.team || 'Acquisition');
+  const [product_category, setProductCategory] = useState('');
+  const [product_name, setProductName] = useState('');
 
   const [city, setCity] = useState('');
   const [customCity, setCustomCity] = useState('');
-  const [deliveryArea, setDeliveryArea] = useState('');
+  const [delivery_area, setDeliveryArea] = useState('');
   const [customArea, setCustomArea] = useState('');
 
   const [flat, setFlat] = useState('');
@@ -36,10 +36,10 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [road, setRoad] = useState('');
   const [block, setBlock] = useState('');
 
-  const [createDate, setCreateDate] = useState('');
-  const [scheduleDate, setScheduleDate] = useState('');
-  const [scheduledTime, setScheduledTime] = useState('');
-  const [orderValue, setOrderValue] = useState<string>('');
+  const [create_date, setCreateDate] = useState('');
+  const [schedule_date, setScheduleDate] = useState('');
+  const [schedule_time, setScheduledTime] = useState('');
+  const [order_value, setOrderValue] = useState<string>('');
 
   const [submitting, setSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -108,24 +108,24 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     const numValue = parseFloat(orderValue) || 0;
 
     const newOrderPayload = {
-      customerName: customerName.trim(),
-      customerId: customerContact.trim(),
-      customerContact: customerContact.trim(),
+      customer_name: customerName.trim(),
+      customer_id: customerContact.trim(),
+      customer_mobile: customerContact.trim(),
       gender: gender || 'Other',
-      createDate: createDate,
-      orderChannel: orderChannel || 'Acquisition',
-      agentId: currentAgent.user,
-      agentName: currentAgent.name,
-      productCategory: productCategory || 'Electronics',
-      productName: productName.trim(),
+      create_date: createDate,
+      order_channel: orderChannel || 'Acquisition',
+      agent_id: currentAgent.user,
+      agent_name: currentAgent.name,
+      product_category: productCategory || 'Electronics',
+      product_name: productName.trim(),
       city: finalCity,
-      deliveryArea: finalArea,
-      addressDetails: addressDetails,
-      scheduleDate: scheduleDate,
-      scheduledTime: scheduledTime,
-      orderValue: numValue,
-      orderStatus: 'Pending',
-      followupStatus: 'Pending',
+      delivery_area: finalArea,
+      address_details: addressDetails,
+      schedule_date: scheduleDate,
+      schedule_time: scheduledTime,
+      order_value: numValue,
+      order_status: 'Pending',
+      followup_status: 'Pending',
       profit: 0
     };
 
@@ -200,7 +200,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 <input
                   type="text"
                   required
-                  value={customerName}
+                  value={customer_name}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="Full name"
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white"
@@ -213,8 +213,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 <input
                   type="tel"
                   required
-                  value={customerContact}
-                  onChange={(e) => setCustomerContact(e.target.value)}
+                  value={customer_mobile}
+                  onChange={(e) => setCustomerMobile(e.target.value)}
                   placeholder="Phone number"
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white"
                 />
@@ -250,7 +250,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 </label>
                 <select
                   required
-                  value={orderChannel}
+                  value={order_channel}
                   onChange={(e) => setOrderChannel(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white"
                 >
@@ -265,7 +265,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 </label>
                 <select
                   required
-                  value={productCategory}
+                  value={product_category}
                   onChange={(e) => setProductCategory(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white"
                 >
@@ -282,7 +282,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 <input
                   type="text"
                   required
-                  value={productName}
+                  value={product_name}
                   onChange={(e) => setProductName(e.target.value)}
                   placeholder="Item name"
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white"

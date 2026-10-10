@@ -69,7 +69,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // STRICTLY filter only for this agent
   const myAgentOrders = useMemo(() => {
     return orders.filter(
-      (o) => o.agentId.toLowerCase() === currentAgent.user.toLowerCase()
+      (o) => o.agent_id.toLowerCase() === currentAgent.user.toLowerCase()
     );
   }, [orders, currentAgent.user]);
 
@@ -77,7 +77,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const orderDeliveredDateMap = useMemo(() => {
     const map = new Map<string, string>();
     myAgentOrders.forEach(o => {
-      if (o.deliveredDate) map.set(String(o.id), o.deliveredDate);
+      if (o.delivered_date) map.set(String(o.order_id), o.delivered_date);
     });
     followupHistory.forEach(h => {
       if (h.newStatus?.toLowerCase() === 'delivered' && h.timestamp) {
@@ -90,7 +90,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const orderCancelledDateMap = useMemo(() => {
     const map = new Map<string, string>();
     myAgentOrders.forEach(o => {
-      if (o.cancelledDate) map.set(String(o.id), o.cancelledDate);
+      if (o.cancelled_date) map.set(String(o.order_id), o.cancelled_date);
     });
     followupHistory.forEach(h => {
       if (h.newStatus?.toLowerCase() === 'cancelled' && h.timestamp) {
@@ -113,23 +113,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const categoryMap: Record<string, number> = {};
 
     myAgentOrders.forEach((o) => {
-      const val = Number(o.orderValue) || 0;
+      const val = Number(o.order_value) || 0;
       const profit = Number(o.profit) || 0;
-      const fStatus = (o.followupStatus || '').toLowerCase();
-      const delivDate = orderDeliveredDateMap.get(String(o.id)) || o.deliveredDate || '';
-      const cancDate = orderCancelledDateMap.get(String(o.id)) || o.cancelledDate || '';
+      const fStatus = (o.followup_status || '').toLowerCase();
+      const delivDate = orderDeliveredDateMap.get(String(o.order_id)) || o.delivered_date || '';
+      const cancDate = orderCancelledDateMap.get(String(o.order_id)) || o.cancelled_date || '';
 
       // 1. Create Orders count & Total Order Value (Filtered by Create Date)
-      if (matchDate(o.createDate, dateFilter, startDate, endDate)) {
+      if (matchDate(o.create_date, dateFilter, startDate, endDate)) {
         totalCreated++;
         totalVal += val;
-        channelMap[o.orderChannel] = (channelMap[o.orderChannel] || 0) + 1;
-        categoryMap[o.productCategory] = (categoryMap[o.productCategory] || 0) + 1;
+        channelMap[o.order_channel] = (channelMap[o.order_channel] || 0) + 1;
+        categoryMap[o.product_category] = (categoryMap[o.product_category] || 0) + 1;
       }
 
       // 2. Delivered Orders, Delivered Value, Delivered Profit (Filtered by Delivered Date)
       if (fStatus === 'delivered' || delivDate) {
-        if (matchDate(delivDate || o.createDate, dateFilter, startDate, endDate)) {
+        if (matchDate(delivDate || o.create_date, dateFilter, startDate, endDate)) {
           deliveredCount++;
           deliveredVal += val;
           deliveredProfit += profit;
@@ -138,14 +138,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       // 3. Cancelled Orders (Filtered by Cancelled Date)
       if (fStatus === 'cancelled' || cancDate) {
-        if (matchDate(cancDate || o.createDate, dateFilter, startDate, endDate)) {
+        if (matchDate(cancDate || o.create_date, dateFilter, startDate, endDate)) {
           cancelledCount++;
         }
       }
 
       // 4. Open Orders (Followup Status not in Delivered, Cancelled)
       if (fStatus !== 'delivered' && fStatus !== 'cancelled') {
-        if (matchDate(o.createDate, dateFilter, startDate, endDate)) {
+        if (matchDate(o.create_date, dateFilter, startDate, endDate)) {
           openCount++;
         }
       }
@@ -155,7 +155,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const cancelledRate = totalCreated > 0 ? Math.round((cancelledCount / totalCreated) * 100) : 0;
     
     // Bucket Size: Distinct customers
-    const bucketSize = new Set(myAgentOrders.map(o => o.customerContact)).size;
+    const bucketSize = new Set(myAgentOrders.map(o => o.customer_mobile)).size;
     
     // NR Ratio = Profit / Delivered Value * 100
     const nrRatio = deliveredVal > 0 ? Number(((deliveredProfit / deliveredVal) * 100).toFixed(1)) : 0;

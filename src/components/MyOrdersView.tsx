@@ -37,27 +37,27 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
   // STRICTLY only this agent's orders (data isolation for agent portal)
   const myAgentOrders = useMemo(() => {
     return orders.filter(
-      (o) => o.agentId.toLowerCase() === currentAgent.user.toLowerCase()
+      (o) => o.agent_id.toLowerCase() === currentAgent.user.toLowerCase()
     );
   }, [orders, currentAgent.user]);
 
   // Apply search and date filters
   const filteredOrders = useMemo(() => {
     return myAgentOrders.filter((order) => {
-      const matchCreate = OrderService.checkDateMatch(order.createDate, filterCreateDate);
+      const matchCreate = OrderService.checkDateMatch(order.create_date, filterCreateDate);
       if (!matchCreate) return false;
 
-      const matchSchedule = OrderService.checkDateMatch(order.scheduleDate, filterScheduleDate);
+      const matchSchedule = OrderService.checkDateMatch(order.schedule_date, filterScheduleDate);
       if (!matchSchedule) return false;
 
-      if (filterFollowupStatus !== 'all' && (order.followupStatus || 'Pending') !== filterFollowupStatus) return false;
+      if (filterFollowupStatus !== 'all' && (order.followup_status || 'Pending') !== filterFollowupStatus) return false;
 
       if (searchValue.trim()) {
-        const q = searchValue.toLowerCase();
-        if (searchType === 'orderId' && !String(order.id || '').toLowerCase().includes(q)) return false;
-        if (searchType === 'customerId' && !String(order.customerId || '').toLowerCase().includes(q)) return false;
-        if (searchType === 'customer' && !String(order.customerContact || '').toLowerCase().includes(q)) return false;
-        if (searchType === 'name' && !String(order.customerName || '').toLowerCase().includes(q)) return false;
+        const q = searchValue.trim().toLowerCase();
+        if (searchType === 'order_id' && String(order.order_id || '').trim().toLowerCase() !== q) return false;
+        if (searchType === 'customer_id' && String(order.customer_id || '').trim().toLowerCase() !== q) return false;
+        if (searchType === 'customer_mobile' && String(order.customer_mobile || '').trim().toLowerCase() !== q) return false;
+        if (searchType === 'customer_name' && !String(order.customer_name || '').toLowerCase().includes(q)) return false;
       }
 
       return true;
@@ -129,14 +129,14 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
           {/* Filter Create Date */}
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-              Create Date
+              create_date
             </label>
             <select
               value={filterCreateDate}
               onChange={(e) => setFilterCreateDate(e.target.value as DateFilterType)}
               className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white"
             >
-              <option value="">All Create Dates</option>
+              <option value="">All</option>
               <option value="today">Today</option>
               <option value="yesterday">Yesterday</option>
               <option value="last7">Last 7 Days</option>
@@ -149,14 +149,14 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
           {/* Filter Schedule Date */}
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-              Schedule Date
+              schedule_date
             </label>
             <select
               value={filterScheduleDate}
               onChange={(e) => setFilterScheduleDate(e.target.value as DateFilterType)}
               className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white"
             >
-              <option value="">All Schedule Dates</option>
+              <option value="">All</option>
               <option value="today">Today</option>
               <option value="yesterday">Yesterday</option>
               <option value="last7">Last 7 Days</option>
@@ -169,15 +169,15 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
           {/* Filter Followup Status */}
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-              Followup Status
+              followup_status
             </label>
             <select
               value={filterFollowupStatus}
               onChange={(e) => setFilterFollowupStatus(e.target.value)}
               className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white"
             >
-              <option value="all">All Statuses</option>
-              {Array.from(new Set(orders.map(o => o.followupStatus || 'Pending'))).map(status => (
+              <option value="all">All</option>
+              {Array.from(new Set(orders.map(o => o.followup_status || 'Pending'))).map(status => (
                 <option key={status} value={status}>{status}</option>
               ))}
             </select>
@@ -191,13 +191,13 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
             <div className="flex items-center gap-2">
               <select
                 value={searchType}
-                onChange={(e) => setSearchType(e.target.value as 'orderId' | 'customerId' | 'customer' | 'name')}
+                onChange={(e) => setSearchType(e.target.value as 'order_id' | 'customer_id' | 'customer_mobile' | 'customer_name')}
                 className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white"
               >
-                <option value="orderId">Order ID</option>
-                <option value="customerId">Customer ID</option>
-                <option value="customer">Customer Mobile</option>
-                <option value="name">Customer Name</option>
+                <option value="order_id">order_id</option>
+                <option value="customer_id">customer_id</option>
+                <option value="customer_mobile">customer_mobile</option>
+                <option value="customer_name">customer_name</option>
               </select>
               <input
                 type="text"
@@ -238,28 +238,28 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-slate-100/90 text-slate-700 sticky top-0 z-10 font-bold border-b border-slate-200">
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Order Id</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Customer Id</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Customer Name</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Customer Contact</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Gender</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Create Date</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Order Channel</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Agent ID</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Agent Name</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Product catrgory</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Product Name</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">City</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Delivery Area</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Address Details</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Schedule Date</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Scheduled Time</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Order Value</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Order Status</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Folllowup Status</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Profit</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Delivered Date</th>
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">Cancelled Date</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">order_id</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">customer_id</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">customer_name</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">customer_mobile</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">gender</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">create_date</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">order_channel</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">agent_id</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">agent_name</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">product_category</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">product_name</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">city</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">delivery_area</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">address_details</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">schedule_date</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">schedule_time</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">order_value</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">order_status</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">followup_status</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">profit</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">delivered_date</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">cancelled_date</th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100 text-center">Action</th>
               </tr>
             </thead>
@@ -276,59 +276,59 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                   const isDelivered = ord.followupStatus.toLowerCase() === 'delivered';
 
                   return (
-                    <tr key={ord.id} className="hover:bg-blue-50/40 transition-colors">
+                    <tr key={ord.order_id} className="hover:bg-blue-50/40 transition-colors">
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-blue-700">
-                        #{ord.id}
+                        #{ord.order_id}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">
-                        {ord.customerId}
+                        {ord.customer_id}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">
-                        {ord.customerName}
+                        {ord.customer_name}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600">
-                        {ord.customerContact}
+                        {ord.customer_mobile}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">
                         {ord.gender}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-slate-600 font-mono text-[11px]">
-                        {OrderService.formatDateTime(ord.createDate)}
+                        {OrderService.formatDateTime(ord.create_date)}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap">
                         <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700">
-                          {ord.orderChannel}
+                          {ord.order_channel}
                         </span>
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600">
-                        {ord.agentId}
+                        {ord.agent_id}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">
-                        {ord.agentName}
+                        {ord.agent_name}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">
-                        {ord.productCategory}
+                        {ord.product_category}
                       </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-800 max-w-[200px] truncate" title={ord.productName}>
-                        {ord.productName}
+                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-800 max-w-[200px] truncate" title={ord.product_name}>
+                        {ord.product_name}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">
                         {ord.city}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">
-                        {ord.deliveryArea}
+                        {ord.delivery_area}
                       </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-500 max-w-[220px] truncate" title={ord.addressDetails}>
-                        {ord.addressDetails}
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-500 max-w-[220px] truncate" title={ord.address_details}>
+                        {ord.address_details}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-slate-700">
-                        {OrderService.formatDateTime(ord.scheduleDate)}
+                        {OrderService.formatDateTime(ord.schedule_date)}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">
-                        {ord.scheduledTime}
+                        {ord.schedule_time}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-bold text-slate-900">
-                        ৳ {ord.orderValue.toLocaleString()}
+                        ৳ {ord.order_value.toLocaleString()}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap">
                         <span
@@ -336,7 +336,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                             isDelivered ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                           }`}
                         >
-                          {ord.orderStatus}
+                          {ord.order_status}
                         </span>
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap">
@@ -345,17 +345,17 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                             isDelivered ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                           }`}
                         >
-                          {ord.followupStatus}
+                          {ord.followup_status}
                         </span>
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-bold text-emerald-600">
                         ৳ {ord.profit.toLocaleString()}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-emerald-700 font-medium">
-                        {ord.deliveredDate ? OrderService.formatDateTime(ord.deliveredDate) : '-'}
+                        {ord.delivered_date ? OrderService.formatDateTime(ord.delivered_date) : '-'}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-red-700 font-medium">
-                        {ord.cancelledDate ? OrderService.formatDateTime(ord.cancelledDate) : '-'}
+                        {ord.cancelled_date ? OrderService.formatDateTime(ord.cancelled_date) : '-'}
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-center">
                         <button
@@ -395,7 +395,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Booked by {selectedOrder.agentName} (@{selectedOrder.agentId}) • Channel: <span className="font-semibold text-slate-700">{selectedOrder.orderChannel}</span>
+                    Booked by {selectedOrder.agent_name} (@{selectedOrder.agent_id}) • Channel: <span className="font-semibold text-slate-700">{selectedOrder.order_channel}</span>
                   </p>
                 </div>
               </div>
@@ -417,11 +417,11 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   <div>
                     <span className="text-[11px] text-slate-500 block">Name:</span>
-                    <span className="font-bold text-slate-900">{selectedOrder.customerName}</span>
+                    <span className="font-bold text-slate-900">{selectedOrder.customer_name}</span>
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-500 block">Contact:</span>
-                    <span className="font-mono font-bold text-blue-700">{selectedOrder.customerContact}</span>
+                    <span className="font-mono font-bold text-blue-700">{selectedOrder.customer_mobile}</span>
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-500 block">Gender:</span>
@@ -439,11 +439,11 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                   <div className="space-y-1">
                     <div>
                       <span className="text-[11px] text-slate-500 block">Product:</span>
-                      <span className="font-bold text-slate-900">{selectedOrder.productName}</span>
+                      <span className="font-bold text-slate-900">{selectedOrder.product_name}</span>
                     </div>
                     <div>
                       <span className="text-[11px] text-slate-500 block">Category:</span>
-                      <span className="font-semibold text-slate-700">{selectedOrder.productCategory}</span>
+                      <span className="font-semibold text-slate-700">{selectedOrder.product_category}</span>
                     </div>
                   </div>
                 </div>
@@ -455,11 +455,11 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                   <div className="space-y-1">
                     <div>
                       <span className="text-[11px] text-slate-500 block">City &amp; Area:</span>
-                      <span className="font-bold text-slate-900">{selectedOrder.city} • {selectedOrder.deliveryArea}</span>
+                      <span className="font-bold text-slate-900">{selectedOrder.city} • {selectedOrder.delivery_area}</span>
                     </div>
                     <div>
                       <span className="text-[11px] text-slate-500 block">Address:</span>
-                      <span className="font-medium text-slate-700">{selectedOrder.addressDetails || '-'}</span>
+                      <span className="font-medium text-slate-700">{selectedOrder.address_details || '-'}</span>
                     </div>
                   </div>
                 </div>
@@ -474,7 +474,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                   <div>
                     <span className="text-[11px] text-slate-500 block">Schedule Date:</span>
                     <span className="font-bold font-mono text-slate-900 text-sm">
-                      {selectedOrder.scheduleDate ? OrderService.formatDateTime(selectedOrder.scheduleDate) : '-'}
+                      {selectedOrder.schedule_date ? OrderService.formatDateTime(selectedOrder.schedule_date) : '-'}
                     </span>
                   </div>
                   <div>
@@ -494,7 +494,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   <div>
                     <span className="text-[11px] text-slate-500 block">Order Value:</span>
-                    <span className="font-extrabold text-slate-900">৳ {selectedOrder.orderValue.toLocaleString()}</span>
+                    <span className="font-extrabold text-slate-900">৳ {selectedOrder.order_value.toLocaleString()}</span>
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-500 block">Profit:</span>
@@ -503,21 +503,21 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                   <div>
                     <span className="text-[11px] text-slate-500 block">Follow-up Status:</span>
                     <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                      selectedOrder.followupStatus === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
-                      selectedOrder.followupStatus === 'Cancelled' ? 'bg-red-100 text-red-800' :
+                      selectedOrder.followup_status === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
+                      selectedOrder.followup_status === 'Cancelled' ? 'bg-red-100 text-red-800' :
                       'bg-indigo-100 text-indigo-800'
                     }`}>
-                      {selectedOrder.followupStatus || 'Pending'}
+                      {selectedOrder.followup_status || 'Pending'}
                     </span>
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-500 block">Order Status:</span>
                     <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                      selectedOrder.orderStatus === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
-                      selectedOrder.orderStatus === 'Cancelled' ? 'bg-red-100 text-red-800' :
+                      selectedOrder.order_status === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
+                      selectedOrder.order_status === 'Cancelled' ? 'bg-red-100 text-red-800' :
                       'bg-blue-100 text-blue-800'
                     }`}>
-                      {selectedOrder.orderStatus || 'Pending'}
+                      {selectedOrder.order_status || 'Pending'}
                     </span>
                   </div>
                 </div>
