@@ -96,6 +96,21 @@ export default function App() {
   };
 
   const handleAgentLogin = (agent: AgentUser) => {
+    if (agent.role === 'Team Leader') {
+      setCurrentSession({
+        role: 'manager',
+        manager: {
+          user: agent.user,
+          pass: agent.pass,
+          name: agent.name || agent.user,
+          role: 'Team Leader'
+        }
+      });
+      sessionStorage.setItem('portal_session_role', 'manager');
+      sessionStorage.setItem('portal_session_user', agent.user);
+      showToast(`Welcome Team Leader, ${agent.name || agent.user}!`);
+      return;
+    }
     setCurrentSession({ role: 'agent', agent });
     sessionStorage.setItem('portal_session_role', 'agent');
     sessionStorage.setItem('portal_session_user', agent.user);

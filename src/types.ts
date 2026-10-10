@@ -10,7 +10,14 @@ export interface AgentUser {
   birthday?: string;
   status?: 'active' | 'deactivated';
   failedAttempts?: number;
-  role?: string;
+  role?: string; // 'Agent' | 'Team Leader'
+  permissions?: {
+    canCreate: boolean;
+    canUpdateStatus: boolean;
+    canChangeValue: boolean;
+    canAddProfit: boolean;
+    canCancel: boolean;
+  };
 }
 
 export interface ManagerUser {

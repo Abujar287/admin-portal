@@ -4,28 +4,44 @@ export const INITIAL_AGENTS: AgentUser[] = [
   { 
     user: 'agent01', 
     pass: 'agent01', 
-    name: 'Agent 01 (Tareq)', 
+    name: 'Agent 01', 
     team: 'Acquisition', 
     contact: '01711223344',
-    email: 'tareq.agent01@portal.local',
+    email: 'agent01@portal.local',
     address: 'House 14, Road 5, Dhanmondi, Dhaka',
     bloodGroup: 'B+',
     birthday: '1996-05-14',
     status: 'active',
-    failedAttempts: 0
+    failedAttempts: 0,
+    role: 'Agent',
+    permissions: {
+      canCreate: true,
+      canUpdateStatus: true,
+      canChangeValue: true,
+      canAddProfit: true,
+      canCancel: true
+    }
   },
   { 
     user: 'aqn01', 
     pass: 'aqn01', 
-    name: 'AQN Officer (Rahim)', 
+    name: 'AQN Officer', 
     team: 'Acquisition',
     contact: '01822334455',
-    email: 'rahim.aqn01@portal.local',
+    email: 'aqn01@portal.local',
     address: 'House 8, Road 2, Mirpur 10, Dhaka',
     bloodGroup: 'O+',
     birthday: '1994-11-20',
     status: 'active',
-    failedAttempts: 0
+    failedAttempts: 0,
+    role: 'Agent',
+    permissions: {
+      canCreate: true,
+      canUpdateStatus: true,
+      canChangeValue: true,
+      canAddProfit: true,
+      canCancel: true
+    }
   },
 ];
 

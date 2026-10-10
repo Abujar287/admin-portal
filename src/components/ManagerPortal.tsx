@@ -60,7 +60,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   onLogout,
   onUpdateOrderStatus
 }) => {
-  const [activeTab, setActiveTab] = useState<'profiles' | 'users' | 'orders' | 'followup' | 'summary'>('users');
+  const isTeamLeader = currentManager.role === 'Team Leader';
+  const [activeTab, setActiveTab] = useState<'profiles' | 'users' | 'orders' | 'followup' | 'summary'>(
+    isTeamLeader ? 'summary' : 'users'
+  );
 
   // Status & Details Modal State
   const [statusModalOrder, setStatusModalOrder] = useState<OrderItem | null>(null);
@@ -94,11 +97,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setModalNotes('');
   };
 
-  // Agent Management Form State
+  // Agent Management Form State (with no demo names)
   const [newAgentUser, setNewAgentUser] = useState('');
   const [newAgentPass, setNewAgentPass] = useState('');
   const [newAgentTeam, setNewAgentTeam] = useState('Acquisition');
   const [newAgentName, setNewAgentName] = useState('');
+  const [newAgentRole, setNewAgentRole] = useState('Agent');
+  const [newCanCreate, setNewCanCreate] = useState(true);
+  const [newCanUpdateStatus, setNewCanUpdateStatus] = useState(true);
+  const [newCanChangeValue, setNewCanChangeValue] = useState(true);
+  const [newCanAddProfit, setNewCanAddProfit] = useState(true);
+  const [newCanCancel, setNewCanCancel] = useState(true);
+
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [selectedAgentDetails, setSelectedAgentDetails] = useState<AgentUser | null>(null);
 
@@ -114,22 +124,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [orderIdSearch, setOrderIdSearch] = useState('');
   const [contactSearch, setContactSearch] = useState('');
 
-  // Summary Tab Filters
-  const [summaryCreateFilter, setSummaryCreateFilter] = useState<DateFilterType>('all');
-  const [summaryCreateStart, setSummaryCreateStart] = useState('');
-  const [summaryCreateEnd, setSummaryCreateEnd] = useState('');
-
-  const [summaryScheduleFilter, setSummaryScheduleFilter] = useState<DateFilterType>('all');
-  const [summaryScheduleStart, setSummaryScheduleStart] = useState('');
-  const [summaryScheduleEnd, setSummaryScheduleEnd] = useState('');
-
-  const [summaryDeliveredFilter, setSummaryDeliveredFilter] = useState<DateFilterType>('all');
-  const [summaryDeliveredStart, setSummaryDeliveredStart] = useState('');
-  const [summaryDeliveredEnd, setSummaryDeliveredEnd] = useState('');
-
-  const [summaryCancelledFilter, setSummaryCancelledFilter] = useState<DateFilterType>('all');
-  const [summaryCancelledStart, setSummaryCancelledStart] = useState('');
-  const [summaryCancelledEnd, setSummaryCancelledEnd] = useState('');
+  // Single Summary Date Filter State
+  const [summaryDateFilter, setSummaryDateFilter] = useState<DateFilterType>('all');
+  const [summaryStartDate, setSummaryStartDate] = useState('');
+  const [summaryEndDate, setSummaryEndDate] = useState('');
 
   // Helper date matcher
   const matchDate = (
@@ -303,56 +301,109 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     contactSearch
   ]);
 
-  // Summary Metrics & Aggregations
-  const summaryFilteredOrders = useMemo(() => {
-    return orders.filter((r) => {
-      if (!matchDate(r.createDate, summaryCreateFilter, summaryCreateStart, summaryCreateEnd)) {
-        return false;
-      }
-      if (!matchDate(r.scheduleDate, summaryScheduleFilter, summaryScheduleStart, summaryScheduleEnd)) {
-        return false;
-      }
-      if (!matchDate(r.deliveredDate || '', summaryDeliveredFilter, summaryDeliveredStart, summaryDeliveredEnd)) {
-        return false;
-      }
-      if (!matchDate(r.cancelledDate || '', summaryCancelledFilter, summaryCancelledStart, summaryCancelledEnd)) {
-        return false;
-      }
-      return true;
+  // Summary Metrics & Aggregations with single date filter
+  const orderDeliveredDateMap = useMemo(() => {
+    const map = new Map<string, string>();
+    orders.forEach(o => {
+      if (o.deliveredDate) map.set(String(o.id), o.deliveredDate);
     });
-  }, [
-    orders,
-    summaryCreateFilter,
-    summaryCreateStart,
-    summaryCreateEnd,
-    summaryScheduleFilter,
-    summaryScheduleStart,
-    summaryScheduleEnd,
-    summaryDeliveredFilter,
-    summaryDeliveredStart,
-    summaryDeliveredEnd,
-    summaryCancelledFilter,
-    summaryCancelledStart,
-    summaryCancelledEnd
-  ]);
+    followupHistory.forEach(h => {
+      if (h.newStatus?.toLowerCase() === 'delivered' && h.timestamp) {
+        map.set(String(h.orderId), h.timestamp);
+      }
+    });
+    return map;
+  }, [orders, followupHistory]);
 
-  const summaryBreakdowns = useMemo(() => {
+  const orderCancelledDateMap = useMemo(() => {
+    const map = new Map<string, string>();
+    orders.forEach(o => {
+      if (o.cancelledDate) map.set(String(o.id), o.cancelledDate);
+    });
+    followupHistory.forEach(h => {
+      if (h.newStatus?.toLowerCase() === 'cancelled' && h.timestamp) {
+        map.set(String(h.orderId), h.timestamp);
+      }
+    });
+    return map;
+  }, [orders, followupHistory]);
+
+  const summaryStats = useMemo(() => {
+    let createOrdersCount = 0;
+    let deliveredOrdersCount = 0;
+    let cancelledOrdersCount = 0;
+    let openOrdersCount = 0;
+    let totalOrderValue = 0;
+    let deliveredOrderValue = 0;
+    let totalProfit = 0;
+
     const cityMap: Record<string, number> = {};
     const channelMap: Record<string, number> = {};
-    const areaMap: Record<string, number> = {};
+    const categoryMap: Record<string, number> = {};
 
-    summaryFilteredOrders.forEach((r) => {
-      const city = r.city || 'Unknown';
-      const channel = r.orderChannel || 'Unknown';
-      const area = r.deliveryArea || 'Unknown';
+    orders.forEach((r) => {
+      const val = Number(r.orderValue) || 0;
+      const profit = Number(r.profit) || 0;
+      const fStatus = (r.followupStatus || '').toLowerCase();
+      const delivDt = orderDeliveredDateMap.get(String(r.id)) || r.deliveredDate || '';
+      const cancDt = orderCancelledDateMap.get(String(r.id)) || r.cancelledDate || '';
 
-      cityMap[city] = (cityMap[city] || 0) + 1;
-      channelMap[channel] = (channelMap[channel] || 0) + 1;
-      areaMap[area] = (areaMap[area] || 0) + 1;
+      // 1. Create Orders (Create Date)
+      if (matchDate(r.createDate, summaryDateFilter, summaryStartDate, summaryEndDate)) {
+        createOrdersCount++;
+        totalOrderValue += val;
+        cityMap[r.city || 'Unknown'] = (cityMap[r.city || 'Unknown'] || 0) + 1;
+        channelMap[r.orderChannel || 'Unknown'] = (channelMap[r.orderChannel || 'Unknown'] || 0) + 1;
+        categoryMap[r.productCategory || 'Unknown'] = (categoryMap[r.productCategory || 'Unknown'] || 0) + 1;
+      }
+
+      // 2. Delivered Orders (Delivered Date & Followup Status = Delivered)
+      if (fStatus === 'delivered' || delivDt) {
+        if (matchDate(delivDt || r.createDate, summaryDateFilter, summaryStartDate, summaryEndDate)) {
+          deliveredOrdersCount++;
+          deliveredOrderValue += val;
+          totalProfit += profit;
+        }
+      }
+
+      // 3. Cancelled Orders (Cancelled Date & Followup Status = Cancelled)
+      if (fStatus === 'cancelled' || cancDt) {
+        if (matchDate(cancDt || r.createDate, summaryDateFilter, summaryStartDate, summaryEndDate)) {
+          cancelledOrdersCount++;
+        }
+      }
+
+      // 4. Open Orders (Followup Status not in Delivered, Cancelled)
+      if (fStatus !== 'delivered' && fStatus !== 'cancelled') {
+        if (matchDate(r.createDate, summaryDateFilter, summaryStartDate, summaryEndDate)) {
+          openOrdersCount++;
+        }
+      }
     });
 
-    return { cityMap, channelMap, areaMap };
-  }, [summaryFilteredOrders]);
+    const totalDelivAndCanc = deliveredOrdersCount + cancelledOrdersCount;
+    const deliveredRatio = totalDelivAndCanc > 0 ? Math.round((deliveredOrdersCount / totalDelivAndCanc) * 100) : 0;
+    const cancelledRatio = totalDelivAndCanc > 0 ? Math.round((cancelledOrdersCount / totalDelivAndCanc) * 100) : 0;
+    const bucketSize = deliveredOrdersCount > 0 ? Math.round(deliveredOrderValue / deliveredOrdersCount) : 0;
+    const nrRatio = deliveredOrderValue > 0 ? Number(((totalProfit / deliveredOrderValue) * 100).toFixed(1)) : 0;
+
+    return {
+      createOrdersCount,
+      deliveredOrdersCount,
+      cancelledOrdersCount,
+      openOrdersCount,
+      totalOrderValue,
+      deliveredOrderValue,
+      totalProfit,
+      deliveredRatio,
+      cancelledRatio,
+      bucketSize,
+      nrRatio,
+      cityMap,
+      channelMap,
+      categoryMap
+    };
+  }, [orders, summaryDateFilter, summaryStartDate, summaryEndDate, orderDeliveredDateMap, orderCancelledDateMap]);
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 font-sans antialiased overflow-hidden">
@@ -371,50 +422,54 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         </div>
 
         <nav className="flex-1 space-y-1.5">
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-              activeTab === 'users'
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                : 'text-slate-300 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>User Details</span>
-            <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
-              {agents.length}
-            </span>
-          </button>
+          {!isTeamLeader && (
+            <>
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                  activeTab === 'users'
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                    : 'text-slate-300 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                <span>User Details</span>
+                <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
+                  {agents.length}
+                </span>
+              </button>
 
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-              activeTab === 'orders'
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                : 'text-slate-300 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            <span>Orders</span>
-            <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
-              {orders.length}
-            </span>
-          </button>
+              <button
+                onClick={() => setActiveTab('orders')}
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                  activeTab === 'orders'
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                    : 'text-slate-300 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                <span>Orders</span>
+                <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
+                  {orders.length}
+                </span>
+              </button>
 
-          <button
-            onClick={() => setActiveTab('followup')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-              activeTab === 'followup'
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                : 'text-slate-300 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <History className="w-4 h-4" />
-            <span>Followup &amp; Sync</span>
-            <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
-              {followupHistory.length}
-            </span>
-          </button>
+              <button
+                onClick={() => setActiveTab('followup')}
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                  activeTab === 'followup'
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                    : 'text-slate-300 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <History className="w-4 h-4" />
+                <span>Followup &amp; Sync</span>
+                <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
+                  {followupHistory.length}
+                </span>
+              </button>
+            </>
+          )}
 
           <button
             onClick={() => setActiveTab('summary')}
@@ -1391,218 +1446,105 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {/* TAB: SUMMARY */}
           {activeTab === 'summary' && (
             <div className="space-y-6">
-              {/* Summary Date Filters */}
-              <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-3">
-                <h3 className="font-extrabold text-slate-900 text-sm">Summary Analytics Range</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                      Create Date
-                    </label>
-                    <select
-                      value={summaryCreateFilter}
-                      onChange={(e) => setSummaryCreateFilter(e.target.value as DateFilterType)}
-                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
-                    >
-                      <option value="all">All Time</option>
-                      <option value="today">Today</option>
-                      <option value="yesterday">Yesterday</option>
-                      <option value="last7">Last 7 Days</option>
-                      <option value="last30">Last 30 Days</option>
-                      <option value="thisMonth">This Month</option>
-                      <option value="lastMonth">Last Month</option>
-                      <option value="lastYear">Last Year</option>
-                      <option value="custom">Custom Date Range</option>
-                    </select>
-                    {summaryCreateFilter === 'custom' && (
-                      <div className="flex items-center gap-1.5 mt-2">
-                        <input
-                          type="date"
-                          value={summaryCreateStart}
-                          onChange={(e) => setSummaryCreateStart(e.target.value)}
-                          className="w-full text-xs p-1 border rounded"
-                        />
-                        <span className="text-xs text-slate-400">to</span>
-                        <input
-                          type="date"
-                          value={summaryCreateEnd}
-                          onChange={(e) => setSummaryCreateEnd(e.target.value)}
-                          className="w-full text-xs p-1 border rounded"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                      Schedule Date
-                    </label>
-                    <select
-                      value={summaryScheduleFilter}
-                      onChange={(e) => setSummaryScheduleFilter(e.target.value as DateFilterType)}
-                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
-                    >
-                      <option value="all">All Time</option>
-                      <option value="today">Today</option>
-                      <option value="yesterday">Yesterday</option>
-                      <option value="last7">Last 7 Days</option>
-                      <option value="last30">Last 30 Days</option>
-                      <option value="thisMonth">This Month</option>
-                      <option value="lastMonth">Last Month</option>
-                      <option value="lastYear">Last Year</option>
-                      <option value="custom">Custom Date Range</option>
-                    </select>
-                    {summaryScheduleFilter === 'custom' && (
-                      <div className="flex items-center gap-1.5 mt-2">
-                        <input
-                          type="date"
-                          value={summaryScheduleStart}
-                          onChange={(e) => setSummaryScheduleStart(e.target.value)}
-                          className="w-full text-xs p-1 border rounded"
-                        />
-                        <span className="text-xs text-slate-400">to</span>
-                        <input
-                          type="date"
-                          value={summaryScheduleEnd}
-                          onChange={(e) => setSummaryScheduleEnd(e.target.value)}
-                          className="w-full text-xs p-1 border rounded"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                      Delivered Date
-                    </label>
-                    <select
-                      value={summaryDeliveredFilter}
-                      onChange={(e) => setSummaryDeliveredFilter(e.target.value as DateFilterType)}
-                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
-                    >
-                      <option value="all">All Time</option>
-                      <option value="today">Today</option>
-                      <option value="yesterday">Yesterday</option>
-                      <option value="last7">Last 7 Days</option>
-                      <option value="last30">Last 30 Days</option>
-                      <option value="thisMonth">This Month</option>
-                      <option value="lastMonth">Last Month</option>
-                      <option value="lastYear">Last Year</option>
-                      <option value="custom">Custom Date Range</option>
-                    </select>
-                    {summaryDeliveredFilter === 'custom' && (
-                      <div className="flex items-center gap-1.5 mt-2">
-                        <input
-                          type="date"
-                          value={summaryDeliveredStart}
-                          onChange={(e) => setSummaryDeliveredStart(e.target.value)}
-                          className="w-full text-xs p-1 border rounded"
-                        />
-                        <span className="text-xs text-slate-400">to</span>
-                        <input
-                          type="date"
-                          value={summaryDeliveredEnd}
-                          onChange={(e) => setSummaryDeliveredEnd(e.target.value)}
-                          className="w-full text-xs p-1 border rounded"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                      Cancelled Date
-                    </label>
-                    <select
-                      value={summaryCancelledFilter}
-                      onChange={(e) => setSummaryCancelledFilter(e.target.value as DateFilterType)}
-                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
-                    >
-                      <option value="all">All Time</option>
-                      <option value="today">Today</option>
-                      <option value="yesterday">Yesterday</option>
-                      <option value="last7">Last 7 Days</option>
-                      <option value="last30">Last 30 Days</option>
-                      <option value="thisMonth">This Month</option>
-                      <option value="lastMonth">Last Month</option>
-                      <option value="lastYear">Last Year</option>
-                      <option value="custom">Custom Date Range</option>
-                    </select>
-                    {summaryCancelledFilter === 'custom' && (
-                      <div className="flex items-center gap-1.5 mt-2">
-                        <input
-                          type="date"
-                          value={summaryCancelledStart}
-                          onChange={(e) => setSummaryCancelledStart(e.target.value)}
-                          className="w-full text-xs p-1 border rounded"
-                        />
-                        <span className="text-xs text-slate-400">to</span>
-                        <input
-                          type="date"
-                          value={summaryCancelledEnd}
-                          onChange={(e) => setSummaryCancelledEnd(e.target.value)}
-                          className="w-full text-xs p-1 border rounded"
-                        />
-                      </div>
-                    )}
-                  </div>
+              {/* Summary Single Date Filter */}
+              <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-sm">Summary Analytics</h3>
+                  <p className="text-xs text-slate-500">Filtered automatically across create date, delivered date, and cancelled date columns.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={summaryDateFilter}
+                    onChange={(e) => setSummaryDateFilter(e.target.value as DateFilterType)}
+                    className="px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-semibold text-slate-700"
+                  >
+                    <option value="all">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="yesterday">Yesterday</option>
+                    <option value="last7">Last 7 Days</option>
+                    <option value="last30">Last 30 Days</option>
+                    <option value="thisMonth">This Month</option>
+                    <option value="lastMonth">Last Month</option>
+                    <option value="lastYear">Last Year</option>
+                    <option value="custom">Custom Range</option>
+                  </select>
+                  {summaryDateFilter === 'custom' && (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="date"
+                        value={summaryStartDate}
+                        onChange={(e) => setSummaryStartDate(e.target.value)}
+                        className="text-xs p-1.5 border rounded-lg"
+                      />
+                      <span className="text-xs text-slate-400">to</span>
+                      <input
+                        type="date"
+                        value={summaryEndDate}
+                        onChange={(e) => setSummaryEndDate(e.target.value)}
+                        className="text-xs p-1.5 border rounded-lg"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Total Orders Card */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs max-w-sm">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  Total Orders
-                </p>
-                <p className="text-4xl font-extrabold text-indigo-700">
-                  {summaryFilteredOrders.length}
-                </p>
-                <p className="text-xs text-slate-400 mt-1">Orders in selected period</p>
+              {/* Summary Metrics Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Create Orders</span>
+                  <p className="text-3xl font-extrabold text-indigo-700 mt-2">{summaryStats.createOrdersCount}</p>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Delivered Orders</span>
+                  <p className="text-3xl font-extrabold text-emerald-700 mt-2">{summaryStats.deliveredOrdersCount}</p>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cancelled Orders</span>
+                  <p className="text-3xl font-extrabold text-red-700 mt-2">{summaryStats.cancelledOrdersCount}</p>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Open Orders</span>
+                  <p className="text-3xl font-extrabold text-amber-700 mt-2">{summaryStats.openOrdersCount}</p>
+                </div>
+
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Order Value</span>
+                  <p className="text-2xl font-extrabold text-slate-900 mt-2">৳ {summaryStats.totalOrderValue.toLocaleString()}</p>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Delivered Order Value</span>
+                  <p className="text-2xl font-extrabold text-indigo-700 mt-2">৳ {summaryStats.deliveredOrderValue.toLocaleString()}</p>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Profit</span>
+                  <p className="text-2xl font-extrabold text-emerald-700 mt-2">৳ {summaryStats.totalProfit.toLocaleString()}</p>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Bucket Size</span>
+                  <p className="text-2xl font-extrabold text-blue-700 mt-2">৳ {summaryStats.bucketSize.toLocaleString()}</p>
+                </div>
+
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Delivered Ratio</span>
+                  <p className="text-2xl font-extrabold text-emerald-600 mt-2">{summaryStats.deliveredRatio}%</p>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cancelled Ratio</span>
+                  <p className="text-2xl font-extrabold text-red-600 mt-2">{summaryStats.cancelledRatio}%</p>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">NR Ratio</span>
+                  <p className="text-2xl font-extrabold text-purple-600 mt-2">{summaryStats.nrRatio}%</p>
+                </div>
               </div>
 
-              {/* 3 Summary Tables */}
+              {/* 3 Summary Tables (Channel, Category, City) */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* City Count */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col">
-                  <h4 className="font-extrabold text-sm text-slate-900 mb-3 flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-indigo-600" />
-                    <span>City Order Count</span>
-                  </h4>
-                  <div className="overflow-x-auto flex-1 border rounded-xl">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="bg-slate-100 text-slate-700 font-bold">
-                          <th className="py-2.5 px-3 text-left">City</th>
-                          <th className="py-2.5 px-3 text-right">Count</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {Object.entries(summaryBreakdowns.cityMap)
-                          .sort((a, b) => b[1] - a[1])
-                          .map(([city, count]) => (
-                            <tr key={city}>
-                              <td className="py-2 px-3 text-slate-700">{city}</td>
-                              <td className="py-2 px-3 text-right font-bold text-slate-900">{count}</td>
-                            </tr>
-                          ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="bg-slate-50 font-bold border-t border-slate-200">
-                          <td className="py-2 px-3">Total</td>
-                          <td className="py-2 px-3 text-right text-indigo-700">
-                            {Object.values(summaryBreakdowns.cityMap).reduce((a, b) => a + b, 0)}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Channel Count */}
+                {/* Channel Wise */}
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col">
                   <h4 className="font-extrabold text-sm text-slate-900 mb-3 flex items-center gap-2">
                     <Layers className="w-4 h-4 text-indigo-600" />
-                    <span>Channel Order Count</span>
+                    <span>Channel Wise Summary</span>
                   </h4>
                   <div className="overflow-x-auto flex-1 border rounded-xl">
                     <table className="w-full text-xs">
@@ -1613,59 +1555,65 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {Object.entries(summaryBreakdowns.channelMap)
-                          .sort((a, b) => b[1] - a[1])
-                          .map(([channel, count]) => (
-                            <tr key={channel}>
-                              <td className="py-2 px-3 text-slate-700">{channel}</td>
-                              <td className="py-2 px-3 text-right font-bold text-slate-900">{count}</td>
-                            </tr>
-                          ))}
+                        {Object.entries(summaryStats.channelMap).map(([k, v]) => (
+                          <tr key={k}>
+                            <td className="py-2 px-3 text-slate-700">{k}</td>
+                            <td className="py-2 px-3 text-right font-bold text-slate-900">{v}</td>
+                          </tr>
+                        ))}
                       </tbody>
-                      <tfoot>
-                        <tr className="bg-slate-50 font-bold border-t border-slate-200">
-                          <td className="py-2 px-3">Total</td>
-                          <td className="py-2 px-3 text-right text-indigo-700">
-                            {Object.values(summaryBreakdowns.channelMap).reduce((a, b) => a + b, 0)}
-                          </td>
-                        </tr>
-                      </tfoot>
                     </table>
                   </div>
                 </div>
 
-                {/* Delivery Area Count */}
+                {/* Category Wise */}
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col">
                   <h4 className="font-extrabold text-sm text-slate-900 mb-3 flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-indigo-600" />
-                    <span>Delivery Area Order Count</span>
+                    <FileText className="w-4 h-4 text-indigo-600" />
+                    <span>Category Wise Summary</span>
                   </h4>
                   <div className="overflow-x-auto flex-1 border rounded-xl">
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="bg-slate-100 text-slate-700 font-bold">
-                          <th className="py-2.5 px-3 text-left">Area</th>
+                          <th className="py-2.5 px-3 text-left">Category</th>
                           <th className="py-2.5 px-3 text-right">Count</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {Object.entries(summaryBreakdowns.areaMap)
-                          .sort((a, b) => b[1] - a[1])
-                          .map(([area, count]) => (
-                            <tr key={area}>
-                              <td className="py-2 px-3 text-slate-700">{area}</td>
-                              <td className="py-2 px-3 text-right font-bold text-slate-900">{count}</td>
-                            </tr>
-                          ))}
+                        {Object.entries(summaryStats.categoryMap).map(([k, v]) => (
+                          <tr key={k}>
+                            <td className="py-2 px-3 text-slate-700">{k}</td>
+                            <td className="py-2 px-3 text-right font-bold text-slate-900">{v}</td>
+                          </tr>
+                        ))}
                       </tbody>
-                      <tfoot>
-                        <tr className="bg-slate-50 font-bold border-t border-slate-200">
-                          <td className="py-2 px-3">Total</td>
-                          <td className="py-2 px-3 text-right text-indigo-700">
-                            {Object.values(summaryBreakdowns.areaMap).reduce((a, b) => a + b, 0)}
-                          </td>
+                    </table>
+                  </div>
+                </div>
+
+                {/* City Wise */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col">
+                  <h4 className="font-extrabold text-sm text-slate-900 mb-3 flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-indigo-600" />
+                    <span>City Wise Summary</span>
+                  </h4>
+                  <div className="overflow-x-auto flex-1 border rounded-xl">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-700 font-bold">
+                          <th className="py-2.5 px-3 text-left">City</th>
+                          <th className="py-2.5 px-3 text-right">Count</th>
                         </tr>
-                      </tfoot>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {Object.entries(summaryStats.cityMap).map(([k, v]) => (
+                          <tr key={k}>
+                            <td className="py-2 px-3 text-slate-700">{k}</td>
+                            <td className="py-2 px-3 text-right font-bold text-slate-900">{v}</td>
+                          </tr>
+                        ))}
+                      </tbody>
                     </table>
                   </div>
                 </div>
