@@ -21,8 +21,9 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
 }) => {
   const [filterCreateDate, setFilterCreateDate] = useState<DateFilterType>('');
   const [filterScheduleDate, setFilterScheduleDate] = useState<DateFilterType>('');
-  const [filterFollowupStatus, setFilterFollowupStatus] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [filterFollowupStatus, setFilterFollowupStatus] = useState<string>('all');
+  const [searchType, setSearchType] = useState<'orderId' | 'customer' | 'name'>('orderId');
+  const [searchValue, setSearchValue] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
@@ -49,33 +50,25 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
       const matchSchedule = OrderService.checkDateMatch(order.scheduleDate, filterScheduleDate);
       if (!matchSchedule) return false;
 
-      if (filterFollowupStatus && order.followupStatus !== filterFollowupStatus) return false;
+      if (filterFollowupStatus !== 'all' && (order.followupStatus || 'Pending') !== filterFollowupStatus) return false;
 
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const searchable = [
-          order.id,
-          order.customerName,
-          order.customerContact,
-          order.productName,
-          order.productCategory,
-          order.city,
-          order.deliveryArea,
-          order.orderChannel
-        ].join(' ').toLowerCase();
-
-        if (!searchable.includes(q)) return false;
+      if (searchValue.trim()) {
+        const q = searchValue.toLowerCase();
+        if (searchType === 'orderId' && !order.id.toLowerCase().includes(q)) return false;
+        if (searchType === 'customer' && !order.customerContact.toLowerCase().includes(q)) return false;
+        if (searchType === 'name' && !order.customerName.toLowerCase().includes(q)) return false;
       }
 
       return true;
     });
-  }, [myAgentOrders, filterCreateDate, filterScheduleDate, searchQuery]);
+  }, [myAgentOrders, filterCreateDate, filterScheduleDate, filterFollowupStatus, searchType, searchValue]);
 
   const handleClearFilters = () => {
     setFilterCreateDate('');
     setFilterScheduleDate('');
-    setFilterFollowupStatus('');
-    setSearchQuery('');
+    setFilterFollowupStatus('all');
+    setSearchType('orderId');
+    setSearchValue('');
   };
 
   return (
@@ -132,27 +125,10 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
       {/* Filter and Search Bar */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-          {/* Search bar */}
-          <div className="relative">
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-              Search My Orders
-            </label>
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="ID, Customer, Phone, SKU..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
-          </div>
-
           {/* Filter Create Date */}
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-              Filter by Create Date
+              Create Date
             </label>
             <select
               value={filterCreateDate}
@@ -172,7 +148,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
           {/* Filter Schedule Date */}
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-              Filter by Schedule Date
+              Schedule Date
             </label>
             <select
               value={filterScheduleDate}
@@ -191,42 +167,68 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
 
           {/* Filter Followup Status */}
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-              Filter by Followup Status
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+              Followup Status
             </label>
             <select
               value={filterFollowupStatus}
               onChange={(e) => setFilterFollowupStatus(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white"
+              className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white"
             >
-              <option value="">All Statuses</option>
+              <option value="all">All Statuses</option>
               {Array.from(new Set(orders.map(o => o.followupStatus || 'Pending'))).map(status => (
                 <option key={status} value={status}>{status}</option>
               ))}
             </select>
           </div>
 
-          {/* Clear button */}
-          <div className="flex items-end">
-            <button
-              onClick={handleClearFilters}
-              className="w-full py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <FilterX className="w-3.5 h-3.5 text-slate-500" />
-              <span>Clear Filters</span>
-            </button>
+          {/* Combined Search */}
+          <div className="flex-2">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+              Search
+            </label>
+            <div className="flex items-center gap-2">
+              <select
+                value={searchType}
+                onChange={(e) => setSearchType(e.target.value as 'orderId' | 'customer' | 'name')}
+                className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white"
+              >
+                <option value="orderId">Order ID</option>
+                <option value="customer">Customer #</option>
+                <option value="name">Name</option>
+              </select>
+              <input
+                type="text"
+                placeholder={`Search...`}
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-300"
+              />
+            </div>
           </div>
         </div>
+        
+        {/* Clear Button */}
+        <div className="flex justify-end pt-2 border-t border-slate-100">
+          <button
+            onClick={handleClearFilters}
+            className="py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <FilterX className="w-3.5 h-3.5 text-slate-500" />
+            <span>Clear Filters</span>
+          </button>
+        </div>
+      </div>
 
         {/* Filter badge summary */}
-        {(filterCreateDate || filterScheduleDate || searchQuery) && (
+        {(filterCreateDate || filterScheduleDate || searchValue) && (
           <div className="flex items-center gap-2 text-[11px] text-slate-500 pt-1 border-t border-slate-100">
             <span>
               Showing <strong>{filteredOrders.length}</strong> of <strong>{myAgentOrders.length}</strong> orders
             </span>
           </div>
         )}
-      </div>
+      {/* End Filter and Search Bar */}
 
       {/* Orders Table Wrapper with Sticky Header - All 19 Columns */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">

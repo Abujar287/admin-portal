@@ -152,6 +152,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     });
 
     const deliveryRate = totalCreated > 0 ? Math.round((deliveredCount / totalCreated) * 100) : 0;
+    const cancelledRate = totalCreated > 0 ? Math.round((cancelledCount / totalCreated) * 100) : 0;
+    
+    // Bucket Size: Distinct customers
+    const bucketSize = new Set(myAgentOrders.map(o => o.customerContact)).size;
+    
+    // NR Ratio = Profit / Delivered Value * 100
+    const nrRatio = deliveredVal > 0 ? Number(((deliveredProfit / deliveredVal) * 100).toFixed(1)) : 0;
 
     return {
       totalCreated,
@@ -162,6 +169,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       deliveredVal,
       deliveredProfit,
       deliveryRate,
+      cancelledRate,
+      bucketSize,
+      nrRatio,
       channelMap,
       categoryMap
     };
@@ -229,120 +239,57 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* Core Performance Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Card 1: Total Created Orders */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Create Orders
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
-              <Layers className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-3xl font-extrabold text-[#1e3a8a]">{stats.totalCreated}</span>
-            <span className="text-xs text-slate-400 ml-2">booked orders</span>
-          </div>
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+        {/* Row 1 */}
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase">Create Orders</span>
+          <div className="text-2xl font-extrabold text-blue-900 mt-1">{stats.totalCreated}</div>
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase">Served Orders</span>
+          <div className="text-2xl font-extrabold text-emerald-700 mt-1">{stats.deliveredCount}</div>
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase">Cancelled</span>
+          <div className="text-2xl font-extrabold text-red-700 mt-1">{stats.cancelledCount}</div>
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase">Open Orders</span>
+          <div className="text-2xl font-extrabold text-amber-700 mt-1">{stats.openCount}</div>
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase">Open Order Val</span>
+          <div className="text-xl font-bold text-slate-800 mt-1">৳ {(stats.totalVal - stats.deliveredVal - 0).toLocaleString()}</div>
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase">Order Value</span>
+          <div className="text-xl font-bold text-slate-800 mt-1">৳ {stats.totalVal.toLocaleString()}</div>
         </div>
 
-        {/* Card 2: Delivered Orders */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Delivered Orders
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-3xl font-extrabold text-emerald-600">{stats.deliveredCount}</span>
-            <span className="text-xs text-emerald-700/80 ml-2 font-medium">({stats.deliveryRate}% rate)</span>
-          </div>
+        {/* Row 2 */}
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase">Deliv. Order Val</span>
+          <div className="text-xl font-bold text-emerald-700 mt-1">৳ {stats.deliveredVal.toLocaleString()}</div>
         </div>
-
-        {/* Card 3: Cancelled Orders */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Cancelled Orders
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center">
-              <XCircle className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-3xl font-extrabold text-red-600">{stats.cancelledCount}</span>
-            <span className="text-xs text-slate-400 ml-2">cancelled orders</span>
-          </div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase">Profit</span>
+          <div className="text-xl font-bold text-emerald-700 mt-1">৳ {stats.deliveredProfit.toLocaleString()}</div>
         </div>
-
-        {/* Card 4: Open Orders */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Open Orders
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-3xl font-extrabold text-amber-600">{stats.openCount}</span>
-            <span className="text-xs text-slate-400 ml-2">in pipeline</span>
-          </div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase">Bucket Size</span>
+          <div className="text-2xl font-extrabold text-slate-800 mt-1">{stats.bucketSize}</div>
         </div>
-
-        {/* Card 5: Total Order Value */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Total Order Value
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs">
-              ৳
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-3xl font-extrabold text-[#1e3a8a]">
-              ৳ {stats.totalVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-          </div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase">NR Ratio</span>
+          <div className="text-2xl font-extrabold text-slate-800 mt-1">{stats.nrRatio}%</div>
         </div>
-
-        {/* Card 6: Delivered Value */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Delivered Value
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs">
-              ৳
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-3xl font-extrabold text-emerald-600">
-              ৳ {stats.deliveredVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-          </div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase">Deliv. Ratio</span>
+          <div className="text-2xl font-extrabold text-emerald-700 mt-1">{stats.deliveryRate}%</div>
         </div>
-
-        {/* Card 7: Delivered Profit */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between sm:col-span-2 lg:col-span-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Delivered Profit (Sum of Profit on Delivered Orders)
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
-              <Award className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-4xl font-extrabold text-emerald-600">
-              ৳ {stats.deliveredProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-          </div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase">Cancelled Ratio</span>
+          <div className="text-2xl font-extrabold text-red-700 mt-1">{stats.cancelledRate}%</div>
         </div>
       </div>
 
