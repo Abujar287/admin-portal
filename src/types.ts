@@ -52,6 +52,7 @@ export interface OrderItem {
   profit: number;
   delivered_date?: string;
   cancelled_date?: string;
+  followup_date?: string;
 
   // Optional Backwards Compatibility Aliases
   id?: string;
@@ -74,6 +75,7 @@ export interface OrderItem {
   followupStatus?: string;
   deliveredDate?: string;
   cancelledDate?: string;
+  followupDate?: string;
 }
 
 export type DateFilterType = '' | 'all' | 'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'lastYear' | 'custom';

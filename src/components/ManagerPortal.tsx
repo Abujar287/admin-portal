@@ -4315,6 +4315,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         modalNotes
                       );
                       setStatusModalOrder(null);
+                      await onRefreshOrders();
+                      setTimeout(() => {
+                        window.location.reload();
+                      }, 400);
                     } finally {
                       setIsSavingStatus(false);
                     }
