@@ -667,7 +667,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                   { label: 'delivery_area', value: order.delivery_area || order.deliveryArea },
                   { label: 'address_details', value: order.address_details || order.addressDetails },
                   { label: 'schedule_date', value: order.schedule_date || order.scheduleDate },
-                  { label: 'schedule_time', value: order.schedule_time || order.scheduleTime },
+                  { label: 'schedule_time', value: order.schedule_time || order.scheduledTime },
                   { label: 'order_value', value: `৳ ${((order.order_value ?? order.orderValue) || 0).toLocaleString()}` },
                   { label: 'order_status', value: order.order_status || order.orderStatus },
                   { label: 'followup_status', value: order.followup_status || order.followupStatus },
