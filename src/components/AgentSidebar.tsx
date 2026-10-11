@@ -1,11 +1,11 @@
 import React from 'react';
-import { AgentUser } from '../types';
-import { User, Package, BarChart3, LogOut, ChevronRight, MoreVertical, Layers } from 'lucide-react';
+import { AgentUser, AgentNavTab } from '../types';
+import { User, Package, BarChart2, History, TrendingUp, LogOut, ChevronRight, MoreVertical, Layers } from 'lucide-react';
 
 interface AgentSidebarProps {
   currentAgent: AgentUser;
-  activeTab: 'profiles' | 'orders' | 'dashboard';
-  setActiveTab: (tab: 'profiles' | 'orders' | 'dashboard') => void;
+  activeTab: AgentNavTab;
+  setActiveTab: (tab: AgentNavTab) => void;
   collapsed: boolean;
   setCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
   onLogout: () => void;
@@ -21,12 +21,26 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   onLogout,
   ordersCount
 }) => {
-  // Only Profile, My Orders, Performance (Create Order removed from sidebar)
-  const navItems = [
-    { id: 'profiles' as const, label: 'Profile', icon: User },
-    { id: 'orders' as const, label: 'My Orders', icon: Package, badge: ordersCount },
-    { id: 'dashboard' as const, label: 'Performance', icon: BarChart3 }
+  // All 5 tabs from manager (excluding user details, category mapping, settings & export)
+  const allNavItems: { id: AgentNavTab; label: string; icon: any; badge?: number }[] = [
+    { id: 'summary', label: 'Summary', icon: BarChart2 },
+    { id: 'orders', label: 'My Orders', icon: Package, badge: ordersCount },
+    { id: 'followup', label: 'Followup', icon: History },
+    { id: 'agent-performance', label: 'Performance', icon: TrendingUp },
+    { id: 'profiles', label: 'Profile', icon: User }
   ];
+
+  const allowedTabs = currentAgent.permissions?.allowedTabs && Array.isArray(currentAgent.permissions.allowedTabs) && currentAgent.permissions.allowedTabs.length > 0
+    ? currentAgent.permissions.allowedTabs
+    : ['summary', 'orders', 'followup', 'agent-performance', 'profiles'];
+
+  const navItems = allNavItems.filter((item) => {
+    return (
+      allowedTabs.includes(item.id) ||
+      (item.id === 'agent-performance' && allowedTabs.includes('dashboard')) ||
+      (item.id === 'dashboard' && allowedTabs.includes('agent-performance'))
+    );
+  });
 
   return (
     <aside
@@ -66,7 +80,10 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
       <nav className="flex-1 space-y-1.5 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = activeTab === item.id;
+          const isActive =
+            activeTab === item.id ||
+            (item.id === 'agent-performance' && activeTab === 'dashboard') ||
+            (item.id === 'dashboard' && activeTab === 'agent-performance');
           return (
             <button
               key={item.id}

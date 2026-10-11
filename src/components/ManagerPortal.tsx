@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { AgentUser, ManagerUser, OrderItem, DateFilterType, FollowupHistoryItem } from '../types';
+import { AgentUser, ManagerUser, OrderItem, DateFilterType, FollowupHistoryItem, AgentPermissions, AgentNavTab } from '../types';
 import { OrderService } from '../services/orderService';
 import { 
   User, 
@@ -8,6 +8,7 @@ import {
   BarChart2, 
   LogOut, 
   RotateCw, 
+  RotateCcw,
   Search, 
   Plus, 
   Edit2, 
@@ -64,12 +65,22 @@ import {
   addTeamItem,
   removeTeamItem,
   getTeamLeadersList,
+  DEFAULT_TEAM_LEADERS,
   addTeamLeaderItem,
   removeTeamLeaderItem,
   getCategoryMappings,
   saveCategoryMappings,
-  CategoryTeamMapping
+  CategoryTeamMapping,
+  ORDER_STATUS_LIST,
 } from '../data/mockOrders';
+
+export const AGENT_MANAGEABLE_TABS: { id: AgentNavTab; label: string; description: string }[] = [
+  { id: 'summary', label: 'Summary', description: 'Analytics, KPI metrics & sales summary' },
+  { id: 'orders', label: 'Orders', description: 'Orders database, search, and order items' },
+  { id: 'followup', label: 'Followup', description: 'Followup statuses, scheduling & updates' },
+  { id: 'agent-performance', label: 'Agent Performance', description: 'Performance analytics & individual rankings' },
+  { id: 'profiles', label: 'Profiles', description: 'Agent profile & personal settings' }
+];
 
 interface ManagerPortalProps {
   currentManager: ManagerUser;
@@ -79,7 +90,7 @@ interface ManagerPortalProps {
   onUpdateOrders?: (orders: OrderItem[]) => void;
   followupHistory?: FollowupHistoryItem[];
   onUpdateFollowupHistory?: (history: FollowupHistoryItem[]) => void;
-  onRevertFollowup?: (historyId: string, orderId: string, previousStatus: string) => Promise<void>;
+  onRevertFollowup?: (historyId: string, orderId: string, previousStatus: string, undoneBy?: string) => Promise<void>;
   onRefreshOrders: () => Promise<void>;
   isRefreshing: boolean;
   onLogout: () => void;
@@ -102,9 +113,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 }) => {
   const isTeamLeader = currentManager.role === 'Team Leader';
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<
+  const [activeTab, setActiveTabState] = useState<
     'profiles' | 'users' | 'orders' | 'followup' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping'
-  >(isTeamLeader ? 'summary' : 'users');
+  >(() => {
+    const saved = sessionStorage.getItem('manager_active_tab') as any;
+    if (saved) return saved;
+    return isTeamLeader ? 'summary' : 'users';
+  });
+
+  const setActiveTab = (tab: 'profiles' | 'users' | 'orders' | 'followup' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping') => {
+    sessionStorage.setItem('manager_active_tab', tab);
+    setActiveTabState(tab);
+  };
   const [managerToast, setManagerToast] = useState<string | null>(null);
   const showToast = (msg: string) => {
     setManagerToast(msg);
@@ -134,12 +154,16 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [editContact, setEditContact] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editBloodGroup, setEditBloodGroup] = useState('');
+  const [editTeamLeaders, setEditTeamLeaders] = useState<string[]>([]);
+  const [editCustomTLInput, setEditCustomTLInput] = useState('');
   const [editStatus, setEditStatus] = useState<'active' | 'deactivated'>('active');
   const [editCanCreate, setEditCanCreate] = useState(true);
   const [editCanUpdateStatus, setEditCanUpdateStatus] = useState(true);
+  const [editCanChangeSchedule, setEditCanChangeSchedule] = useState(true);
   const [editCanChangeValue, setEditCanChangeValue] = useState(true);
   const [editCanAddProfit, setEditCanAddProfit] = useState(true);
-  const [editCanCancel, setEditCanCancel] = useState(true);
+  const [editAllowedOrderStatuses, setEditAllowedOrderStatuses] = useState<string[]>(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
+  const [editAllowedTabs, setEditAllowedTabs] = useState<AgentNavTab[]>(['summary', 'orders', 'followup', 'agent-performance', 'profiles']);
 
   // Agent Performance Tab Filters & Search
   const [agentPerformanceSearch, setAgentPerformanceSearch] = useState('');
@@ -170,14 +194,17 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [newAgentPass, setNewAgentPass] = useState('');
   const [newAgentTeam, setNewAgentTeam] = useState('Acquisition');
   const [newTeamName, setNewTeamName] = useState('');
-  const [newAgentTeamLeader, setNewAgentTeamLeader] = useState('');
+  const [newAgentTeamLeaders, setNewAgentTeamLeaders] = useState<string[]>([]);
+  const [newCustomTLInput, setNewCustomTLInput] = useState('');
   const [newAgentName, setNewAgentName] = useState('');
   const [newAgentRole, setNewAgentRole] = useState('Agent');
   const [newCanCreate, setNewCanCreate] = useState(true);
   const [newCanUpdateStatus, setNewCanUpdateStatus] = useState(true);
+  const [newCanChangeSchedule, setNewCanChangeSchedule] = useState(true);
   const [newCanChangeValue, setNewCanChangeValue] = useState(true);
   const [newCanAddProfit, setNewCanAddProfit] = useState(true);
-  const [newCanCancel, setNewCanCancel] = useState(true);
+  const [newAllowedOrderStatuses, setNewAllowedOrderStatuses] = useState<string[]>(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
+  const [newAllowedTabs, setNewAllowedTabs] = useState<AgentNavTab[]>(['summary', 'orders', 'followup', 'agent-performance', 'profiles']);
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [selectedAgentDetails, setSelectedAgentDetails] = useState<AgentUser | null>(null);
@@ -291,6 +318,24 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   // 5. Team Leader
   const [teamLeadersList, setTeamLeadersList] = useState<string[]>(() => getTeamLeadersList());
   const [newTeamLeaderInput, setNewTeamLeaderInput] = useState('');
+
+  // Comprehensive deduplicated list of available Team Leaders for multi-select dropdowns
+  const availableTeamLeaders = useMemo(() => {
+    const set = new Set<string>();
+    (teamLeadersList || []).forEach((tl) => {
+      if (tl && tl.trim()) set.add(tl.trim());
+    });
+    agents.forEach((a) => {
+      if (a.role === 'Team Leader') {
+        if (a.name) set.add(a.name);
+        if (a.user) set.add(a.user);
+      }
+    });
+    if (set.size === 0) {
+      DEFAULT_TEAM_LEADERS.forEach((tl) => set.add(tl));
+    }
+    return Array.from(set);
+  }, [teamLeadersList, agents]);
 
   // Matrix mappings
   const [categoryMappings, setCategoryMappings] = useState<CategoryTeamMapping[]>(() => getCategoryMappings());
@@ -478,17 +523,26 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     if (!item) return;
     const isAuth = !isTeamLeader || 
                    item.updatedBy === currentManager.user ||
-                   agents.some(a => a.user === item.updatedBy && a.teamLeaderId === currentManager.user);
+                   agents.some(a => a.user === item.updatedBy && (
+                     a.teamLeaderId === currentManager.user ||
+                     a.teamLeaderId?.includes(currentManager.user) ||
+                     a.teamLeaderId?.includes(currentManager.name) ||
+                     (Array.isArray(a.teamLeaders) && (
+                       a.teamLeaders.includes(currentManager.user) ||
+                       a.teamLeaders.includes(currentManager.name)
+                     ))
+                   ));
     if (!isAuth) {
       showToast('Not authorized to remove this follow-up record.');
       return;
     }
 
     const prevStatus = item.previousStatus || 'Pending';
+    const undoneBy = currentManager.name || currentManager.user || 'Manager';
     if (onRevertFollowup) {
-      await onRevertFollowup(historyId, item.orderId, prevStatus);
+      await onRevertFollowup(historyId, item.orderId, prevStatus, undoneBy);
     } else {
-      const res = await OrderService.revertFollowup(historyId, item.orderId, prevStatus);
+      const res = await OrderService.revertFollowup(historyId, item.orderId, prevStatus, undoneBy);
       if (onUpdateOrders) {
         onUpdateOrders(res.updatedOrders);
       }
@@ -496,7 +550,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         onUpdateFollowupHistory(res.updatedHistory);
       }
     }
-    showToast(`Followup undone: order #${item.orderId} restored to "${prevStatus}", profit & dates cleared!`);
+    showToast(`Undo successful: Order #${item.orderId} reverted from "${item.newStatus}" to "${prevStatus}", logged in history!`);
   };
 
   const handlePreviewCsv = (data: any[], title: string, filename: string) => {
@@ -625,13 +679,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     const p = newAgentPass.trim();
     if (!u || !p) return;
 
-    const permissions = {
+    const permissions: AgentPermissions = {
       canCreate: newCanCreate,
       canUpdateStatus: newCanUpdateStatus,
+      canChangeSchedule: newCanChangeSchedule,
       canChangeValue: newCanChangeValue,
       canAddProfit: newCanAddProfit,
-      canCancel: newCanCancel
+      allowedOrderStatuses: newCanUpdateStatus ? newAllowedOrderStatuses : [],
+      allowedTabs: newAllowedTabs
     };
+
+    const assignedTLs = newAgentTeamLeaders;
+    const primaryTL = assignedTLs.length > 0 ? assignedTLs.join(', ') : '';
 
     let updated: AgentUser[];
     if (editingIndex !== null && editingIndex >= 0 && editingIndex < agents.length) {
@@ -642,6 +701,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               user: u,
               pass: p,
               team: newAgentTeam,
+              teamLeaderId: primaryTL,
+              teamLeaders: assignedTLs,
               name: newAgentName.trim() || agent.name || `Agent ${u}`,
               role: newAgentRole,
               permissions: permissions
@@ -659,7 +720,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 user: u, 
                 pass: p, 
                 team: newAgentTeam, 
-                teamLeaderId: newAgentTeamLeader,
+                teamLeaderId: primaryTL,
+                teamLeaders: assignedTLs,
                 name: newAgentName.trim() || agent.name,
                 role: newAgentRole,
                 permissions: permissions
@@ -673,7 +735,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             user: u,
             pass: p,
             team: newAgentTeam,
-            teamLeaderId: newAgentTeamLeader,
+            teamLeaderId: primaryTL,
+            teamLeaders: assignedTLs,
             name: newAgentName.trim() || `Agent ${u}`,
             email: `${u.toLowerCase()}@portal.local`,
             status: 'active',
@@ -691,11 +754,15 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setNewAgentName('');
     setNewAgentTeam('Acquisition');
     setNewAgentRole('Agent');
+    setNewAgentTeamLeaders([]);
+    setNewCustomTLInput('');
     setNewCanCreate(true);
     setNewCanUpdateStatus(true);
+    setNewCanChangeSchedule(true);
     setNewCanChangeValue(true);
     setNewCanAddProfit(true);
-    setNewCanCancel(true);
+    setNewAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
+    setNewAllowedTabs(['summary', 'orders', 'followup', 'agent-performance', 'profiles']);
   };
 
   const handleEditAgent = (index: number) => {
@@ -707,15 +774,29 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setEditName(ag.name || '');
     setEditTeam(ag.team || 'Acquisition');
     setEditRole(ag.role === 'Team Leader' ? 'Team Leader' : 'Agent');
+    const agTLs = Array.isArray(ag.teamLeaders) && ag.teamLeaders.length > 0
+      ? ag.teamLeaders
+      : (ag.teamLeaderId ? ag.teamLeaderId.split(',').map(s => s.trim()).filter(Boolean) : []);
+    setEditTeamLeaders(agTLs);
+    setEditCustomTLInput('');
     setEditContact(ag.contact || '');
     setEditEmail(ag.email || '');
     setEditBloodGroup(ag.bloodGroup || '');
     setEditStatus(ag.status === 'deactivated' ? 'deactivated' : 'active');
     setEditCanCreate(ag.permissions?.canCreate ?? true);
     setEditCanUpdateStatus(ag.permissions?.canUpdateStatus ?? true);
+    setEditCanChangeSchedule(ag.permissions?.canChangeSchedule ?? true);
     setEditCanChangeValue(ag.permissions?.canChangeValue ?? true);
     setEditCanAddProfit(ag.permissions?.canAddProfit ?? true);
-    setEditCanCancel(ag.permissions?.canCancel ?? true);
+    setEditAllowedOrderStatuses(
+      ag.permissions?.allowedOrderStatuses && Array.isArray(ag.permissions.allowedOrderStatuses)
+        ? ag.permissions.allowedOrderStatuses
+        : (ag.permissions?.canUpdateStatus !== false ? ['Pending', 'In Progress', 'Confirmed', 'Follow-up'] : [])
+    );
+    const loadedTabs = ag.permissions?.allowedTabs && Array.isArray(ag.permissions.allowedTabs) && ag.permissions.allowedTabs.length > 0
+      ? ag.permissions.allowedTabs.map(t => (t === 'dashboard' ? 'agent-performance' : t))
+      : ['summary', 'orders', 'followup', 'agent-performance', 'profiles'];
+    setEditAllowedTabs(loadedTabs as AgentNavTab[]);
   };
 
   const handleSaveEditedAgentModal = (e: React.FormEvent) => {
@@ -726,13 +807,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     const p = editPass.trim();
     if (!u || !p) return;
 
-    const permissions = {
+    const permissions: AgentPermissions = {
       canCreate: editCanCreate,
       canUpdateStatus: editCanUpdateStatus,
+      canChangeSchedule: editCanChangeSchedule,
       canChangeValue: editCanChangeValue,
       canAddProfit: editCanAddProfit,
-      canCancel: editCanCancel
+      allowedOrderStatuses: editCanUpdateStatus ? editAllowedOrderStatuses : [],
+      allowedTabs: editAllowedTabs
     };
+
+    const assignedTLs = editTeamLeaders;
+    const primaryTL = assignedTLs.length > 0 ? assignedTLs.join(', ') : '';
 
     const updated = agents.map((agent, idx) =>
       idx === editModalIndex
@@ -743,6 +829,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             name: editName.trim() || agent.name || `Agent ${u}`,
             role: editRole,
             team: editTeam,
+            teamLeaderId: primaryTL,
+            teamLeaders: assignedTLs,
             contact: editContact.trim(),
             email: editEmail.trim(),
             bloodGroup: editBloodGroup.trim(),
@@ -756,6 +844,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     onUpdateAgents(updated, true);
     setEditingAgentModal(null);
     setEditModalIndex(null);
+    setEditTeamLeaders([]);
+    setEditCustomTLInput('');
+    setEditAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
   };
 
   const handleDeleteAgent = (index: number) => {
@@ -885,7 +976,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       if (o.delivered_date) map.set(String(o.order_id), o.delivered_date);
     });
     followupHistory.forEach(h => {
-      if (h.newStatus?.toLowerCase() === 'delivered' && h.timestamp) {
+      if (!h.isUndone && h.newStatus?.toLowerCase() === 'delivered' && h.timestamp) {
         map.set(String(h.orderId), h.timestamp);
       }
     });
@@ -898,7 +989,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       if (o.cancelled_date) map.set(String(o.order_id), o.cancelled_date);
     });
     followupHistory.forEach(h => {
-      if (h.newStatus?.toLowerCase() === 'cancelled' && h.timestamp) {
+      if (!h.isUndone && h.newStatus?.toLowerCase() === 'cancelled' && h.timestamp) {
         map.set(String(h.orderId), h.timestamp);
       }
     });
@@ -928,12 +1019,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     const catMap: Record<string, ReturnType<typeof buildGroupMap>> = {};
     const cityMap: Record<string, ReturnType<typeof buildGroupMap>> = {};
 
-    const buildAgentMapItem = (id: string, name: string, team: string, role: string, status: string) => ({
+    const buildAgentMapItem = (id: string, name: string, team: string, role: string, status: string, teamLeaderId?: string, teamLeaders?: string[]) => ({
       id,
       name,
       team,
       role,
       status,
+      teamLeaderId,
+      teamLeaders,
       createOrders: 0,
       servedOrders: 0,
       cancelledOrders: 0,
@@ -952,7 +1045,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         a.name || `Agent ${a.user}`,
         a.team || 'Acquisition',
         a.role || 'Agent',
-        a.status || 'active'
+        a.status || 'active',
+        a.teamLeaderId,
+        a.teamLeaders
       );
     });
 
@@ -1055,7 +1150,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
     // Also count follow-ups logged by agents
     followupHistory.forEach((h) => {
-      if (h.updatedBy && matchDate(h.timestamp, summaryDateFilter, summaryStartDate, summaryEndDate)) {
+      if (!h.isUndo && h.updatedBy && matchDate(h.timestamp, summaryDateFilter, summaryStartDate, summaryEndDate)) {
         const ag = getOrInitAgent(h.updatedBy);
         ag.followupCount += 1;
       }
@@ -1194,8 +1289,20 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const filteredAgentPerformance = useMemo(() => {
     const list = summaryStats.agentSummary.filter((ag) => {
       // If user is a Team Leader, only show agents assigned to them
-      if (currentManager.role === 'Team Leader' && (ag as any).id !== currentManager.user && (ag as any).teamLeaderId !== currentManager.user) {
-        return false;
+      if (currentManager.role === 'Team Leader') {
+        const isSelf = (ag as any).id === currentManager.user;
+        const matchesTLId = (ag as any).teamLeaderId && (
+          (ag as any).teamLeaderId === currentManager.user ||
+          (ag as any).teamLeaderId.includes(currentManager.user) ||
+          (ag as any).teamLeaderId.includes(currentManager.name)
+        );
+        const matchesTLArray = Array.isArray((ag as any).teamLeaders) && (
+          (ag as any).teamLeaders.includes(currentManager.user) ||
+          (ag as any).teamLeaders.includes(currentManager.name)
+        );
+        if (!isSelf && !matchesTLId && !matchesTLArray) {
+          return false;
+        }
       }
 
       const matchSearch =
@@ -1444,76 +1551,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {/* TAB: USER DETAILS (AGENT DIRECTORY WITH DETAILS STORE) */}
           {activeTab === 'users' && (
             <div className="space-y-6">
-              {/* Professional Team & Team Leader Creator Card */}
-              <div className="bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 shadow-md border border-indigo-800/40">
-                <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold">
-                      🏢
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-sm text-white">Professional Team &amp; Team Leader Management</h3>
-                      <p className="text-[11px] text-indigo-200">
-                        Create a new team and manually assign/input the Team Leader name.
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-xs bg-white/10 text-indigo-200 font-bold px-3 py-1 rounded-full">
-                    {teams.length} Teams Active
-                  </span>
-                </div>
-
-                <form onSubmit={handleAddNewTeam} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1.5">
-                        New Team Name
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={newTeamInputName}
-                        onChange={(e) => setNewTeamInputName(e.target.value)}
-                        placeholder="e.g. Acquisition Pro"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-indigo-400/30 bg-slate-900 text-white text-xs focus:outline-hidden focus:border-indigo-400"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1.5">
-                        Team Leader Name (Manual Input)
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={newTeamLeaderInputName}
-                        onChange={(e) => setNewTeamLeaderInputName(e.target.value)}
-                        placeholder="e.g. MD Abujar"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-indigo-400/30 bg-slate-900 text-white text-xs focus:outline-hidden focus:border-indigo-400"
-                      />
-                    </div>
-                    <div className="flex items-end">
-                      <button
-                        type="submit"
-                        className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-900/30 flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>Create Team &amp; Assign TL</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-wrap pt-2">
-                    <span className="text-[11px] text-indigo-300 font-bold uppercase">Active Teams:</span>
-                    {teams.map((t) => (
-                      <span key={t.name} className="px-2.5 py-1 bg-white/10 text-indigo-100 rounded-lg text-xs font-semibold border border-white/10 flex items-center gap-1.5">
-                        <span>{t.name}</span>
-                        <span className="text-[10px] bg-indigo-500/40 text-indigo-200 px-1.5 py-0.2 rounded font-mono">TL: {t.teamLeaderName || 'Unassigned'}</span>
-                      </span>
-                    ))}
-                  </div>
-                </form>
-              </div>
-
               {/* Add / Edit Agent Card */}
               <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs">
                 <div className="flex items-center justify-between mb-4">
@@ -1522,7 +1559,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       {editingIndex !== null ? 'Edit Agent Profile & Permissions' : 'Add New Agent'}
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Configure credentials, team, role, and granular action permissions for this Agent ID.
+                      Configure credentials, team, role, assigned team leaders, and granular action permissions for this Agent ID.
                     </p>
                   </div>
                   {editingIndex !== null && (
@@ -1532,8 +1569,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   )}
                 </div>
 
-                <form onSubmit={handleSaveAgent} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+                <form onSubmit={handleSaveAgent} className="space-y-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                     <div>
                       <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
                         Agent Username (ID)
@@ -1590,7 +1627,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       </select>
                     </div>
 
-                    <div className="md:col-span-5 flex items-end gap-3">
+                    <div className="sm:col-span-4 flex items-end gap-3">
                       <div className="flex-1">
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
                           Team Assignment
@@ -1634,101 +1671,503 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                        Assign Team Leader
-                      </label>
-                      <select
-                        value={newAgentTeamLeader}
-                        onChange={(e) => setNewAgentTeamLeader(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
-                      >
-                        <option key="no-tl" value="">-- No TL Assigned --</option>
-                        {agents.filter(a => a.role === 'Team Leader').map((tl, idx) => (
-                          <option key={`tl-opt-${tl.user}-${idx}`} value={tl.user}>
-                            {tl.name} (@{tl.user})
-                          </option>
-                        ))}
-                      </select>
+                    {/* Multi-Select Team Leader(s) */}
+                    <div className="sm:col-span-4 bg-slate-50/90 rounded-2xl p-4 border border-slate-200">
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-800">
+                            Assign Team Leader(s) <span className="text-indigo-600 font-extrabold normal-case">(Multiple Select Allowed)</span>
+                          </label>
+                          <p className="text-[11px] text-slate-500">
+                            Click to select one or multiple Team Leaders for this agent.
+                          </p>
+                        </div>
+                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                          {newAgentTeamLeaders.length} Selected
+                        </span>
+                      </div>
+
+                      {/* Selected TL Badges */}
+                      {newAgentTeamLeaders.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 mb-3 p-2 bg-white rounded-xl border border-indigo-100">
+                          <span className="text-[11px] font-bold text-slate-500 mr-1">Assigned:</span>
+                          {newAgentTeamLeaders.map((tl) => (
+                            <span
+                              key={tl}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs"
+                            >
+                              <span>👔 {tl}</span>
+                              <button
+                                type="button"
+                                onClick={() => setNewAgentTeamLeaders(prev => prev.filter(x => x !== tl))}
+                                className="text-purple-400 hover:text-red-600 transition-colors cursor-pointer"
+                                title={`Remove ${tl}`}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </span>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => setNewAgentTeamLeaders([])}
+                            className="text-[11px] text-red-600 hover:underline font-semibold ml-auto cursor-pointer"
+                          >
+                            Clear All
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Selectable Team Leader Cards */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                        {availableTeamLeaders.map((tl) => {
+                          const isSelected = newAgentTeamLeaders.includes(tl);
+                          return (
+                            <label
+                              key={tl}
+                              className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs cursor-pointer transition-all select-none ${
+                                isSelected
+                                  ? 'bg-purple-100/70 border-purple-300 text-purple-950 font-bold shadow-2xs'
+                                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {
+                                  if (isSelected) {
+                                    setNewAgentTeamLeaders(prev => prev.filter(x => x !== tl));
+                                  } else {
+                                    setNewAgentTeamLeaders(prev => [...prev, tl]);
+                                  }
+                                }}
+                                className="rounded text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer"
+                              />
+                              <span className="truncate" title={tl}>{tl}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+
+                      {/* Quick Add New Team Leader */}
+                      <div className="flex items-center gap-2 pt-2 border-t border-slate-200">
+                        <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">+ Custom TL:</span>
+                        <input
+                          type="text"
+                          value={newCustomTLInput}
+                          onChange={(e) => setNewCustomTLInput(e.target.value)}
+                          placeholder="Type new Team Leader name..."
+                          className="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-white focus:outline-hidden focus:border-indigo-600"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const trimmed = newCustomTLInput.trim();
+                            if (trimmed) {
+                              const updated = addTeamLeaderItem(trimmed);
+                              setTeamLeadersList([...updated]);
+                              if (!newAgentTeamLeaders.includes(trimmed)) {
+                                setNewAgentTeamLeaders(prev => [...prev, trimmed]);
+                              }
+                              setNewCustomTLInput('');
+                              showToast(`Team Leader "${trimmed}" added and selected!`);
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer shrink-0"
+                        >
+                          + Add &amp; Select
+                        </button>
+                      </div>
                     </div>
                   </div>
 
                   {/* Individual Access & Permissions (Agent ID Wise) */}
-                  <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200">
-                    <div className="flex items-center justify-between mb-2.5">
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                        Agent ID-Wise Permissions &amp; Access Controls
-                      </label>
-                      <span className="text-[11px] text-slate-500">
-                        Choose exactly what actions this agent is authorized to perform
-                      </span>
+                  <div className="bg-slate-50/95 p-4 rounded-2xl border border-slate-200 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2.5">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                          Agent ID-Wise Permissions &amp; Access Controls
+                        </label>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Set dropdown-based permissions and status-wise access for @{newAgentUser || 'agent'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewCanCreate(true);
+                            setNewCanUpdateStatus(true);
+                            setNewCanChangeSchedule(true);
+                            setNewCanChangeValue(true);
+                            setNewCanAddProfit(true);
+                            setNewAllowedOrderStatuses(ORDER_STATUS_LIST);
+                          }}
+                          className="px-2.5 py-1 text-[11px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg border border-indigo-200 transition-colors cursor-pointer"
+                        >
+                          Full Access
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewCanCreate(true);
+                            setNewCanUpdateStatus(true);
+                            setNewCanChangeSchedule(true);
+                            setNewCanChangeValue(false);
+                            setNewCanAddProfit(false);
+                            setNewAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
+                          }}
+                          className="px-2.5 py-1 text-[11px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg border border-amber-200 transition-colors cursor-pointer"
+                        >
+                          ⭐ Standard (No Deliv/Canc)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewCanCreate(true);
+                            setNewCanUpdateStatus(false);
+                            setNewCanChangeSchedule(false);
+                            setNewCanChangeValue(false);
+                            setNewCanAddProfit(false);
+                            setNewAllowedOrderStatuses([]);
+                          }}
+                          className="px-2.5 py-1 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg border border-slate-200 transition-colors cursor-pointer"
+                        >
+                          Strictly Restricted
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                      <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${newCanCreate ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900' : 'bg-white border-slate-200 text-slate-600'}`}>
-                        <input
-                          type="checkbox"
-                          checked={newCanCreate}
-                          onChange={(e) => setNewCanCreate(e.target.checked)}
-                          className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                        />
-                        <div className="text-xs">
-                          <span className="font-bold block">Order Create</span>
-                          <span className="text-[10px] text-slate-500">Create new orders</span>
-                        </div>
-                      </label>
+                    {/* 5 Core Permissions in Dropdown Format */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {/* 1. Create Order */}
+                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                        <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                          <span>1. Create Order</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${newCanCreate ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                            {newCanCreate ? 'Active' : 'Locked'}
+                          </span>
+                        </label>
+                        <select
+                          value={newCanCreate ? 'allowed' : 'restricted'}
+                          onChange={(e) => setNewCanCreate(e.target.value === 'allowed')}
+                          className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
+                        >
+                          <option value="allowed">Allowed — Can create new orders</option>
+                          <option value="restricted">Restricted — Cannot create orders</option>
+                        </select>
+                        <span className="text-[10px] text-slate-400 block mt-1">Book customer orders into system</span>
+                      </div>
 
-                      <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${newCanUpdateStatus ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900' : 'bg-white border-slate-200 text-slate-600'}`}>
-                        <input
-                          type="checkbox"
-                          checked={newCanUpdateStatus}
-                          onChange={(e) => setNewCanUpdateStatus(e.target.checked)}
-                          className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                        />
-                        <div className="text-xs">
-                          <span className="font-bold block">Status Update</span>
-                          <span className="text-[10px] text-slate-500">Change follow-up status</span>
-                        </div>
-                      </label>
+                      {/* 2. Status Update */}
+                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                        <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                          <span>2. Status Update</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${newCanUpdateStatus ? 'bg-indigo-100 text-indigo-800' : 'bg-red-100 text-red-800'}`}>
+                            {newCanUpdateStatus ? 'Active' : 'Locked'}
+                          </span>
+                        </label>
+                        <select
+                          value={newCanUpdateStatus ? 'allowed' : 'restricted'}
+                          onChange={(e) => {
+                            const isAllowed = e.target.value === 'allowed';
+                            setNewCanUpdateStatus(isAllowed);
+                            if (isAllowed && newAllowedOrderStatuses.length === 0) {
+                              setNewAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
+                            }
+                          }}
+                          className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
+                        >
+                          <option value="allowed">Allowed — Can update order statuses</option>
+                          <option value="restricted">Restricted — Read-only order status</option>
+                        </select>
+                        <span className="text-[10px] text-slate-400 block mt-1">Change order and follow-up status</span>
+                      </div>
 
-                      <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${newCanChangeValue ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900' : 'bg-white border-slate-200 text-slate-600'}`}>
-                        <input
-                          type="checkbox"
-                          checked={newCanChangeValue}
-                          onChange={(e) => setNewCanChangeValue(e.target.checked)}
-                          className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                        />
-                        <div className="text-xs">
-                          <span className="font-bold block">Change Value</span>
-                          <span className="text-[10px] text-slate-500">Edit order value (৳)</span>
-                        </div>
-                      </label>
+                      {/* 3. Schedule Date & Time Slot Change */}
+                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                        <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                          <span>3. Schedule Date &amp; Time Slot Change</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${newCanChangeSchedule ? 'bg-sky-100 text-sky-800' : 'bg-red-100 text-red-800'}`}>
+                            {newCanChangeSchedule ? 'Active' : 'Locked'}
+                          </span>
+                        </label>
+                        <select
+                          value={newCanChangeSchedule ? 'allowed' : 'restricted'}
+                          onChange={(e) => setNewCanChangeSchedule(e.target.value === 'allowed')}
+                          className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
+                        >
+                          <option value="allowed">Allowed — Can change schedule date &amp; slot</option>
+                          <option value="restricted">Restricted — Delivery schedule is locked</option>
+                        </select>
+                        <span className="text-[10px] text-slate-400 block mt-1">Reschedule delivery date and time slots</span>
+                      </div>
 
-                      <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${newCanAddProfit ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900' : 'bg-white border-slate-200 text-slate-600'}`}>
-                        <input
-                          type="checkbox"
-                          checked={newCanAddProfit}
-                          onChange={(e) => setNewCanAddProfit(e.target.checked)}
-                          className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                        />
-                        <div className="text-xs">
-                          <span className="font-bold block">Add Profit</span>
-                          <span className="text-[10px] text-slate-500">Set profit on delivery</span>
-                        </div>
-                      </label>
+                      {/* 4. Change Value */}
+                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                        <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                          <span>4. Change Value (৳)</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${newCanChangeValue ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
+                            {newCanChangeValue ? 'Active' : 'Locked'}
+                          </span>
+                        </label>
+                        <select
+                          value={newCanChangeValue ? 'allowed' : 'restricted'}
+                          onChange={(e) => setNewCanChangeValue(e.target.value === 'allowed')}
+                          className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
+                        >
+                          <option value="allowed">Allowed — Can edit order value (৳)</option>
+                          <option value="restricted">Restricted — Order value is locked</option>
+                        </select>
+                        <span className="text-[10px] text-slate-400 block mt-1">Modify total order amount</span>
+                      </div>
 
-                      <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${newCanCancel ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900' : 'bg-white border-slate-200 text-slate-600'}`}>
-                        <input
-                          type="checkbox"
-                          checked={newCanCancel}
-                          onChange={(e) => setNewCanCancel(e.target.checked)}
-                          className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                        />
-                        <div className="text-xs">
-                          <span className="font-bold block">Cancel Order</span>
-                          <span className="text-[10px] text-slate-500">Mark order as cancelled</span>
+                      {/* 5. Add Profit */}
+                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                        <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                          <span>5. Add Profit (৳)</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${newCanAddProfit ? 'bg-purple-100 text-purple-800' : 'bg-red-100 text-red-800'}`}>
+                            {newCanAddProfit ? 'Active' : 'Locked'}
+                          </span>
+                        </label>
+                        <select
+                          value={newCanAddProfit ? 'allowed' : 'restricted'}
+                          onChange={(e) => setNewCanAddProfit(e.target.value === 'allowed')}
+                          className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
+                        >
+                          <option value="allowed">Allowed — Can set and customize profit</option>
+                          <option value="restricted">Restricted — Profit is auto/read-only</option>
+                        </select>
+                        <span className="text-[10px] text-slate-400 block mt-1">Input margin on completed bookings</span>
+                      </div>
+                    </div>
+
+                    {/* Status-Wise Access Dropdown Section */}
+                    {newCanUpdateStatus && (
+                      <div className="bg-white p-4 rounded-xl border border-indigo-200 space-y-3 animate-fadeIn">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                              <CheckSquare className="w-3.5 h-3.5 text-indigo-600" />
+                              Status-Wise Access Control (Dropdown)
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                              {newAllowedOrderStatuses.length} Statuses Permitted
+                            </span>
+                          </div>
+
+                          {/* Policy Preset Dropdown */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Policy Preset:</span>
+                            <select
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === 'all') setNewAllowedOrderStatuses([...getOrderStatuses()]);
+                                else if (val === 'standard') setNewAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
+                                else if (val === 'initial') setNewAllowedOrderStatuses(['Pending', 'In Progress']);
+                                else if (val === 'clear') setNewAllowedOrderStatuses([]);
+                              }}
+                              className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 text-slate-800 focus:bg-white cursor-pointer"
+                              defaultValue="standard"
+                            >
+                              <option value="standard">⭐ Standard (No Delivered &amp; Cancelled)</option>
+                              <option value="all">Full Access (All 7 Statuses Allowed)</option>
+                              <option value="initial">Initial Only (Pending &amp; In Progress)</option>
+                              <option value="clear">Clear All (Restricted)</option>
+                            </select>
+                          </div>
                         </div>
-                      </label>
+
+                        {/* Dropdown to Add / Toggle Status */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              Select Status from Dropdown to Grant / Revoke Access:
+                            </label>
+                            <select
+                              value=""
+                              onChange={(e) => {
+                                const st = e.target.value;
+                                if (!st) return;
+                                if (newAllowedOrderStatuses.includes(st)) {
+                                  setNewAllowedOrderStatuses(prev => prev.filter(x => x !== st));
+                                } else {
+                                  setNewAllowedOrderStatuses(prev => [...prev, st]);
+                                }
+                              }}
+                              className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-indigo-300 bg-indigo-50/40 text-indigo-900 focus:bg-white cursor-pointer"
+                            >
+                              <option value="">-- Choose Status from Dropdown to Toggle Access --</option>
+                              {getOrderStatuses().map((st) => {
+                                const isAllowed = newAllowedOrderStatuses.includes(st);
+                                const isSpecial = st.toLowerCase() === 'delivered' || st.toLowerCase() === 'cancelled';
+                                return (
+                                  <option key={`dd-new-${st}`} value={st}>
+                                    {isAllowed ? `✓ [Currently Permitted] ${st}` : `+ [Click to Allow] ${st}`} {isSpecial ? '(High Privilege / Admin)' : ''}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+
+                          <div className="text-[11px] text-slate-500 leading-tight">
+                            Status-wise control prevents unauthorized completion or cancellation. 
+                            <strong className="text-emerald-700"> Delivered</strong> and <strong className="text-rose-700">Cancelled</strong> are excluded by default for standard agents.
+                          </div>
+                        </div>
+
+                        {/* Currently Permitted Status Badges */}
+                        <div className="pt-2 border-t border-slate-100">
+                          <span className="text-[11px] font-bold text-slate-600 block mb-1.5">
+                            Active Authorized Statuses ({newAllowedOrderStatuses.length}):
+                          </span>
+                          {newAllowedOrderStatuses.length === 0 ? (
+                            <span className="text-xs text-rose-600 italic">No statuses allowed. Agent cannot update order status.</span>
+                          ) : (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {newAllowedOrderStatuses.map((st) => {
+                                const isDeliv = st.toLowerCase() === 'delivered';
+                                const isCanc = st.toLowerCase() === 'cancelled';
+                                return (
+                                  <span
+                                    key={`active-new-${st}`}
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+                                      isDeliv
+                                        ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                                        : isCanc
+                                        ? 'bg-rose-50 text-rose-900 border-rose-300'
+                                        : 'bg-indigo-50 text-indigo-900 border-indigo-200'
+                                    }`}
+                                  >
+                                    <span>✓ {st}</span>
+                                    {(isDeliv || isCanc) && (
+                                      <span className={`text-[9px] uppercase px-1 rounded ${isDeliv ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-200 text-rose-800'}`}>
+                                        Admin
+                                      </span>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewAllowedOrderStatuses(prev => prev.filter(x => x !== st))}
+                                      className="text-slate-400 hover:text-red-600 cursor-pointer ml-0.5"
+                                      title={`Revoke ${st}`}
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tab Visibility Access Controls (Dropdown & Selector) */}
+                    <div className="bg-white p-4 rounded-xl border border-sky-200 space-y-3 animate-fadeIn">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-100 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                            <Layers className="w-3.5 h-3.5 text-sky-600" />
+                            Agent Tab Visibility Access (Select Which Tabs to View)
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800 border border-sky-200">
+                            {newAllowedTabs.length} of {AGENT_MANAGEABLE_TABS.length} Tabs Visible
+                          </span>
+                        </div>
+
+                        {/* Preset Buttons */}
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setNewAllowedTabs(['summary', 'orders', 'followup', 'agent-performance', 'profiles'])}
+                            className="px-2 py-0.5 text-[10px] font-bold bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-md border border-sky-200 transition-colors cursor-pointer"
+                          >
+                            All 5 Tabs
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNewAllowedTabs(['orders'])}
+                            className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors cursor-pointer"
+                          >
+                            Orders Only
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNewAllowedTabs(['orders', 'followup'])}
+                            className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors cursor-pointer"
+                          >
+                            Orders + Followup
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNewAllowedTabs(['orders', 'agent-performance'])}
+                            className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors cursor-pointer"
+                          >
+                            Orders + Perf
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Dropdown for quick Tab Toggle */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                            Dropdown to Toggle Tab Visibility:
+                          </label>
+                          <select
+                            value=""
+                            onChange={(e) => {
+                              const tab = e.target.value as AgentNavTab;
+                              if (!tab) return;
+                              if (newAllowedTabs.includes(tab)) {
+                                if (newAllowedTabs.length === 1) return; // keep at least 1 tab
+                                setNewAllowedTabs(prev => prev.filter(t => t !== tab));
+                              } else {
+                                setNewAllowedTabs(prev => [...prev, tab]);
+                              }
+                            }}
+                            className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-sky-300 bg-sky-50/40 text-sky-900 focus:bg-white cursor-pointer"
+                          >
+                            <option value="">-- Choose Tab from Dropdown to Toggle Visibility --</option>
+                            {AGENT_MANAGEABLE_TABS.map((tab) => (
+                              <option key={`opt-new-${tab.id}`} value={tab.id}>
+                                {newAllowedTabs.includes(tab.id)
+                                  ? `✓ [Currently Visible] ${tab.label} Tab`
+                                  : `+ [Click to Show] ${tab.label} Tab`}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Interactive Pill Badges to show active & click to toggle */}
+                        <div className="flex flex-wrap items-center gap-2 pt-1 sm:pt-4">
+                          {AGENT_MANAGEABLE_TABS.map((tab) => {
+                            const isSelected = newAllowedTabs.includes(tab.id);
+                            return (
+                              <button
+                                key={`tab-toggle-new-${tab.id}`}
+                                type="button"
+                                onClick={() => {
+                                  if (isSelected) {
+                                    if (newAllowedTabs.length === 1) return; // keep at least 1 tab
+                                    setNewAllowedTabs(prev => prev.filter(t => t !== tab.id));
+                                  } else {
+                                    setNewAllowedTabs(prev => [...prev, tab.id]);
+                                  }
+                                }}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                                  isSelected
+                                    ? 'bg-sky-500 text-white border-sky-600 shadow-xs'
+                                    : 'bg-slate-100 text-slate-400 border-slate-200 line-through'
+                                }`}
+                              >
+                                <span>{isSelected ? '✓' : '✗'}</span>
+                                <span>{tab.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -1745,9 +2184,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           setNewAgentRole('Agent');
                           setNewCanCreate(true);
                           setNewCanUpdateStatus(true);
+                          setNewCanChangeSchedule(true);
                           setNewCanChangeValue(true);
                           setNewCanAddProfit(true);
-                          setNewCanCancel(true);
+                          setNewAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
                         }}
                         className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
                       >
@@ -1788,6 +2228,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <th className="py-3 px-3.5 whitespace-nowrap">Password</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Role</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Team</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Assigned TL</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Individual Permissions</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Contact</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Email</th>
@@ -1803,10 +2244,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         const perms = agent.permissions || {
                           canCreate: true,
                           canUpdateStatus: true,
+                          canChangeSchedule: true,
                           canChangeValue: true,
                           canAddProfit: true,
-                          canCancel: true
+                          allowedOrderStatuses: ['Pending', 'In Progress', 'Confirmed', 'Follow-up'],
+                          allowedTabs: ['summary', 'orders', 'followup', 'agent-performance', 'profiles']
                         };
+
+                        const tabsCount = perms.allowedTabs ? perms.allowedTabs.length : 5;
 
                         return (
                           <tr key={agent.user} className="hover:bg-slate-50/80 transition-colors">
@@ -1838,6 +2283,23 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               </span>
                             </td>
                             <td className="py-3 px-3.5 whitespace-nowrap">
+                              {agent.teamLeaders && agent.teamLeaders.length > 0 ? (
+                                <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                  {agent.teamLeaders.map((tl, i) => (
+                                    <span key={i} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                      👔 {tl}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : agent.teamLeaderId ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                  👔 {agent.teamLeaderId}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-[11px] italic">Unassigned</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3.5 whitespace-nowrap">
                               <div className="flex items-center gap-1">
                                 <span
                                   title={perms.canCreate ? 'Can Create Orders: YES' : 'Can Create Orders: NO'}
@@ -1846,10 +2308,24 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                   Create
                                 </span>
                                 <span
-                                  title={perms.canUpdateStatus ? 'Can Update Status: YES' : 'Can Update Status: NO'}
-                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${perms.canUpdateStatus ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-400 line-through'}`}
+                                  title={perms.canUpdateStatus ? `Can Update Status: YES (Allowed: ${(perms.allowedOrderStatuses || []).join(', ') || 'All'})` : 'Can Update Status: NO'}
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${perms.canUpdateStatus ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' : 'bg-slate-100 text-slate-400 line-through'}`}
                                 >
-                                  Status
+                                  {perms.canUpdateStatus ? `Status (${(perms.allowedOrderStatuses || []).length})` : 'Status'}
+                                </span>
+                                {perms.canUpdateStatus && perms.allowedOrderStatuses && !perms.allowedOrderStatuses.includes('Delivered') && !perms.allowedOrderStatuses.includes('Cancelled') && (
+                                  <span
+                                    title="Delivered & Cancelled restricted for this agent"
+                                    className="px-1 py-0.5 rounded text-[9px] font-extrabold bg-amber-50 text-amber-800 border border-amber-300"
+                                  >
+                                    No Deliv/Canc
+                                  </span>
+                                )}
+                                <span
+                                  title={perms.canChangeSchedule ? 'Can Change Schedule Date & Time Slot: YES' : 'Can Change Schedule Date & Time Slot: NO'}
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${perms.canChangeSchedule ? 'bg-sky-100 text-sky-800 border border-sky-200' : 'bg-slate-100 text-slate-400 line-through'}`}
+                                >
+                                  Schedule
                                 </span>
                                 <span
                                   title={perms.canChangeValue ? 'Can Change Value: YES' : 'Can Change Value: NO'}
@@ -1864,10 +2340,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                   Profit
                                 </span>
                                 <span
-                                  title={perms.canCancel ? 'Can Cancel Order: YES' : 'Can Cancel Order: NO'}
-                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${perms.canCancel ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-400 line-through'}`}
+                                  title={`Visible Tabs: ${(perms.allowedTabs || ['summary', 'orders', 'followup', 'agent-performance', 'profiles']).join(', ')}`}
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${tabsCount === 5 ? 'bg-sky-100 text-sky-800 border border-sky-200' : 'bg-amber-100 text-amber-800 border border-amber-300'}`}
                                 >
-                                  Cancel
+                                  Tabs ({tabsCount}/5)
                                 </span>
                               </div>
                             </td>
@@ -2306,7 +2782,16 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         'Manager',
                         quickUpdateNotes
                       );
+                      const updatedOId = quickUpdateOrderId;
+                      setQuickUpdateOrderId('');
+                      setQuickUpdateStatus('Pending');
+                      setQuickUpdateOrderValue('');
+                      setQuickUpdateProfit('');
+                      setQuickUpdateScheduleDate('');
+                      setQuickUpdateScheduledTime('');
                       setQuickUpdateNotes('');
+                      await onRefreshOrders?.();
+                      showToast(`Order #${updatedOId} followup updated & form reset!`);
                     } finally {
                       setIsSavingStatus(false);
                     }
@@ -2451,11 +2936,27 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       />
                     </div>
 
-                    <div className="flex items-end">
+                    <div className="flex items-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuickUpdateOrderId('');
+                          setQuickUpdateStatus('Pending');
+                          setQuickUpdateOrderValue('');
+                          setQuickUpdateProfit('');
+                          setQuickUpdateScheduleDate('');
+                          setQuickUpdateScheduledTime('');
+                          setQuickUpdateNotes('');
+                        }}
+                        className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition-all cursor-pointer border border-slate-700"
+                        title="Clear / Reset fields"
+                      >
+                        Reset
+                      </button>
                       <button
                         type="submit"
                         disabled={!quickUpdateOrderId || isSavingStatus}
-                        className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-emerald-900/30 active:scale-[0.99]"
+                        className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-emerald-900/30 active:scale-[0.99]"
                       >
                         {isSavingStatus ? (
                           <>
@@ -2532,7 +3033,15 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             // Filter by current user or TL's agents
                             const isAuthorized = currentManager.role === 'Manager' || 
                                                  h.updatedBy === currentManager.user ||
-                                                 agents.some(a => a.user === h.updatedBy && a.teamLeaderId === currentManager.user);
+                                                 agents.some(a => a.user === h.updatedBy && (
+                                                   a.teamLeaderId === currentManager.user ||
+                                                   a.teamLeaderId?.includes(currentManager.user) ||
+                                                   a.teamLeaderId?.includes(currentManager.name) ||
+                                                   (Array.isArray(a.teamLeaders) && (
+                                                     a.teamLeaders.includes(currentManager.user) ||
+                                                     a.teamLeaders.includes(currentManager.name)
+                                                   ))
+                                                 ));
                             if (!isAuthorized) return false;
                             
                             if (!followupSearch.trim()) return true;
@@ -2541,37 +3050,120 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               String(h.followupId || '').toLowerCase().includes(q) ||
                               String(h.orderId || (h as any).order_id || '').toLowerCase().includes(q) ||
                               String(h.customerName || (h as any).customer_name || '').toLowerCase().includes(q) ||
+                              String(h.previousStatus || '').toLowerCase().includes(q) ||
                               String(h.newStatus || (h as any).new_status || '').toLowerCase().includes(q) ||
                               String(h.action || '').toLowerCase().includes(q) ||
-                              String(h.notes || '').toLowerCase().includes(q)
+                              String(h.notes || '').toLowerCase().includes(q) ||
+                              (h.isUndo ? 'undo revert'.includes(q) : false)
                             );
                           })
-                          .map((hist, histIdx) => (
-                            <tr key={`followup-hist-${hist.id || hist.followupId || histIdx}-${histIdx}`} className="hover:bg-slate-50 transition-colors">
-                              <td className="py-3 px-3.5 font-mono font-bold text-indigo-800 whitespace-nowrap">#{hist.followupId || hist.id}</td>
-                              <td className="py-3 px-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">#{hist.orderId}</td>
-                              <td className="py-3 px-3.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">{hist.timestamp}</td>
-                              <td className="py-3 px-3.5 text-slate-700 whitespace-nowrap">{hist.customerName || '-'}</td>
-                              <td className="py-3 px-3.5 text-slate-600 font-mono whitespace-nowrap">{hist.customerContact || '-'}</td>
-                              <td className="py-3 px-3.5 text-slate-500 whitespace-nowrap">{hist.previousStatus}</td>
-                              <td className="py-3 px-3.5 font-bold text-indigo-700 whitespace-nowrap">{hist.newStatus}</td>
-                              <td className="py-3 px-3.5 text-slate-600 whitespace-nowrap">{hist.orderStatus}</td>
-                              <td className="py-3 px-3.5 text-slate-700 font-medium whitespace-nowrap">৳ {hist.orderValue != null ? Number(hist.orderValue).toLocaleString() : '-'}</td>
-                              <td className="py-3 px-3.5 text-slate-600 text-[10px] whitespace-nowrap">{hist.scheduleDate}<br/>{hist.scheduledTime}</td>
-                              <td className="py-3 px-3.5 font-bold text-slate-700 whitespace-nowrap">{hist.updatedBy}</td>
-                              <td className="py-3 px-3.5 whitespace-nowrap"><span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">{hist.action || 'Follow-up Update'}</span></td>
-                              <td className="py-3 px-3.5 text-slate-600 max-w-[200px] truncate" title={hist.notes}>{hist.notes || '-'}</td>
-                              <td className="py-3 px-3.5 text-center whitespace-nowrap">
-                                <button
-                                  onClick={() => handleUndoFollowup(hist.id)}
-                                  title="Remove Followup & Revert Order Status"
-                                  className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-md font-bold text-[10px] cursor-pointer"
-                                >
-                                  Undo / Remove
-                                </button>
-                              </td>
-                            </tr>
-                          ))
+                          .map((hist, histIdx) => {
+                            const isUndoRecord = !!hist.isUndo;
+                            const isRevertedRecord = !!hist.isUndone;
+
+                            return (
+                              <tr 
+                                key={`followup-hist-${hist.id || hist.followupId || histIdx}-${histIdx}`} 
+                                className={`transition-colors ${isUndoRecord ? 'bg-amber-50/50 hover:bg-amber-100/50 border-l-4 border-l-amber-500' : (isRevertedRecord ? 'opacity-80 bg-slate-50/40 hover:bg-slate-100/50' : 'hover:bg-slate-50')}`}
+                              >
+                                <td className="py-3 px-3.5 font-mono font-bold text-indigo-800 whitespace-nowrap">
+                                  #{hist.followupId || hist.id}
+                                </td>
+                                <td className="py-3 px-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">
+                                  <div className="flex items-center gap-1.5">
+                                    {isUndoRecord && (
+                                      <span title="Undo Audit Event">
+                                        <RotateCcw className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                      </span>
+                                    )}
+                                    <span>#{hist.orderId}</span>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-3.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                                  {hist.timestamp}
+                                </td>
+                                <td className="py-3 px-3.5 text-slate-700 whitespace-nowrap font-medium">
+                                  {hist.customerName || '-'}
+                                </td>
+                                <td className="py-3 px-3.5 text-slate-600 font-mono whitespace-nowrap">
+                                  {hist.customerContact || '-'}
+                                </td>
+                                <td className="py-3 px-3.5 whitespace-nowrap">
+                                  {isUndoRecord ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200">
+                                      from {hist.previousStatus}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-600 font-medium">
+                                      {hist.previousStatus}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-3.5 whitespace-nowrap">
+                                  {isUndoRecord ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                      ➔ to {hist.newStatus}
+                                    </span>
+                                  ) : (
+                                    <span className="font-bold text-indigo-700">
+                                      {hist.newStatus}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-3.5 text-slate-600 whitespace-nowrap">
+                                  {hist.orderStatus}
+                                </td>
+                                <td className="py-3 px-3.5 text-slate-700 font-medium whitespace-nowrap">
+                                  ৳ {hist.orderValue != null ? Number(hist.orderValue).toLocaleString() : '-'}
+                                </td>
+                                <td className="py-3 px-3.5 text-slate-600 text-[10px] whitespace-nowrap">
+                                  {hist.scheduleDate}<br/>{hist.scheduledTime}
+                                </td>
+                                <td className="py-3 px-3.5 font-bold text-slate-700 whitespace-nowrap">
+                                  {hist.updatedBy}
+                                </td>
+                                <td className="py-3 px-3.5 whitespace-nowrap">
+                                  {isUndoRecord ? (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                                      <RotateCcw className="w-3 h-3 text-amber-700" />
+                                      {hist.action || 'Undo / Revert'}
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                      {hist.action || 'Follow-up Update'}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-3.5 text-slate-600 max-w-[200px] truncate" title={hist.notes}>
+                                  {hist.notes || '-'}
+                                </td>
+                                <td className="py-3 px-3.5 text-center whitespace-nowrap">
+                                  {isUndoRecord ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-md font-bold text-[10px]">
+                                      <RotateCcw className="w-2.5 h-2.5 text-amber-600" />
+                                      Undo Event
+                                    </span>
+                                  ) : isRevertedRecord ? (
+                                    <span 
+                                      className="px-2 py-1 bg-slate-100 text-slate-400 border border-slate-200 rounded-md font-bold text-[10px] italic"
+                                      title="This action has already been reverted via Undo"
+                                    >
+                                      Reverted
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleUndoFollowup(hist.id)}
+                                      title={`Undo this follow-up & revert order back to "${hist.previousStatus}"`}
+                                      className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-md font-bold text-[10px] cursor-pointer transition-colors"
+                                    >
+                                      <RotateCcw className="w-3 h-3 text-red-600" />
+                                      Undo / Revert
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })
                       )}
                     </tbody>
                   </table>
@@ -4274,7 +4866,15 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               <div className="flex items-center gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setStatusModalOrder(null)}
+                  onClick={() => {
+                    setStatusModalOrder(null);
+                    setModalFollowupStatus('Pending');
+                    setModalOrderValue('');
+                    setModalProfit('');
+                    setModalScheduleDate('');
+                    setModalScheduledTime('');
+                    setModalNotes('');
+                  }}
                   className="flex-1 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
@@ -4315,6 +4915,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         modalNotes
                       );
                       setStatusModalOrder(null);
+                      setModalFollowupStatus('Pending');
+                      setModalOrderValue('');
+                      setModalProfit('');
+                      setModalScheduleDate('');
+                      setModalScheduledTime('');
+                      setModalNotes('');
                       await onRefreshOrders();
                       setTimeout(() => {
                         window.location.reload();
@@ -4481,8 +5087,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 </span>
                 <span className="font-mono text-slate-700">{selectedAgentDetails.birthday || 'Not set'}</span>
               </div>
-              <div className="bg-slate-50 p-2.5 rounded-xl col-span-2">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+              <div className="bg-slate-50 p-2.5 rounded-xl col-span-2 space-y-2">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">
                   Role &amp; Authorized Permissions
                 </span>
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -4492,8 +5098,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${selectedAgentDetails.permissions?.canCreate ?? true ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-400 line-through'}`}>
                     Create
                   </span>
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${selectedAgentDetails.permissions?.canUpdateStatus ?? true ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-400 line-through'}`}>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${selectedAgentDetails.permissions?.canUpdateStatus ?? true ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-400 line-through'}`}>
                     Status
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${selectedAgentDetails.permissions?.canChangeSchedule ?? true ? 'bg-sky-100 text-sky-800' : 'bg-slate-200 text-slate-400 line-through'}`}>
+                    Schedule
                   </span>
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${selectedAgentDetails.permissions?.canChangeValue ?? true ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-400 line-through'}`}>
                     Value
@@ -4501,9 +5110,82 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${selectedAgentDetails.permissions?.canAddProfit ?? true ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-400 line-through'}`}>
                     Profit
                   </span>
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${selectedAgentDetails.permissions?.canCancel ?? true ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-400 line-through'}`}>
-                    Cancel
+                </div>
+
+                {/* Granular Order Statuses in Details */}
+                {selectedAgentDetails.permissions?.canUpdateStatus && (
+                  <div className="pt-1.5 border-t border-slate-200/60">
+                    <span className="text-[10px] font-bold text-slate-500 block mb-1">
+                      Permitted Order Statuses ({selectedAgentDetails.permissions.allowedOrderStatuses?.length || 'All'}):
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {(selectedAgentDetails.permissions.allowedOrderStatuses || ORDER_STATUS_LIST).map((st) => {
+                        const isDeliv = st.toLowerCase() === 'delivered';
+                        const isCanc = st.toLowerCase() === 'cancelled';
+                        return (
+                          <span
+                            key={`det-st-${st}`}
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                              isDeliv 
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                                : isCanc 
+                                ? 'bg-rose-50 text-rose-800 border border-rose-200' 
+                                : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            {st}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Permitted Tabs in Details */}
+                <div className="pt-1.5 border-t border-slate-200/60">
+                  <span className="text-[10px] font-bold text-slate-500 block mb-1">
+                    Permitted Navigation Tabs ({(selectedAgentDetails.permissions?.allowedTabs || ['summary', 'orders', 'followup', 'agent-performance', 'profiles']).length}/5):
                   </span>
+                  <div className="flex flex-wrap gap-1">
+                    {AGENT_MANAGEABLE_TABS.map((tab) => {
+                      const allowedList = selectedAgentDetails.permissions?.allowedTabs || ['summary', 'orders', 'followup', 'agent-performance', 'profiles'];
+                      const isAllowed = allowedList.includes(tab.id) ||
+                        (tab.id === 'agent-performance' && (allowedList as any[]).includes('dashboard'));
+                      return (
+                        <span
+                          key={`det-tab-${tab.id}`}
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                            isAllowed
+                              ? 'bg-sky-50 text-sky-800 border border-sky-200'
+                              : 'bg-slate-100 text-slate-400 line-through'
+                          }`}
+                        >
+                          {isAllowed ? '✓' : '✗'} {tab.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-2.5 rounded-xl col-span-2">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                  Assigned Team Leader(s)
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {selectedAgentDetails.teamLeaders && selectedAgentDetails.teamLeaders.length > 0 ? (
+                    selectedAgentDetails.teamLeaders.map((tl, i) => (
+                      <span key={i} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                        👔 {tl}
+                      </span>
+                    ))
+                  ) : selectedAgentDetails.teamLeaderId ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                      👔 {selectedAgentDetails.teamLeaderId}
+                    </span>
+                  ) : (
+                    <span className="text-slate-400 text-xs italic">No Team Leader Assigned</span>
+                  )}
                 </div>
               </div>
 
@@ -4676,6 +5358,111 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   </select>
                 </div>
 
+                {/* Multi-Select Team Leader(s) in Edit Modal */}
+                <div className="sm:col-span-2 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-800">
+                        Assign Team Leader(s) <span className="text-indigo-600 font-extrabold normal-case">(Multiple Select Allowed)</span>
+                      </label>
+                      <p className="text-[11px] text-slate-500">
+                        Select one or multiple Team Leaders for @{editUser}
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                      {editTeamLeaders.length} Selected
+                    </span>
+                  </div>
+
+                  {editTeamLeaders.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 mb-2.5 p-2 bg-white rounded-xl border border-indigo-100">
+                      <span className="text-[11px] font-bold text-slate-500 mr-1">Assigned:</span>
+                      {editTeamLeaders.map((tl) => (
+                        <span
+                          key={tl}
+                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200"
+                        >
+                          <span>👔 {tl}</span>
+                          <button
+                            type="button"
+                            onClick={() => setEditTeamLeaders(prev => prev.filter(x => x !== tl))}
+                            className="text-purple-400 hover:text-red-600 transition-colors cursor-pointer"
+                            title={`Remove ${tl}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setEditTeamLeaders([])}
+                        className="text-[11px] text-red-600 hover:underline font-semibold ml-auto cursor-pointer"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+                    {availableTeamLeaders.map((tl) => {
+                      const isSelected = editTeamLeaders.includes(tl);
+                      return (
+                        <label
+                          key={tl}
+                          className={`flex items-center gap-2 p-2 rounded-xl border text-xs cursor-pointer transition-all select-none ${
+                            isSelected
+                              ? 'bg-purple-100/70 border-purple-300 text-purple-950 font-bold'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {
+                              if (isSelected) {
+                                setEditTeamLeaders(prev => prev.filter(x => x !== tl));
+                              } else {
+                                setEditTeamLeaders(prev => [...prev, tl]);
+                              }
+                            }}
+                            className="rounded text-purple-600 focus:ring-purple-500 w-3.5 h-3.5 cursor-pointer"
+                          />
+                          <span className="truncate" title={tl}>{tl}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2 border-t border-slate-200">
+                    <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">+ Custom TL:</span>
+                    <input
+                      type="text"
+                      value={editCustomTLInput}
+                      onChange={(e) => setEditCustomTLInput(e.target.value)}
+                      placeholder="Type new Team Leader name..."
+                      className="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-white focus:outline-hidden focus:border-indigo-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const trimmed = editCustomTLInput.trim();
+                        if (trimmed) {
+                          const updated = addTeamLeaderItem(trimmed);
+                          setTeamLeadersList([...updated]);
+                          if (!editTeamLeaders.includes(trimmed)) {
+                            setEditTeamLeaders(prev => [...prev, trimmed]);
+                          }
+                          setEditCustomTLInput('');
+                          showToast(`Team Leader "${trimmed}" added and selected!`);
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer shrink-0"
+                    >
+                      + Add &amp; Select
+                    </button>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                     Contact Phone
@@ -4725,64 +5512,393 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               </div>
 
               {/* Granular Access Controls */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-800 block mb-1">
-                  Individual Action Permissions
-                </span>
-                <p className="text-[11px] text-slate-500 mb-3">
-                  Specify what operations this agent is permitted to perform in their portal.
-                </p>
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2.5">
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-800 block flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                      Agent ID-Wise Permissions &amp; Access Controls
+                    </span>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Set dropdown-based permissions and status-wise access for @{editUser}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditCanCreate(true);
+                        setEditCanUpdateStatus(true);
+                        setEditCanChangeSchedule(true);
+                        setEditCanChangeValue(true);
+                        setEditCanAddProfit(true);
+                        setEditAllowedOrderStatuses(ORDER_STATUS_LIST);
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg border border-indigo-200 transition-colors cursor-pointer"
+                    >
+                      Full Access
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditCanCreate(true);
+                        setEditCanUpdateStatus(true);
+                        setEditCanChangeSchedule(true);
+                        setEditCanChangeValue(false);
+                        setEditCanAddProfit(false);
+                        setEditAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg border border-amber-200 transition-colors cursor-pointer"
+                    >
+                      ⭐ Standard (No Deliv/Canc)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditCanCreate(true);
+                        setEditCanUpdateStatus(false);
+                        setEditCanChangeSchedule(false);
+                        setEditCanChangeValue(false);
+                        setEditCanAddProfit(false);
+                        setEditAllowedOrderStatuses([]);
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg border border-slate-200 transition-colors cursor-pointer"
+                    >
+                      Strictly Restricted
+                    </button>
+                  </div>
+                </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${editCanCreate ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900 font-bold' : 'bg-white border-slate-200 text-slate-600'}`}>
-                    <input
-                      type="checkbox"
-                      checked={editCanCreate}
-                      onChange={(e) => setEditCanCreate(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                    />
-                    <span className="text-xs">Create Order</span>
-                  </label>
+                {/* 5 Core Permissions in Dropdown Format */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {/* 1. Create Order */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>1. Create Order</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${editCanCreate ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                        {editCanCreate ? 'Active' : 'Locked'}
+                      </span>
+                    </label>
+                    <select
+                      value={editCanCreate ? 'allowed' : 'restricted'}
+                      onChange={(e) => setEditCanCreate(e.target.value === 'allowed')}
+                      className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
+                    >
+                      <option value="allowed">Allowed — Can create new orders</option>
+                      <option value="restricted">Restricted — Cannot create orders</option>
+                    </select>
+                    <span className="text-[10px] text-slate-400 block mt-1">Book customer orders into system</span>
+                  </div>
 
-                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${editCanUpdateStatus ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900 font-bold' : 'bg-white border-slate-200 text-slate-600'}`}>
-                    <input
-                      type="checkbox"
-                      checked={editCanUpdateStatus}
-                      onChange={(e) => setEditCanUpdateStatus(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                    />
-                    <span className="text-xs">Update Status</span>
-                  </label>
+                  {/* 2. Status Update */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>2. Status Update</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${editCanUpdateStatus ? 'bg-indigo-100 text-indigo-800' : 'bg-red-100 text-red-800'}`}>
+                        {editCanUpdateStatus ? 'Active' : 'Locked'}
+                      </span>
+                    </label>
+                    <select
+                      value={editCanUpdateStatus ? 'allowed' : 'restricted'}
+                      onChange={(e) => {
+                        const isAllowed = e.target.value === 'allowed';
+                        setEditCanUpdateStatus(isAllowed);
+                        if (isAllowed && editAllowedOrderStatuses.length === 0) {
+                          setEditAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
+                        }
+                      }}
+                      className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
+                    >
+                      <option value="allowed">Allowed — Can update order statuses</option>
+                      <option value="restricted">Restricted — Read-only order status</option>
+                    </select>
+                    <span className="text-[10px] text-slate-400 block mt-1">Change order and follow-up status</span>
+                  </div>
 
-                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${editCanChangeValue ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900 font-bold' : 'bg-white border-slate-200 text-slate-600'}`}>
-                    <input
-                      type="checkbox"
-                      checked={editCanChangeValue}
-                      onChange={(e) => setEditCanChangeValue(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                    />
-                    <span className="text-xs">Change Value</span>
-                  </label>
+                  {/* 3. Schedule Date & Time Slot Change */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>3. Schedule Date &amp; Time Slot Change</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${editCanChangeSchedule ? 'bg-sky-100 text-sky-800' : 'bg-red-100 text-red-800'}`}>
+                        {editCanChangeSchedule ? 'Active' : 'Locked'}
+                      </span>
+                    </label>
+                    <select
+                      value={editCanChangeSchedule ? 'allowed' : 'restricted'}
+                      onChange={(e) => setEditCanChangeSchedule(e.target.value === 'allowed')}
+                      className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
+                    >
+                      <option value="allowed">Allowed — Can change schedule date &amp; slot</option>
+                      <option value="restricted">Restricted — Delivery schedule is locked</option>
+                    </select>
+                    <span className="text-[10px] text-slate-400 block mt-1">Reschedule delivery date and time slots</span>
+                  </div>
 
-                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${editCanAddProfit ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900 font-bold' : 'bg-white border-slate-200 text-slate-600'}`}>
-                    <input
-                      type="checkbox"
-                      checked={editCanAddProfit}
-                      onChange={(e) => setEditCanAddProfit(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                    />
-                    <span className="text-xs">Add Profit</span>
-                  </label>
+                  {/* 4. Change Value */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>4. Change Value (৳)</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${editCanChangeValue ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
+                        {editCanChangeValue ? 'Active' : 'Locked'}
+                      </span>
+                    </label>
+                    <select
+                      value={editCanChangeValue ? 'allowed' : 'restricted'}
+                      onChange={(e) => setEditCanChangeValue(e.target.value === 'allowed')}
+                      className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
+                    >
+                      <option value="allowed">Allowed — Can edit order value (৳)</option>
+                      <option value="restricted">Restricted — Order value is locked</option>
+                    </select>
+                    <span className="text-[10px] text-slate-400 block mt-1">Modify total order amount</span>
+                  </div>
 
-                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${editCanCancel ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900 font-bold' : 'bg-white border-slate-200 text-slate-600'}`}>
-                    <input
-                      type="checkbox"
-                      checked={editCanCancel}
-                      onChange={(e) => setEditCanCancel(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                    />
-                    <span className="text-xs">Cancel Order</span>
-                  </label>
+                  {/* 5. Add Profit */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>5. Add Profit (৳)</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${editCanAddProfit ? 'bg-purple-100 text-purple-800' : 'bg-red-100 text-red-800'}`}>
+                        {editCanAddProfit ? 'Active' : 'Locked'}
+                      </span>
+                    </label>
+                    <select
+                      value={editCanAddProfit ? 'allowed' : 'restricted'}
+                      onChange={(e) => setEditCanAddProfit(e.target.value === 'allowed')}
+                      className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
+                    >
+                      <option value="allowed">Allowed — Can set and customize profit</option>
+                      <option value="restricted">Restricted — Profit is auto/read-only</option>
+                    </select>
+                    <span className="text-[10px] text-slate-400 block mt-1">Input margin on completed bookings</span>
+                  </div>
+                </div>
+
+                {/* Status-Wise Access Dropdown Section */}
+                {editCanUpdateStatus && (
+                  <div className="bg-white p-4 rounded-xl border border-indigo-200 space-y-3 animate-fadeIn">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                          <CheckSquare className="w-3.5 h-3.5 text-indigo-600" />
+                          Status-Wise Access Control (Dropdown)
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                          {editAllowedOrderStatuses.length} Statuses Permitted
+                        </span>
+                      </div>
+
+                      {/* Policy Preset Dropdown */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Policy Preset:</span>
+                        <select
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === 'all') setEditAllowedOrderStatuses([...getOrderStatuses()]);
+                            else if (val === 'standard') setEditAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
+                            else if (val === 'initial') setEditAllowedOrderStatuses(['Pending', 'In Progress']);
+                            else if (val === 'clear') setEditAllowedOrderStatuses([]);
+                          }}
+                          className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 text-slate-800 focus:bg-white cursor-pointer"
+                          defaultValue="standard"
+                        >
+                          <option value="standard">⭐ Standard (No Delivered &amp; Cancelled)</option>
+                          <option value="all">Full Access (All 7 Statuses Allowed)</option>
+                          <option value="initial">Initial Only (Pending &amp; In Progress)</option>
+                          <option value="clear">Clear All (Restricted)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Dropdown to Add / Toggle Status */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Select Status from Dropdown to Grant / Revoke Access:
+                        </label>
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const st = e.target.value;
+                            if (!st) return;
+                            if (editAllowedOrderStatuses.includes(st)) {
+                              setEditAllowedOrderStatuses(prev => prev.filter(x => x !== st));
+                            } else {
+                              setEditAllowedOrderStatuses(prev => [...prev, st]);
+                            }
+                          }}
+                          className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-indigo-300 bg-indigo-50/40 text-indigo-900 focus:bg-white cursor-pointer"
+                        >
+                          <option value="">-- Choose Status from Dropdown to Toggle Access --</option>
+                          {getOrderStatuses().map((st) => {
+                            const isAllowed = editAllowedOrderStatuses.includes(st);
+                            const isSpecial = st.toLowerCase() === 'delivered' || st.toLowerCase() === 'cancelled';
+                            return (
+                              <option key={`dd-edit-${st}`} value={st}>
+                                {isAllowed ? `✓ [Currently Permitted] ${st}` : `+ [Click to Allow] ${st}`} {isSpecial ? '(High Privilege / Admin)' : ''}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+
+                      <div className="text-[11px] text-slate-500 leading-tight">
+                        Status-wise control prevents unauthorized completion or cancellation. 
+                        <strong className="text-emerald-700"> Delivered</strong> and <strong className="text-rose-700">Cancelled</strong> are excluded by default for standard agents.
+                      </div>
+                    </div>
+
+                    {/* Currently Permitted Status Badges */}
+                    <div className="pt-2 border-t border-slate-100">
+                      <span className="text-[11px] font-bold text-slate-600 block mb-1.5">
+                        Active Authorized Statuses ({editAllowedOrderStatuses.length}):
+                      </span>
+                      {editAllowedOrderStatuses.length === 0 ? (
+                        <span className="text-xs text-rose-600 italic">No statuses allowed. Agent cannot update order status.</span>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {editAllowedOrderStatuses.map((st) => {
+                            const isDeliv = st.toLowerCase() === 'delivered';
+                            const isCanc = st.toLowerCase() === 'cancelled';
+                            return (
+                              <span
+                                key={`active-edit-${st}`}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+                                  isDeliv
+                                    ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                                    : isCanc
+                                    ? 'bg-rose-50 text-rose-900 border-rose-300'
+                                    : 'bg-indigo-50 text-indigo-900 border-indigo-200'
+                                }`}
+                              >
+                                <span>✓ {st}</span>
+                                {(isDeliv || isCanc) && (
+                                  <span className={`text-[9px] uppercase px-1 rounded ${isDeliv ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-200 text-rose-800'}`}>
+                                    Admin
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setEditAllowedOrderStatuses(prev => prev.filter(x => x !== st))}
+                                  className="text-slate-400 hover:text-red-600 cursor-pointer ml-0.5"
+                                  title={`Revoke ${st}`}
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tab Visibility Access Controls (Dropdown & Selector) */}
+                <div className="bg-white p-4 rounded-xl border border-sky-200 space-y-3 animate-fadeIn">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-100 pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-sky-600" />
+                        Agent Tab Visibility Access (Select Which Tabs to View)
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800 border border-sky-200">
+                        {editAllowedTabs.length} of {AGENT_MANAGEABLE_TABS.length} Tabs Visible
+                      </span>
+                    </div>
+
+                    {/* Preset Buttons */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setEditAllowedTabs(['summary', 'orders', 'followup', 'agent-performance', 'profiles'])}
+                        className="px-2 py-0.5 text-[10px] font-bold bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-md border border-sky-200 transition-colors cursor-pointer"
+                      >
+                        All 5 Tabs
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditAllowedTabs(['orders'])}
+                        className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors cursor-pointer"
+                      >
+                        Orders Only
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditAllowedTabs(['orders', 'followup'])}
+                        className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors cursor-pointer"
+                      >
+                        Orders + Followup
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditAllowedTabs(['orders', 'agent-performance'])}
+                        className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors cursor-pointer"
+                      >
+                        Orders + Perf
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Dropdown for quick Tab Toggle */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Dropdown to Toggle Tab Visibility:
+                      </label>
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const tab = e.target.value as AgentNavTab;
+                          if (!tab) return;
+                          if (editAllowedTabs.includes(tab)) {
+                            if (editAllowedTabs.length === 1) return; // keep at least 1 tab
+                            setEditAllowedTabs(prev => prev.filter(t => t !== tab));
+                          } else {
+                            setEditAllowedTabs(prev => [...prev, tab]);
+                          }
+                        }}
+                        className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-sky-300 bg-sky-50/40 text-sky-900 focus:bg-white cursor-pointer"
+                      >
+                        <option value="">-- Choose Tab from Dropdown to Toggle Visibility --</option>
+                        {AGENT_MANAGEABLE_TABS.map((tab) => (
+                          <option key={`opt-edit-${tab.id}`} value={tab.id}>
+                            {editAllowedTabs.includes(tab.id)
+                              ? `✓ [Currently Visible] ${tab.label} Tab`
+                              : `+ [Click to Show] ${tab.label} Tab`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Interactive Pill Badges to show active & click to toggle */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1 sm:pt-4">
+                      {AGENT_MANAGEABLE_TABS.map((tab) => {
+                        const isSelected = editAllowedTabs.includes(tab.id);
+                        return (
+                          <button
+                            key={`tab-toggle-edit-${tab.id}`}
+                            type="button"
+                            onClick={() => {
+                              if (isSelected) {
+                                if (editAllowedTabs.length === 1) return; // keep at least 1 tab
+                                setEditAllowedTabs(prev => prev.filter(t => t !== tab.id));
+                              } else {
+                                setEditAllowedTabs(prev => [...prev, tab.id]);
+                              }
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                              isSelected
+                                ? 'bg-sky-500 text-white border-sky-600 shadow-xs'
+                                : 'bg-slate-100 text-slate-400 border-slate-200 line-through'
+                            }`}
+                          >
+                            <span>{isSelected ? '✓' : '✗'}</span>
+                            <span>{tab.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
 

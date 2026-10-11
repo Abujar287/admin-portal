@@ -1,9 +1,23 @@
+export type AgentNavTab = 'summary' | 'orders' | 'followup' | 'agent-performance' | 'profiles' | 'dashboard';
+
+export interface AgentPermissions {
+  canCreate: boolean;
+  canUpdateStatus: boolean;
+  canChangeSchedule?: boolean;
+  canChangeValue: boolean;
+  canAddProfit: boolean;
+  canCancel?: boolean;
+  allowedOrderStatuses?: string[];
+  allowedTabs?: AgentNavTab[];
+}
+
 export interface AgentUser {
   user: string;
   pass: string;
   name: string;
   team: string;
   teamLeaderId?: string;
+  teamLeaders?: string[];
   contact?: string;
   email?: string;
   address?: string;
@@ -12,13 +26,7 @@ export interface AgentUser {
   status?: 'active' | 'deactivated';
   failedAttempts?: number;
   role?: string; // 'Agent' | 'Team Leader' | 'Sr Agent'
-  permissions?: {
-    canCreate: boolean;
-    canUpdateStatus: boolean;
-    canChangeValue: boolean;
-    canAddProfit: boolean;
-    canCancel: boolean;
-  };
+  permissions?: AgentPermissions;
 }
 
 export interface ManagerUser {
@@ -96,4 +104,6 @@ export interface FollowupHistoryItem {
   timestamp: string;
   action?: string;
   notes?: string;
+  isUndo?: boolean;
+  isUndone?: boolean;
 }

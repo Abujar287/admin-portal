@@ -400,14 +400,13 @@ export class OrderService {
   ): Promise<{ success: boolean; order: OrderItem; remoteSynced: boolean }> {
     const localOrders = this.getLocalOrders();
 
-    let nextNum = 1001;
+    let nextNum = 1;
     if (localOrders.length > 0) {
-      const topId = String(localOrders[0].order_id || localOrders[0].id || '').replace(/[^0-9]/g, '');
-      const parsedNum = parseInt(topId, 10);
-      if (!isNaN(parsedNum)) {
-        nextNum = parsedNum + 1;
+      const ids = localOrders.map(o => Number(o.order_id || o.id)).filter(n => !isNaN(n));
+      if (ids.length > 0) {
+        nextNum = Math.max(...ids) + 1;
       } else {
-        nextNum = 1001 + localOrders.length;
+        nextNum = 1 + localOrders.length;
       }
     }
     const orderId = String(newOrder.order_id || newOrder.id || nextNum);
@@ -842,31 +841,43 @@ export class OrderService {
 
   /**
    * Reverts an order's followup status back to its previous status in Sheet1 (Orders),
-   * clears profit (set to 0), clears delivered and cancelled dates, and removes the log item.
+   * clears profit & dates if applicable, and records a dedicated "Undo" audit log in history.
+   * As requested: Records "from status" (e.g. Delivered) and "to status" (e.g. Confirmed/Pending).
    */
   static async revertFollowup(
     historyId: string,
     orderId: string,
-    previousStatus: string
+    previousStatus: string,
+    undoneBy?: string
   ): Promise<{ updatedOrders: OrderItem[]; updatedHistory: FollowupHistoryItem[] }> {
     const orders = this.getLocalOrders();
-    const prevStatus = previousStatus || 'Pending';
-    const isDeliv = prevStatus.toLowerCase() === 'delivered';
-    const isCanc = prevStatus.toLowerCase() === 'cancelled';
+    const history = this.getFollowupHistory();
+    const targetItem = history.find((h) => String(h.id) === String(historyId));
+    const existingOrder = orders.find((ord) => String(ord.order_id || ord.id) === String(orderId));
+
+    // Determine the status before undo (what it was changed to)
+    const currentStatusBeforeUndo = targetItem?.newStatus || existingOrder?.followup_status || existingOrder?.order_status || 'Delivered';
+    // Determine the target status to restore to
+    const restoredStatus = previousStatus || targetItem?.previousStatus || 'Pending';
+
+    const isDeliv = restoredStatus.toLowerCase() === 'delivered';
+    const isCanc = restoredStatus.toLowerCase() === 'cancelled';
 
     const updatedOrders = orders.map((ord) => {
       if (String(ord.order_id || ord.id) === String(orderId)) {
+        const orderVal = Number(ord.order_value || ord.orderValue || 0);
         return {
           ...ord,
-          followup_status: prevStatus,
-          followupStatus: prevStatus,
-          order_status: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : 'Pending'),
-          orderStatus: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : 'Pending'),
-          profit: 0,
-          delivered_date: '',
-          deliveredDate: '',
-          cancelled_date: '',
-          cancelledDate: ''
+          followup_status: restoredStatus,
+          followupStatus: restoredStatus,
+          order_status: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : restoredStatus),
+          orderStatus: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : restoredStatus),
+          profit: isDeliv ? Math.round(orderVal * 0.20) : 0,
+          delivered_date: isDeliv ? (ord.delivered_date || ord.deliveredDate || '') : '',
+          deliveredDate: isDeliv ? (ord.delivered_date || ord.deliveredDate || '') : '',
+          cancelled_date: isCanc ? (ord.cancelled_date || ord.cancelledDate || '') : '',
+          cancelledDate: isCanc ? (ord.cancelled_date || ord.cancelledDate || '') : '',
+          followup_date: ''
         };
       }
       return ord;
@@ -874,11 +885,46 @@ export class OrderService {
 
     this.saveLocalOrders(updatedOrders);
 
-    const history = this.getFollowupHistory();
-    const updatedHistory = history.filter((h) => String(h.id) !== String(historyId));
+    const nowTimestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const nextFollowupId = history.length + 1;
+
+    // Create the new UNDO history audit record (recording from which status to which status)
+    const undoHistoryItem: FollowupHistoryItem = {
+      id: String(Date.now()),
+      followupId: nextFollowupId,
+      orderId: String(orderId),
+      customerName: targetItem?.customerName || existingOrder?.customer_name || existingOrder?.customerName || '-',
+      customerContact: targetItem?.customerContact || existingOrder?.customer_mobile || existingOrder?.customerContact || '-',
+      previousStatus: currentStatusBeforeUndo, // From which status it came (e.g. Delivered)
+      newStatus: restoredStatus,             // To which status it arrived (e.g. Confirmed/Pending)
+      orderStatus: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : restoredStatus),
+      orderValue: targetItem?.orderValue ?? Number(existingOrder?.order_value || existingOrder?.orderValue || 0),
+      scheduleDate: targetItem?.scheduleDate || existingOrder?.schedule_date || existingOrder?.scheduleDate || '',
+      scheduledTime: targetItem?.scheduledTime || existingOrder?.schedule_time || existingOrder?.scheduledTime || '',
+      updatedBy: undoneBy || 'Manager',
+      timestamp: nowTimestamp,
+      action: `Undo (${currentStatusBeforeUndo} → ${restoredStatus})`,
+      notes: `Order status reverted via Undo from "${currentStatusBeforeUndo}" back to "${restoredStatus}"`,
+      isUndo: true
+    };
+
+    // Keep history intact, mark the target item as undone, and prepend the new Undo audit record
+    const updatedHistory = [
+      undoHistoryItem,
+      ...history.map((h) => 
+        String(h.id) === String(historyId) 
+          ? { 
+              ...h, 
+              isUndone: true, 
+              notes: (h.notes ? `${h.notes} | ` : '') + `[Undone → ${restoredStatus}]` 
+            } 
+          : h
+      )
+    ];
+
     this.saveFollowupHistory(updatedHistory);
 
-    // Sync revert to remote Google Sheet if URL configured
+    // Sync revert and undo log to remote Google Sheet if URL configured
     const scriptUrl = this.getScriptUrl();
     if (scriptUrl) {
       try {
@@ -886,7 +932,16 @@ export class OrderService {
         params.append('action', 'revertFollowup');
         params.append('order_id', String(orderId));
         params.append('orderId', String(orderId));
-        params.append('previousStatus', prevStatus);
+        params.append('previousStatus', restoredStatus);
+        params.append('currentStatus', currentStatusBeforeUndo);
+        params.append('updated_by', undoneBy || 'Manager');
+        params.append('updatedBy', undoneBy || 'Manager');
+        params.append('actionName', `Undo (${currentStatusBeforeUndo} → ${restoredStatus})`);
+        params.append('customerName', undoHistoryItem.customerName || '');
+        params.append('customerMobile', undoHistoryItem.customerContact || '');
+        params.append('orderValue', String(undoHistoryItem.orderValue || ''));
+        params.append('scheduleDate', undoHistoryItem.scheduleDate || '');
+        params.append('scheduledTime', undoHistoryItem.scheduledTime || '');
 
         fetch(scriptUrl, {
           method: 'POST',
@@ -954,24 +1009,64 @@ function doPost(e) {
       }
     }
     if (foundRowIndex > 0) {
-      // Revert Followup Status (Col 19 / 18)
-      mainSheet.getRange(foundRowIndex, 19).setValue(prevStatus);
-      mainSheet.getRange(foundRowIndex, 18).setValue(prevStatus);
-      // Order Status (Col 18 / 17)
       var stat = prevStatus === 'Delivered' ? 'Delivered' : (prevStatus === 'Cancelled' ? 'Cancelled' : 'Pending');
+      var ordVal = parseFloat(rows[foundRowIndex - 1][16]) || 0;
+
+      // Order Status (Col 18)
       mainSheet.getRange(foundRowIndex, 18).setValue(stat);
-      mainSheet.getRange(foundRowIndex, 17).setValue(stat);
-      // Profit cleared (Col 20 / 19)
-      mainSheet.getRange(foundRowIndex, 20).setValue('');
-      mainSheet.getRange(foundRowIndex, 19).setValue('');
-      // Delivered Date cleared (Col 21 / 20)
-      mainSheet.getRange(foundRowIndex, 21).setValue('');
-      // Cancelled Date cleared (Col 22 / 21)
-      mainSheet.getRange(foundRowIndex, 22).setValue('');
+      // Followup Status (Col 19)
+      mainSheet.getRange(foundRowIndex, 19).setValue(prevStatus);
+      // Profit (Col 20)
+      if (prevStatus === 'Delivered') {
+        mainSheet.getRange(foundRowIndex, 20).setValue(Math.round(ordVal * 0.20));
+      } else {
+        mainSheet.getRange(foundRowIndex, 20).setValue('');
+      }
+      // Delivered Date (Col 21)
+      if (prevStatus !== 'Delivered') {
+        mainSheet.getRange(foundRowIndex, 21).setValue('');
+      }
+      // Cancelled Date (Col 22)
+      if (prevStatus !== 'Cancelled') {
+        mainSheet.getRange(foundRowIndex, 22).setValue('');
+      }
+      // Followup Date (Col 23)
+      mainSheet.getRange(foundRowIndex, 23).setValue('');
+
+      // Also record Undo Audit Row into 'Followup' sheet
+      var followupSheet = ss.getSheetByName("Followup");
+      if (followupSheet) {
+        var lastFollowupRow = followupSheet.getLastRow();
+        var nextFupId = lastFollowupRow > 1 ? (lastFollowupRow - 1) : 1;
+        var custName = data.customerName || data.customer_name || rows[foundRowIndex - 1][3] || '';
+        var custMob = data.customerMobile || data.customer_mobile || rows[foundRowIndex - 1][2] || '';
+        var scDate = data.scheduleDate || data.schedule_date || rows[foundRowIndex - 1][14] || '';
+        var scTime = data.scheduledTime || data.scheduled_time || rows[foundRowIndex - 1][15] || '';
+        var currStat = data.currentStatus || data.current_status || 'Delivered';
+        var uBy = data.updatedBy || data.updated_by || 'Manager';
+        var actName = data.actionName || data.action_name || ("Undo (" + currStat + " -> " + prevStatus + ")");
+
+        followupSheet.appendRow([
+          new Date(),
+          nextFupId,
+          orderIdToFind,
+          custName,
+          custMob,
+          currStat,
+          prevStatus,
+          stat,
+          ordVal,
+          scDate,
+          scTime,
+          uBy,
+          currStat + " -> " + prevStatus + " (Undone)",
+          actName
+        ]);
+      }
 
       return ContentService.createTextOutput(JSON.stringify({
         status: 'success',
-        message: 'Order #' + orderIdToFind + ' reverted to ' + prevStatus + ', profit & dates cleared'
+        message: 'Order #' + orderIdToFind + ' reverted from ' + (data.currentStatus || 'status') + ' to ' + prevStatus + ', undo logged in history'
       })).setMimeType(ContentService.MimeType.JSON);
     }
   }

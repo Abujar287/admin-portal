@@ -2,7 +2,29 @@ import React, { useState, useMemo } from 'react';
 import { AgentUser, DateFilterType, OrderItem } from '../types';
 import { OrderService } from '../services/orderService';
 import { CreateOrderModal } from './CreateOrderModal';
-import { RotateCw, Search, FilterX, Eye, X, CheckCircle, Clock, Plus, Lock, Calendar, DollarSign, MapPin, Package, User } from 'lucide-react';
+import { 
+  RotateCw, 
+  Search, 
+  FilterX, 
+  Eye, 
+  X, 
+  CheckCircle, 
+  Clock, 
+  Plus, 
+  Lock, 
+  Calendar, 
+  DollarSign, 
+  MapPin, 
+  Package, 
+  User,
+  CheckCircle2,
+  ShieldCheck,
+  ShieldAlert,
+  Edit3,
+  Save,
+  AlertTriangle
+} from 'lucide-react';
+import { getOrderStatuses, ORDER_STATUS_LIST, TIME_SLOTS } from '../data/mockOrders';
 
 interface MyOrdersViewProps {
   currentAgent: AgentUser;
@@ -10,6 +32,12 @@ interface MyOrdersViewProps {
   onRefresh: () => Promise<void>;
   isRefreshing: boolean;
   onOrderCreated: (order: OrderItem) => void;
+  onUpdateOrderStatus?: (
+    orderId: string, 
+    updates: Partial<OrderItem>, 
+    updatedBy?: string, 
+    notes?: string
+  ) => Promise<void>;
 }
 
 export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
@@ -17,7 +45,8 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
   orders,
   onRefresh,
   isRefreshing,
-  onOrderCreated
+  onOrderCreated,
+  onUpdateOrderStatus
 }) => {
   const [filterCreateDate, setFilterCreateDate] = useState<DateFilterType>('');
   const [filterScheduleDate, setFilterScheduleDate] = useState<DateFilterType>('');
@@ -27,11 +56,46 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Agent permissions check for order creation
-  const perms = currentAgent.permissions || { canCreate: true };
+  // Edit fields for opened order
+  const [editOrderStatus, setEditOrderStatus] = useState<string>('Pending');
+  const [editFollowupStatus, setEditFollowupStatus] = useState<string>('Pending');
+  const [editScheduleDate, setEditScheduleDate] = useState<string>('');
+  const [editScheduleTime, setEditScheduleTime] = useState<string>('');
+  const [editOrderValue, setEditOrderValue] = useState<string>('');
+  const [editProfit, setEditProfit] = useState<string>('');
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
+  const [orderSaveMsg, setOrderSaveMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Agent permissions check
+  const perms = currentAgent.permissions || { 
+    canCreate: true, 
+    canUpdateStatus: true, 
+    canChangeSchedule: true,
+    canChangeValue: true, 
+    canAddProfit: true, 
+    allowedOrderStatuses: ['Pending', 'In Progress', 'Confirmed', 'Follow-up']
+  };
+
+  const allowedStatuses = useMemo(() => {
+    if (!perms.canUpdateStatus) return [];
+    if (perms.allowedOrderStatuses && Array.isArray(perms.allowedOrderStatuses) && perms.allowedOrderStatuses.length > 0) {
+      return perms.allowedOrderStatuses;
+    }
+    return getOrderStatuses();
+  }, [perms.canUpdateStatus, perms.allowedOrderStatuses]);
+
+  const canEditAnyField = perms.canUpdateStatus || perms.canChangeSchedule || perms.canChangeValue || perms.canAddProfit;
 
   const handleOpenOrder = (ord: OrderItem) => {
     setSelectedOrder(ord);
+    setEditOrderStatus(ord.order_status || ord.orderStatus || 'Pending');
+    setEditFollowupStatus(ord.followup_status || ord.followupStatus || 'Pending');
+    const rawDate = ord.schedule_date || ord.scheduleDate || '';
+    setEditScheduleDate(rawDate ? rawDate.split('T')[0].split(' ')[0] : '');
+    setEditScheduleTime(ord.schedule_time || ord.scheduledTime || '');
+    setEditOrderValue(String(ord.order_value ?? ord.orderValue ?? '0'));
+    setEditProfit(String(ord.profit ?? '0'));
+    setOrderSaveMsg(null);
   };
 
   // STRICTLY only this agent's orders (data isolation for agent portal)
@@ -378,11 +442,15 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                       <td className="py-3 px-3.5 whitespace-nowrap text-center">
                         <button
                           onClick={() => handleOpenOrder(ord)}
-                          title="View / Update Details"
-                          className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                          title={canEditAnyField ? "View / Update Details" : "View Details"}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer ${
+                            canEditAnyField 
+                              ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700' 
+                              : 'bg-blue-50 hover:bg-blue-100 text-blue-700'
+                          }`}
                         >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>View</span>
+                          {canEditAnyField ? <Edit3 className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          <span>{canEditAnyField ? 'Update' : 'View'}</span>
                         </button>
                       </td>
                     </tr>
@@ -394,26 +462,33 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
         </div>
       </div>
 
-      {/* Order Details & Action Modal */}
+      {/* Order Details & Access-Controlled Action Modal */}
       {selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-100 space-y-5 animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-fadeIn my-6 max-h-[92vh] overflow-y-auto">
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 border border-blue-100 flex items-center justify-center font-bold">
                   #{selectedOrder.order_id || selectedOrder.id}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-extrabold text-slate-900 text-base">Order Details</h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-amber-600" />
-                      Read-Only (Agent View)
-                    </span>
+                    <h3 className="font-extrabold text-slate-900 text-base">Order Details &amp; Actions</h3>
+                    {canEditAnyField ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                        <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                        Authorized Edit
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+                        <Lock className="w-3 h-3 text-amber-600" />
+                        Read-Only View
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Booked by {selectedOrder.agent_name || selectedOrder.agentName} (@{selectedOrder.agent_id || selectedOrder.agentId}) • Channel: <span className="font-semibold text-slate-700">{selectedOrder.order_channel || selectedOrder.orderChannel}</span>
+                    Agent: <span className="font-semibold text-slate-700">{selectedOrder.agent_name || selectedOrder.agentName} (@{selectedOrder.agent_id || selectedOrder.agentId})</span> • Channel: <span className="font-semibold text-slate-700">{selectedOrder.order_channel || selectedOrder.orderChannel}</span>
                   </p>
                 </div>
               </div>
@@ -425,8 +500,25 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
               </button>
             </div>
 
+            {orderSaveMsg && (
+              <div
+                className={`p-3 rounded-xl border flex items-center gap-2 text-xs font-semibold ${
+                  orderSaveMsg.type === 'success'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : 'bg-red-50 text-red-800 border-red-200'
+                }`}
+              >
+                {orderSaveMsg.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                )}
+                <span>{orderSaveMsg.text}</span>
+              </div>
+            )}
+
             {/* Read-Only Details Grid */}
-            <div className="space-y-3.5 text-xs">
+            <div className="space-y-3 text-xs">
               {/* Customer Info */}
               <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
@@ -483,78 +575,292 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                 </div>
               </div>
 
-              {/* Schedule Details - Read Only */}
-              <div className="bg-blue-50/60 p-3.5 rounded-2xl border border-blue-100">
-                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5" /> Delivery Schedule (Fixed)
-                </span>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <span className="text-[11px] text-slate-500 block">Schedule Date:</span>
-                    <span className="font-bold font-mono text-slate-900 text-sm">
-                      {selectedOrder.schedule_date || selectedOrder.scheduleDate ? OrderService.formatDateTime((selectedOrder.schedule_date || selectedOrder.scheduleDate)!) : '-'}
+              {/* Access-Controlled Order Update Form */}
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!selectedOrder || !onUpdateOrderStatus) return;
+
+                if (perms.canUpdateStatus && allowedStatuses.length > 0) {
+                  if (!allowedStatuses.includes(editOrderStatus)) {
+                    setOrderSaveMsg({
+                      type: 'error',
+                      text: `Status "${editOrderStatus}" is not permitted for your agent account.`
+                    });
+                    return;
+                  }
+                }
+
+                setIsSavingOrder(true);
+                setOrderSaveMsg(null);
+                try {
+                  const updates: Partial<OrderItem> = {};
+                  if (perms.canUpdateStatus) {
+                    updates.order_status = editOrderStatus;
+                    updates.followup_status = editFollowupStatus;
+                  }
+                  if (perms.canChangeSchedule) {
+                    if (editScheduleDate) updates.schedule_date = editScheduleDate;
+                    if (editScheduleTime !== undefined) updates.schedule_time = editScheduleTime;
+                  }
+                  if (perms.canChangeValue) {
+                    updates.order_value = parseFloat(editOrderValue) || 0;
+                  }
+                  if (perms.canAddProfit) {
+                    updates.profit = parseFloat(editProfit) || 0;
+                  }
+
+                  await onUpdateOrderStatus(
+                    String(selectedOrder.order_id || selectedOrder.id),
+                    updates,
+                    currentAgent.name || currentAgent.user
+                  );
+                  setOrderSaveMsg({ type: 'success', text: 'Order updated and synced successfully!' });
+                  setTimeout(() => {
+                    setSelectedOrder(null);
+                  }, 800);
+                } catch {
+                  setOrderSaveMsg({ type: 'error', text: 'Failed to update order. Please retry.' });
+                } finally {
+                  setIsSavingOrder(false);
+                }
+              }} className="space-y-3">
+
+                {/* Delivery Schedule Section (Editable if canChangeSchedule) */}
+                <div className={`p-3.5 rounded-2xl border transition-all ${perms.canChangeSchedule ? 'bg-sky-50/70 border-sky-200' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold text-sky-900 uppercase tracking-wider flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-sky-600" />
+                      Delivery Schedule {perms.canChangeSchedule ? '(Editable)' : '(Fixed)'}
                     </span>
+                    {!perms.canChangeSchedule && (
+                      <span className="text-[9px] font-semibold text-slate-500 flex items-center gap-0.5">
+                        <Lock className="w-2.5 h-2.5 text-slate-400" /> Read-Only
+                      </span>
+                    )}
                   </div>
-                  <div>
-                    <span className="text-[11px] text-slate-500 block">Scheduled Time Slot:</span>
-                    <span className="font-bold text-slate-900 text-sm">
-                      {selectedOrder.schedule_time || selectedOrder.scheduledTime || 'Unscheduled'}
-                    </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Schedule Date:
+                      </label>
+                      {perms.canChangeSchedule ? (
+                        <input
+                          type="date"
+                          value={editScheduleDate}
+                          onChange={(e) => setEditScheduleDate(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-sky-300 bg-white font-mono font-bold text-slate-900 focus:outline-hidden focus:border-sky-600 text-xs shadow-2xs"
+                        />
+                      ) : (
+                        <div className="px-3 py-2 rounded-xl bg-white border border-slate-200 font-bold font-mono text-slate-800 text-xs">
+                          {selectedOrder.schedule_date || selectedOrder.scheduleDate ? OrderService.formatDateTime((selectedOrder.schedule_date || selectedOrder.scheduleDate)!) : '-'}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Scheduled Time Slot:
+                      </label>
+                      {perms.canChangeSchedule ? (
+                        <select
+                          value={editScheduleTime}
+                          onChange={(e) => setEditScheduleTime(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-sky-300 bg-white font-bold text-slate-900 focus:outline-hidden focus:border-sky-600 text-xs shadow-2xs cursor-pointer"
+                        >
+                          <option value="">-- Choose Time Slot --</option>
+                          {TIME_SLOTS.map((slot) => (
+                            <option key={slot} value={slot}>{slot}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="px-3 py-2 rounded-xl bg-white border border-slate-200 font-bold text-slate-800 text-xs">
+                          {selectedOrder.schedule_time || selectedOrder.scheduledTime || 'Unscheduled'}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Financials & Status */}
-              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
-                  <DollarSign className="w-3.5 h-3.5 text-emerald-600" /> Financials &amp; Status
-                </span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  <div>
-                    <span className="text-[11px] text-slate-500 block">Order Value:</span>
-                    <span className="font-extrabold text-slate-900">৳ {((selectedOrder.order_value ?? selectedOrder.orderValue) || 0).toLocaleString()}</span>
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-500 block">Profit:</span>
-                    <span className="font-extrabold text-emerald-600">৳ {((selectedOrder.profit ?? 0) || 0).toLocaleString()}</span>
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-500 block">Follow-up Status:</span>
-                    <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                      (selectedOrder.followup_status || selectedOrder.followupStatus) === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
-                      (selectedOrder.followup_status || selectedOrder.followupStatus) === 'Cancelled' ? 'bg-red-100 text-red-800' :
-                      'bg-indigo-100 text-indigo-800'
-                    }`}>
-                      {selectedOrder.followup_status || selectedOrder.followupStatus || 'Pending'}
+                {/* Access-Controlled Financials & Status Update Panel */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/70 pb-2">
+                    <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <DollarSign className="w-3.5 h-3.5 text-emerald-600" /> Financials &amp; Operational Status
                     </span>
+                    <div className="flex items-center gap-1">
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${perms.canUpdateStatus ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-500'}`}>
+                        Status: {perms.canUpdateStatus ? `${allowedStatuses.length} Permitted` : 'Locked'}
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${perms.canChangeSchedule ? 'bg-sky-100 text-sky-800' : 'bg-slate-200 text-slate-500'}`}>
+                        Schedule: {perms.canChangeSchedule ? 'Editable' : 'Locked'}
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${perms.canChangeValue ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-500'}`}>
+                        Value: {perms.canChangeValue ? 'Editable' : 'Locked'}
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${perms.canAddProfit ? 'bg-purple-100 text-purple-800' : 'bg-slate-200 text-slate-500'}`}>
+                        Profit: {perms.canAddProfit ? 'Editable' : 'Locked'}
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-[11px] text-slate-500 block">Order Status:</span>
-                    <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                      (selectedOrder.order_status || selectedOrder.orderStatus) === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
-                      (selectedOrder.order_status || selectedOrder.orderStatus) === 'Cancelled' ? 'bg-red-100 text-red-800' :
-                      'bg-blue-100 text-blue-800'
-                    }`}>
-                      {selectedOrder.order_status || selectedOrder.orderStatus || 'Pending'}
-                    </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Order Value (Editable if canChangeValue) */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center justify-between">
+                        <span>Order Value (৳)</span>
+                        {!perms.canChangeValue && (
+                          <span className="text-[9px] font-semibold text-amber-700 flex items-center gap-0.5">
+                            <Lock className="w-2.5 h-2.5" /> Read-Only
+                          </span>
+                        )}
+                      </label>
+                      {perms.canChangeValue ? (
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={editOrderValue}
+                          onChange={(e) => setEditOrderValue(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold text-slate-900 focus:outline-hidden focus:border-indigo-600 text-xs"
+                        />
+                      ) : (
+                        <div className="px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 font-extrabold text-slate-800 text-xs">
+                          ৳ {((selectedOrder.order_value ?? selectedOrder.orderValue) || 0).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Profit (Editable if canAddProfit) */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center justify-between">
+                        <span>Profit (৳)</span>
+                        {!perms.canAddProfit && (
+                          <span className="text-[9px] font-semibold text-amber-700 flex items-center gap-0.5">
+                            <Lock className="w-2.5 h-2.5" /> Read-Only
+                          </span>
+                        )}
+                      </label>
+                      {perms.canAddProfit ? (
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={editProfit}
+                          onChange={(e) => setEditProfit(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold text-emerald-700 focus:outline-hidden focus:border-indigo-600 text-xs"
+                        />
+                      ) : (
+                        <div className="px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 font-extrabold text-emerald-700 text-xs">
+                          ৳ {((selectedOrder.profit ?? 0) || 0).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Order Status (Granular Access Control) */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center justify-between">
+                        <span>Order Status</span>
+                        {!perms.canUpdateStatus && (
+                          <span className="text-[9px] font-semibold text-amber-700 flex items-center gap-0.5">
+                            <Lock className="w-2.5 h-2.5" /> Read-Only
+                          </span>
+                        )}
+                      </label>
+                      {perms.canUpdateStatus ? (
+                        <div>
+                          <select
+                            value={editOrderStatus}
+                            onChange={(e) => setEditOrderStatus(e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold text-slate-900 focus:outline-hidden focus:border-indigo-600 text-xs cursor-pointer"
+                          >
+                            {getOrderStatuses().map((st) => {
+                              const isAllowed = allowedStatuses.includes(st);
+                              return (
+                                <option
+                                  key={`opt-st-${st}`}
+                                  value={st}
+                                  disabled={!isAllowed}
+                                  className={!isAllowed ? 'text-slate-400 bg-slate-100 italic' : ''}
+                                >
+                                  {st} {!isAllowed ? '— (Restricted: Manager Only)' : ''}
+                                </option>
+                              );
+                            })}
+                          </select>
+                          {allowedStatuses.length > 0 && (!allowedStatuses.includes('Delivered') || !allowedStatuses.includes('Cancelled')) && (
+                            <p className="text-[10px] text-amber-700 mt-1 font-medium flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                              <span>Delivered &amp; Cancelled statuses are restricted to Manager approval.</span>
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 font-bold text-blue-800 text-xs">
+                          {selectedOrder.order_status || selectedOrder.orderStatus || 'Pending'}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Follow-up Status */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center justify-between">
+                        <span>Follow-up Status</span>
+                        {!perms.canUpdateStatus && (
+                          <span className="text-[9px] font-semibold text-amber-700 flex items-center gap-0.5">
+                            <Lock className="w-2.5 h-2.5" /> Read-Only
+                          </span>
+                        )}
+                      </label>
+                      {perms.canUpdateStatus ? (
+                        <select
+                          value={editFollowupStatus}
+                          onChange={(e) => setEditFollowupStatus(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold text-slate-900 focus:outline-hidden focus:border-indigo-600 text-xs cursor-pointer"
+                        >
+                          {['Pending', 'Confirmed', 'Follow-up', 'Delivered', 'Cancelled'].map((st) => {
+                            const isAllowed = allowedStatuses.includes(st) || (st !== 'Delivered' && st !== 'Cancelled');
+                            return (
+                              <option
+                                key={`opt-fu-${st}`}
+                                value={st}
+                                disabled={!isAllowed}
+                                className={!isAllowed ? 'text-slate-400 bg-slate-100 italic' : ''}
+                              >
+                                {st} {!isAllowed ? '— (Restricted: Manager Only)' : ''}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      ) : (
+                        <div className="px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 font-bold text-indigo-800 text-xs">
+                          {selectedOrder.followup_status || selectedOrder.followupStatus || 'Pending'}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Read-Only Restriction Notice & Close Button */}
-            <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <p className="text-[11px] text-slate-400 italic flex items-center gap-1">
-                <Lock className="w-3 h-3 text-slate-400 shrink-0" />
-                <span>Order rescheduling and status updates are managed by Follow-up &amp; Manager.</span>
-              </p>
-              <button
-                type="button"
-                onClick={() => setSelectedOrder(null)}
-                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shrink-0"
-              >
-                Close Details
-              </button>
+                {/* Footer Buttons */}
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOrder(null)}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Close
+                  </button>
+
+                  {canEditAnyField && onUpdateOrderStatus && (
+                    <button
+                      type="submit"
+                      disabled={isSavingOrder}
+                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-md shadow-indigo-600/20"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{isSavingOrder ? 'Saving...' : 'Save & Sync Order'}</span>
+                    </button>
+                  )}
+                </div>
+              </form>
             </div>
           </div>
         </div>

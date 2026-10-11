@@ -6,6 +6,8 @@ export const INITIAL_AGENTS: AgentUser[] = [
     pass: 'agent01', 
     name: 'Agent 01', 
     team: 'Acquisition', 
+    teamLeaderId: 'MD Abujar',
+    teamLeaders: ['MD Abujar'],
     contact: '01711223344',
     email: 'agent01@portal.local',
     address: 'House 14, Road 5, Dhanmondi, Dhaka',
@@ -17,9 +19,10 @@ export const INITIAL_AGENTS: AgentUser[] = [
     permissions: {
       canCreate: true,
       canUpdateStatus: true,
+      canChangeSchedule: true,
       canChangeValue: true,
       canAddProfit: true,
-      canCancel: true
+      allowedOrderStatuses: ['Pending', 'In Progress', 'Confirmed', 'Follow-up', 'Delivered', 'Cancelled', 'Returned']
     }
   },
   { 
@@ -27,6 +30,8 @@ export const INITIAL_AGENTS: AgentUser[] = [
     pass: 'agent02', 
     name: 'Agent 02', 
     team: 'Acquisition',
+    teamLeaderId: 'MD Abujar',
+    teamLeaders: ['MD Abujar'],
     contact: '01722334455',
     email: 'agent02@portal.local',
     address: 'House 8, Road 2, Mirpur 10, Dhaka',
@@ -38,9 +43,10 @@ export const INITIAL_AGENTS: AgentUser[] = [
     permissions: {
       canCreate: true,
       canUpdateStatus: true,
-      canChangeValue: true,
-      canAddProfit: true,
-      canCancel: true
+      canChangeSchedule: false,
+      canChangeValue: false,
+      canAddProfit: false,
+      allowedOrderStatuses: ['Pending', 'In Progress', 'Confirmed', 'Follow-up']
     }
   },
   { 
@@ -48,6 +54,8 @@ export const INITIAL_AGENTS: AgentUser[] = [
     pass: 'agent03', 
     name: 'Agent 03', 
     team: 'Retention',
+    teamLeaderId: 'MD Abujar, Manager (Admin)',
+    teamLeaders: ['MD Abujar', 'Manager (Admin)'],
     contact: '01733445566',
     email: 'agent03@portal.local',
     address: 'House 22, Road 11, Banani, Dhaka',
@@ -59,9 +67,10 @@ export const INITIAL_AGENTS: AgentUser[] = [
     permissions: {
       canCreate: true,
       canUpdateStatus: true,
+      canChangeSchedule: true,
       canChangeValue: true,
       canAddProfit: true,
-      canCancel: true
+      allowedOrderStatuses: ['Pending', 'In Progress', 'Confirmed', 'Follow-up', 'Delivered', 'Cancelled', 'Returned']
     }
   }
 ];
@@ -169,6 +178,13 @@ export const ORDER_STATUS_LIST = [
   'Delivered',
   'Cancelled',
   'Returned'
+];
+
+export const DEFAULT_ALLOWED_ORDER_STATUSES = [
+  'Pending',
+  'In Progress',
+  'Confirmed',
+  'Follow-up'
 ];
 
 export const getOrderStatuses = (): string[] => {

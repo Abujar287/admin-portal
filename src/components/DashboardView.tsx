@@ -82,7 +82,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       if (dDt) map.set(oId, dDt);
     });
     followupHistory.forEach(h => {
-      if (h.newStatus?.toLowerCase() === 'delivered' && h.timestamp) {
+      if (!h.isUndone && h.newStatus?.toLowerCase() === 'delivered' && h.timestamp) {
         map.set(String(h.orderId), h.timestamp);
       }
     });
@@ -97,7 +97,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       if (cDt) map.set(oId, cDt);
     });
     followupHistory.forEach(h => {
-      if (h.newStatus?.toLowerCase() === 'cancelled' && h.timestamp) {
+      if (!h.isUndone && h.newStatus?.toLowerCase() === 'cancelled' && h.timestamp) {
         map.set(String(h.orderId), h.timestamp);
       }
     });

@@ -4,13 +4,15 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { AgentUser, ManagerUser, OrderItem, FollowupHistoryItem } from './types';
+import { AgentUser, ManagerUser, OrderItem, FollowupHistoryItem, AgentNavTab } from './types';
 import { OrderService } from './services/orderService';
 import { AuthScreen } from './components/AuthScreen';
 import { AgentSidebar } from './components/AgentSidebar';
 import { AgentProfileView } from './components/AgentProfileView';
 import { MyOrdersView } from './components/MyOrdersView';
 import { DashboardView } from './components/DashboardView';
+import { AgentFollowupView } from './components/AgentFollowupView';
+import { AgentSummaryView } from './components/AgentSummaryView';
 import { ManagerPortal } from './components/ManagerPortal';
 import { Menu, Shield, RefreshCw, CheckCircle2 } from 'lucide-react';
 
@@ -20,8 +22,8 @@ export default function App() {
     { role: 'agent'; agent: AgentUser } | { role: 'manager'; manager: ManagerUser } | null
   >(null);
 
-  // Agent navigation state (strictly Profile, My Orders, Performance - no Create Order in sidebar)
-  const [agentActiveTab, setAgentActiveTab] = useState<'profiles' | 'orders' | 'dashboard'>('orders');
+  // Agent navigation state supporting all manager-assigned tabs
+  const [agentActiveTab, setAgentActiveTab] = useState<AgentNavTab>('orders');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -114,7 +116,11 @@ export default function App() {
     setCurrentSession({ role: 'agent', agent });
     sessionStorage.setItem('portal_session_role', 'agent');
     sessionStorage.setItem('portal_session_user', agent.user);
-    setAgentActiveTab('orders');
+    const allowedTabs = agent.permissions?.allowedTabs && Array.isArray(agent.permissions.allowedTabs) && agent.permissions.allowedTabs.length > 0
+      ? agent.permissions.allowedTabs
+      : ['summary', 'orders', 'followup', 'agent-performance', 'profiles'];
+    const defaultTab = (allowedTabs.includes('orders') ? 'orders' : allowedTabs[0]) as AgentNavTab;
+    setAgentActiveTab(defaultTab || 'orders');
     showToast(`Welcome, ${agent.name || agent.user}!`);
   };
 
@@ -162,10 +168,57 @@ export default function App() {
     updatedBy = 'Manager',
     notes = ''
   ) => {
-    if (currentSession?.role !== 'manager') {
-      showToast('Access Denied: Only managers can update orders!');
+    if (!currentSession) {
+      showToast('Access Denied: Please log in!');
       return;
     }
+
+    if (currentSession.role === 'agent') {
+      const perms = currentSession.agent.permissions || {
+        canCreate: true,
+        canUpdateStatus: true,
+        canChangeValue: true,
+        canAddProfit: true,
+        canCancel: true
+      };
+
+      // Check status update permission and allowed statuses
+      const requestedStatus = updates.order_status || updates.orderStatus || updates.followup_status || updates.followupStatus;
+      if (requestedStatus) {
+        if (perms.canUpdateStatus === false) {
+          showToast('Access Denied: You do not have permission to update status.');
+          return;
+        }
+
+        const allowed = perms.allowedOrderStatuses;
+        if (Array.isArray(allowed) && allowed.length > 0) {
+          const isAllowed = allowed.some(s => s.toLowerCase() === String(requestedStatus).toLowerCase());
+          if (!isAllowed) {
+            showToast(`Access Denied: Status "${requestedStatus}" is restricted for your agent role.`);
+            return;
+          }
+        }
+      }
+
+      // Check change value permission
+      if (updates.order_value !== undefined || updates.orderValue !== undefined) {
+        if (perms.canChangeValue === false) {
+          showToast('Access Denied: You do not have permission to change order value.');
+          return;
+        }
+      }
+
+      // Check add profit permission
+      if (updates.profit !== undefined && updates.profit !== null && String(updates.profit) !== '') {
+        if (perms.canAddProfit === false) {
+          showToast('Access Denied: You do not have permission to modify profit.');
+          return;
+        }
+      }
+
+      updatedBy = currentSession.agent.name || currentSession.agent.user;
+    }
+
     const res = await OrderService.updateOrderStatus(orderId, updates, updatedBy, notes);
     setOrders(res.updatedOrders);
     if (res.historyItem) {
@@ -173,21 +226,22 @@ export default function App() {
     }
     await loadOrdersData(true);
     showToast(
-      updates.followupStatus
-        ? `Order #${orderId} followup status updated to "${updates.followupStatus}" & synced!`
+      updates.followup_status || updates.followupStatus
+        ? `Order #${orderId} followup status updated to "${updates.followup_status || updates.followupStatus}" & synced!`
         : `Order #${orderId} status updated & synced!`
     );
   };
 
-  const handleRevertFollowup = async (historyId: string, orderId: string, previousStatus: string) => {
+  const handleRevertFollowup = async (historyId: string, orderId: string, previousStatus: string, undoneBy?: string) => {
     if (currentSession?.role !== 'manager') {
       showToast('Access Denied: Only managers can revert followups!');
       return;
     }
-    const res = await OrderService.revertFollowup(historyId, orderId, previousStatus);
+    const userWhoUndid = undoneBy || (currentSession?.role === 'manager' ? (currentSession.manager.name || currentSession.manager.user) : 'Manager');
+    const res = await OrderService.revertFollowup(historyId, orderId, previousStatus, userWhoUndid);
     setOrders(res.updatedOrders);
     setFollowupHistory(res.updatedHistory);
-    showToast(`Order #${orderId} reverted to "${previousStatus || 'Pending'}"! Profit and dates cleared.`);
+    showToast(`Order #${orderId} reverted to "${previousStatus || 'Pending'}"! Undo event logged in history.`);
   };
 
   return (
@@ -297,7 +351,9 @@ export default function App() {
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     {agentActiveTab === 'profiles' && 'My Profile'}
                     {agentActiveTab === 'orders' && 'My Orders'}
-                    {agentActiveTab === 'dashboard' && 'Performance Analytics'}
+                    {(agentActiveTab === 'dashboard' || agentActiveTab === 'agent-performance') && 'Performance Analytics'}
+                    {agentActiveTab === 'followup' && 'Followup Status & History'}
+                    {agentActiveTab === 'summary' && 'Analytics & Store Summary'}
                   </span>
                   <span className="text-slate-300">•</span>
                   <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 flex items-center gap-1">
@@ -336,10 +392,32 @@ export default function App() {
                   onRefresh={() => loadOrdersData(true)}
                   isRefreshing={isRefreshing}
                   onOrderCreated={handleOrderCreated}
+                  onUpdateOrderStatus={handleUpdateOrderStatus}
                 />
               )}
 
-              {agentActiveTab === 'dashboard' && (
+              {agentActiveTab === 'followup' && (
+                <AgentFollowupView
+                  currentAgent={currentSession.agent}
+                  orders={orders}
+                  followupHistory={followupHistory}
+                  onRefresh={() => loadOrdersData(true)}
+                  isRefreshing={isRefreshing}
+                  onUpdateOrderStatus={handleUpdateOrderStatus}
+                />
+              )}
+
+              {agentActiveTab === 'summary' && (
+                <AgentSummaryView
+                  currentAgent={currentSession.agent}
+                  orders={orders}
+                  followupHistory={followupHistory}
+                  onRefresh={() => loadOrdersData(true)}
+                  isRefreshing={isRefreshing}
+                />
+              )}
+
+              {(agentActiveTab === 'dashboard' || agentActiveTab === 'agent-performance') && (
                 <DashboardView
                   currentAgent={currentSession.agent}
                   orders={orders}

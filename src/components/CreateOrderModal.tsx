@@ -57,7 +57,24 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  const resetFormTimes = () => {
+  const resetForm = () => {
+    setCustomerName('');
+    setCustomerContact('');
+    setGender('');
+    setProductCategory('');
+    setProductName('');
+    setCity('');
+    setCustomCity('');
+    setDeliveryArea('');
+    setCustomArea('');
+    setFlat('');
+    setHouse('');
+    setRoad('');
+    setBlock('');
+    setOrderValue('');
+    setScheduledTime('');
+    setStatusMessage(null);
+
     const now = new Date();
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -74,8 +91,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      resetFormTimes();
-      setStatusMessage(null);
+      resetForm();
     }
   }, [isOpen]);
 
