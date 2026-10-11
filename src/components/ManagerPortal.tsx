@@ -78,7 +78,6 @@ import { OrderJourneyModal } from './OrderJourneyModal';
 export const AGENT_MANAGEABLE_TABS: { id: AgentNavTab; label: string; description: string }[] = [
   { id: 'summary', label: 'Summary', description: 'Analytics, KPI metrics & sales summary' },
   { id: 'orders', label: 'Orders', description: 'Orders database, search, and order items' },
-  { id: 'followup', label: 'Followup', description: 'Followup statuses, scheduling & updates' },
   { id: 'agent-performance', label: 'Agent Performance', description: 'Performance analytics & individual rankings' },
   { id: 'profiles', label: 'Profiles', description: 'Agent profile & personal settings' }
 ];
@@ -115,14 +114,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const isTeamLeader = currentManager.role === 'Team Leader';
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTabState] = useState<
-    'profiles' | 'users' | 'orders' | 'followup' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping'
+    'profiles' | 'users' | 'orders' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping'
   >(() => {
     const saved = sessionStorage.getItem('manager_active_tab') as any;
-    if (saved) return saved;
+    if (saved && saved !== 'followup') return saved;
     return isTeamLeader ? 'summary' : 'users';
   });
 
-  const setActiveTab = (tab: 'profiles' | 'users' | 'orders' | 'followup' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping') => {
+  const setActiveTab = (tab: 'profiles' | 'users' | 'orders' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping') => {
     sessionStorage.setItem('manager_active_tab', tab);
     setActiveTabState(tab);
   };
@@ -765,7 +764,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setNewCanChangeValue(true);
     setNewCanAddProfit(true);
     setNewAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
-    setNewAllowedTabs(['summary', 'orders', 'followup', 'agent-performance', 'profiles']);
+    setNewAllowedTabs(['summary', 'orders', 'agent-performance', 'profiles']);
   };
 
   const handleEditAgent = (index: number) => {
@@ -1411,22 +1410,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             )}
           </button>
 
-          <button
-            onClick={() => setActiveTab('followup')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-              activeTab === 'followup'
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                : 'text-slate-300 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <History className="w-4 h-4" />
-            {isSidebarOpen && <span>Followup</span>}
-            {isSidebarOpen && (
-              <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
-                {followupHistory.length}
-              </span>
-            )}
-          </button>
+          {/* Followup tab removed */}
 
           {!isTeamLeader && (
             <button
@@ -1528,7 +1512,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             <h1 className="text-lg font-extrabold text-slate-900 capitalize">
               {activeTab === 'users' && 'User Details (Agent Directory)'}
               {activeTab === 'orders' && 'All Orders Database'}
-              {activeTab === 'followup' && 'Followup Status & History'}
               {activeTab === 'summary' && 'Analytics & Summary'}
               {activeTab === 'agent-performance' && 'Agent Performance Report'}
               {activeTab === 'category-mapping' && 'Category, Team & Status Mapping'}
@@ -2082,10 +2065,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <div className="flex items-center gap-1.5">
                           <button
                             type="button"
-                            onClick={() => setNewAllowedTabs(['summary', 'orders', 'followup', 'agent-performance', 'profiles'])}
+                            onClick={() => setNewAllowedTabs(['summary', 'orders', 'agent-performance', 'profiles'])}
                             className="px-2 py-0.5 text-[10px] font-bold bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-md border border-sky-200 transition-colors cursor-pointer"
                           >
-                            All 5 Tabs
+                            All 4 Tabs
                           </button>
                           <button
                             type="button"
@@ -2093,13 +2076,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors cursor-pointer"
                           >
                             Orders Only
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setNewAllowedTabs(['orders', 'followup'])}
-                            className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors cursor-pointer"
-                          >
-                            Orders + Followup
                           </button>
                           <button
                             type="button"
@@ -2607,17 +2583,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           const isDelivered = (ord.followup_status || ord.followupStatus || '').toLowerCase() === 'delivered';
                           return (
                             <tr key={`manager-ord-${ord.order_id || ord.id || idx}-${idx}`} className="hover:bg-indigo-50/40 transition-colors">
-                              <td className="py-2.5 px-3 whitespace-nowrap text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => setViewJourneyOrder(ord)}
-                                  className="px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200 transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs group"
-                                  title="Open Full Order Details & Step-by-Step Activity Journey"
-                                >
-                                  <History className="w-3.5 h-3.5 text-indigo-500 group-hover:text-white" />
-                                  <span>Journey</span>
-                                </button>
-                              </td>
+
                               <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-indigo-700">
                                 <button
                                   type="button"
@@ -2750,8 +2716,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             </div>
           )}
 
-          {/* TAB: FOLLOWUP & SHEET SYNC */}
-          {activeTab === 'followup' && (
+          {/* TAB: FOLLOWUP & SHEET SYNC - REMOVED */}
+          {false && (
             <div className="space-y-6">
               {/* Header Card */}
               <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">

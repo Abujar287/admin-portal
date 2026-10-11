@@ -360,7 +360,14 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                   return (
                     <tr key={`agent-ord-${ord.order_id || ord.id || idx}-${idx}`} className="hover:bg-blue-50/40 transition-colors">
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-blue-700">
-                        #{ord.order_id || ord.id}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenOrder(ord)}
+                          className="hover:underline text-blue-700 hover:text-blue-900 font-bold cursor-pointer flex items-center gap-1"
+                          title="Click to open order details"
+                        >
+                          <span>#{ord.order_id || ord.id}</span>
+                        </button>
                       </td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">
                         {ord.customer_id || ord.customerId}

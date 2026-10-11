@@ -25,14 +25,13 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   const allNavItems: { id: AgentNavTab; label: string; icon: any; badge?: number }[] = [
     { id: 'summary', label: 'Summary', icon: BarChart2 },
     { id: 'orders', label: 'My Orders', icon: Package, badge: ordersCount },
-    { id: 'followup', label: 'Followup', icon: History },
     { id: 'agent-performance', label: 'Performance', icon: TrendingUp },
     { id: 'profiles', label: 'Profile', icon: User }
   ];
 
   const allowedTabs = currentAgent.permissions?.allowedTabs && Array.isArray(currentAgent.permissions.allowedTabs) && currentAgent.permissions.allowedTabs.length > 0
-    ? currentAgent.permissions.allowedTabs
-    : ['summary', 'orders', 'followup', 'agent-performance', 'profiles'];
+    ? currentAgent.permissions.allowedTabs.filter(t => t !== 'followup')
+    : ['summary', 'orders', 'agent-performance', 'profiles'];
 
   const navItems = allNavItems.filter((item) => {
     return (
