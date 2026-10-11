@@ -215,11 +215,15 @@ export default function App() {
           return;
         }
       }
-
-      updatedBy = currentSession.agent.name || currentSession.agent.user;
     }
 
-    const res = await OrderService.updateOrderStatus(orderId, updates, updatedBy, notes);
+    // Determine real account username of active user
+    const activeAccountName = currentSession.role === 'manager'
+      ? `${currentSession.manager.name || currentSession.manager.user} (@${currentSession.manager.user})`
+      : `${currentSession.agent.name || currentSession.agent.user} (@${currentSession.agent.user})`;
+    const effectiveUpdatedBy = (updatedBy && updatedBy !== 'Manager') ? updatedBy : activeAccountName;
+
+    const res = await OrderService.updateOrderStatus(orderId, updates, effectiveUpdatedBy, notes);
     setOrders(res.updatedOrders);
     if (res.historyItem) {
       setFollowupHistory((prev) => [res.historyItem!, ...prev]);

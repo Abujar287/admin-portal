@@ -73,6 +73,7 @@ import {
   CategoryTeamMapping,
   ORDER_STATUS_LIST,
 } from '../data/mockOrders';
+import { OrderJourneyModal } from './OrderJourneyModal';
 
 export const AGENT_MANAGEABLE_TABS: { id: AgentNavTab; label: string; description: string }[] = [
   { id: 'summary', label: 'Summary', description: 'Analytics, KPI metrics & sales summary' },
@@ -178,8 +179,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [quickUpdateScheduledTime, setQuickUpdateScheduledTime] = useState<string>('');
   const [quickUpdateNotes, setQuickUpdateNotes] = useState<string>('');
   const [followupSearch, setFollowupSearch] = useState<string>('');
+  const [viewJourneyOrder, setViewJourneyOrder] = useState<OrderItem | null>(null);
 
   const handleOpenOrderModal = (ord: OrderItem) => {
+    setViewJourneyOrder(ord);
     setStatusModalOrder(ord);
     setModalFollowupStatus(ord.followup_status || ord.followupStatus || 'Pending');
     setModalOrderValue(String(ord.order_value ?? ord.orderValue ?? ''));
@@ -2531,11 +2534,27 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       </select>
                       <input
                         type="text"
-                        placeholder={`Search...`}
+                        placeholder={`Search ${searchType}... (e.g. 1002)`}
                         value={searchValue}
                         onChange={(e) => setSearchValue(e.target.value)}
-                        className="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-300"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && filteredOrders.length > 0) {
+                            setViewJourneyOrder(filteredOrders[0]);
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-300 focus:border-indigo-600 focus:outline-hidden"
                       />
+                      {searchValue.trim() && filteredOrders.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setViewJourneyOrder(filteredOrders[0])}
+                          className="px-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0 transition-transform active:scale-95"
+                          title="Open Order Details & Full Journey"
+                        >
+                          <History className="w-3.5 h-3.5" />
+                          <span>View #{filteredOrders[0].order_id || filteredOrders[0].id} Journey</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2551,6 +2570,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-gradient-to-r from-indigo-700 to-purple-800 text-white sticky top-0 z-10 font-bold">
+                        <th className="py-3.5 px-3 whitespace-nowrap text-center">Journey &amp; Details</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">order_id</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">customer_id</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">customer_mobile</th>
@@ -2578,7 +2598,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <tbody className="divide-y divide-slate-100 text-slate-800">
                       {filteredOrders.length === 0 ? (
                         <tr>
-                          <td colSpan={22} className="text-center py-12 text-slate-400 font-semibold">
+                          <td colSpan={23} className="text-center py-12 text-slate-400 font-semibold">
                             No orders found matching filters.
                           </td>
                         </tr>
@@ -2587,8 +2607,27 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           const isDelivered = (ord.followup_status || ord.followupStatus || '').toLowerCase() === 'delivered';
                           return (
                             <tr key={`manager-ord-${ord.order_id || ord.id || idx}-${idx}`} className="hover:bg-indigo-50/40 transition-colors">
+                              <td className="py-2.5 px-3 whitespace-nowrap text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setViewJourneyOrder(ord)}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200 transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs group"
+                                  title="Open Full Order Details & Step-by-Step Activity Journey"
+                                >
+                                  <History className="w-3.5 h-3.5 text-indigo-500 group-hover:text-white" />
+                                  <span>Journey</span>
+                                </button>
+                              </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-indigo-700">
-                                #{ord.order_id || ord.id}
+                                <button
+                                  type="button"
+                                  onClick={() => setViewJourneyOrder(ord)}
+                                  className="hover:underline text-indigo-700 hover:text-indigo-900 flex items-center gap-1 cursor-pointer font-bold"
+                                  title="Click to view full order details & journey"
+                                >
+                                  <span>#{ord.order_id || ord.id}</span>
+                                  <ExternalLink className="w-3 h-3 text-indigo-400" />
+                                </button>
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-800">
                                 {ord.customer_id || ord.customerId}
@@ -2661,7 +2700,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                           followup_status: newStatus,
                                           order_status: newStatus === 'Delivered' ? 'Delivered' : ord.order_status
                                         },
-                                        'Manager'
+                                        currentManager.name || currentManager.user || 'Manager'
                                       );
                                     }}
                                     className={`px-2.5 py-1 rounded-md text-[11px] font-bold border transition-all cursor-pointer ${
@@ -2683,9 +2722,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                     <option value="Cancelled">Cancelled</option>
                                   </select>
                                   <button
-                                    onClick={() => handleOpenOrderModal(ord)}
-                                    title="Edit Order Value, Schedule, Followup Status & Remarks"
-                                    className="p-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-indigo-600 transition-colors cursor-pointer"
+                                    onClick={() => setViewJourneyOrder(ord)}
+                                    title="Open Full Order Details, Activity Journey & Edit"
+                                    className="p-1 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-900 transition-colors cursor-pointer"
                                   >
                                     <Edit2 className="w-3 h-3" />
                                   </button>
@@ -2833,6 +2872,19 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           );
                         })}
                       </select>
+                      {quickUpdateOrderId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const ord = orders.find((o) => String(o.order_id || o.id) === String(quickUpdateOrderId));
+                            if (ord) setViewJourneyOrder(ord);
+                          }}
+                          className="mt-1.5 text-[11px] font-bold text-amber-300 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          <History className="w-3.5 h-3.5" />
+                          <span>View #{quickUpdateOrderId} Journey &amp; History ➔</span>
+                        </button>
+                      )}
                     </div>
 
                     <div>
@@ -3076,7 +3128,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                         <RotateCcw className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                                       </span>
                                     )}
-                                    <span>#{hist.orderId}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const ord = orders.find((o) => String(o.order_id || o.id) === String(hist.orderId));
+                                        if (ord) setViewJourneyOrder(ord);
+                                      }}
+                                      className="font-mono font-bold text-indigo-700 hover:text-indigo-900 hover:underline flex items-center gap-1 cursor-pointer"
+                                      title="Click to view full order details & complete journey"
+                                    >
+                                      <span>#{hist.orderId}</span>
+                                      <ExternalLink className="w-3 h-3 text-indigo-400" />
+                                    </button>
                                   </div>
                                 </td>
                                 <td className="py-3 px-3.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">
@@ -3138,28 +3201,42 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                   {hist.notes || '-'}
                                 </td>
                                 <td className="py-3 px-3.5 text-center whitespace-nowrap">
-                                  {isUndoRecord ? (
-                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-md font-bold text-[10px]">
-                                      <RotateCcw className="w-2.5 h-2.5 text-amber-600" />
-                                      Undo Event
-                                    </span>
-                                  ) : isRevertedRecord ? (
-                                    <span 
-                                      className="px-2 py-1 bg-slate-100 text-slate-400 border border-slate-200 rounded-md font-bold text-[10px] italic"
-                                      title="This action has already been reverted via Undo"
-                                    >
-                                      Reverted
-                                    </span>
-                                  ) : (
+                                  <div className="flex items-center justify-center gap-1.5">
                                     <button
-                                      onClick={() => handleUndoFollowup(hist.id)}
-                                      title={`Undo this follow-up & revert order back to "${hist.previousStatus}"`}
-                                      className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-md font-bold text-[10px] cursor-pointer transition-colors"
+                                      type="button"
+                                      onClick={() => {
+                                        const ord = orders.find((o) => String(o.order_id || o.id) === String(hist.orderId));
+                                        if (ord) setViewJourneyOrder(ord);
+                                      }}
+                                      className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md font-bold text-[10px] cursor-pointer transition-colors"
+                                      title="Open Full Order Details & Step-by-Step Activity Journey"
                                     >
-                                      <RotateCcw className="w-3 h-3 text-red-600" />
-                                      Undo / Revert
+                                      <History className="w-3 h-3 text-indigo-600" />
+                                      <span>Journey</span>
                                     </button>
-                                  )}
+                                    {isUndoRecord ? (
+                                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-md font-bold text-[10px]">
+                                        <RotateCcw className="w-2.5 h-2.5 text-amber-600" />
+                                        Undo
+                                      </span>
+                                    ) : isRevertedRecord ? (
+                                      <span 
+                                        className="px-2 py-1 bg-slate-100 text-slate-400 border border-slate-200 rounded-md font-bold text-[10px] italic"
+                                        title="This action has already been reverted via Undo"
+                                      >
+                                        Reverted
+                                      </span>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleUndoFollowup(hist.id)}
+                                        title={`Undo this follow-up & revert order back to "${hist.previousStatus}"`}
+                                        className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-md font-bold text-[10px] cursor-pointer transition-colors"
+                                      >
+                                        <RotateCcw className="w-3 h-3 text-red-600" />
+                                        Revert
+                                      </button>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -4723,6 +4800,23 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         </div>
       )}
 
+      {/* Modal: Full Order Details & Complete Activity Journey */}
+      {viewJourneyOrder && (
+        <OrderJourneyModal
+          order={viewJourneyOrder}
+          onClose={() => setViewJourneyOrder(null)}
+          followupHistory={followupHistory}
+          currentUser={{
+            name: currentManager.name || currentManager.user,
+            user: currentManager.user,
+            role: currentManager.role || 'Manager'
+          }}
+          onUpdateOrderStatus={onUpdateOrderStatus}
+          onRefreshOrders={onRefreshOrders}
+          canEdit={true}
+        />
+      )}
+
       {/* Modal: Status & Remarks Update Modal */}
       {statusModalOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs">
@@ -4911,7 +5005,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           schedule_time: modalScheduledTime,
                           scheduledTime: modalScheduledTime
                         },
-                        'Manager',
+                        currentManager.name || currentManager.user || 'Manager',
                         modalNotes
                       );
                       setStatusModalOrder(null);
@@ -4922,9 +5016,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       setModalScheduledTime('');
                       setModalNotes('');
                       await onRefreshOrders();
-                      setTimeout(() => {
-                        window.location.reload();
-                      }, 400);
                     } finally {
                       setIsSavingStatus(false);
                     }
