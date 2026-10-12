@@ -5472,105 +5472,34 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 {/* 5 Core Permissions in Dropdown Format */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {/* 1. Create Order */}
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                      <span>1. Create Order</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${editCanCreate ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                        {editCanCreate ? 'Active' : 'Locked'}
-                      </span>
-                    </label>
-                    <select
-                      value={editCanCreate ? 'allowed' : 'restricted'}
-                      onChange={(e) => setEditCanCreate(e.target.value === 'allowed')}
-                      className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
-                    >
-                      <option value="allowed">Allowed — Can create new orders</option>
-                      <option value="restricted">Restricted — Cannot create orders</option>
-                    </select>
-                    <span className="text-[10px] text-slate-400 block mt-1">Book customer orders into system</span>
-                  </div>
+                  <label className="flex items-center gap-1.5 p-2 rounded-lg border border-slate-200">
+                    <input type="checkbox" checked={editCanCreate} onChange={e => setEditCanCreate(e.target.checked)} />
+                    <span className="text-xs font-bold">Create Order</span>
+                  </label>
 
                   {/* 2. Status Update */}
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                      <span>2. Status Update</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${editCanUpdateStatus ? 'bg-indigo-100 text-indigo-800' : 'bg-red-100 text-red-800'}`}>
-                        {editCanUpdateStatus ? 'Active' : 'Locked'}
-                      </span>
-                    </label>
-                    <select
-                      value={editCanUpdateStatus ? 'allowed' : 'restricted'}
-                      onChange={(e) => {
-                        const isAllowed = e.target.value === 'allowed';
-                        setEditCanUpdateStatus(isAllowed);
-                        if (isAllowed && editAllowedOrderStatuses.length === 0) {
-                          setEditAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
-                        }
-                      }}
-                      className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
-                    >
-                      <option value="allowed">Allowed — Can update order statuses</option>
-                      <option value="restricted">Restricted — Read-only order status</option>
-                    </select>
-                    <span className="text-[10px] text-slate-400 block mt-1">Change order and follow-up status</span>
-                  </div>
+                  <label className="flex items-center gap-1.5 p-2 rounded-lg border border-slate-200">
+                    <input type="checkbox" checked={editCanUpdateStatus} onChange={e => setEditCanUpdateStatus(e.target.checked)} />
+                    <span className="text-xs font-bold">Status Update</span>
+                  </label>
 
                   {/* 3. Schedule Date & Time Slot Change */}
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                      <span>3. Schedule Date &amp; Time Slot Change</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${editCanChangeSchedule ? 'bg-sky-100 text-sky-800' : 'bg-red-100 text-red-800'}`}>
-                        {editCanChangeSchedule ? 'Active' : 'Locked'}
-                      </span>
-                    </label>
-                    <select
-                      value={editCanChangeSchedule ? 'allowed' : 'restricted'}
-                      onChange={(e) => setEditCanChangeSchedule(e.target.value === 'allowed')}
-                      className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
-                    >
-                      <option value="allowed">Allowed — Can change schedule date &amp; slot</option>
-                      <option value="restricted">Restricted — Delivery schedule is locked</option>
-                    </select>
-                    <span className="text-[10px] text-slate-400 block mt-1">Reschedule delivery date and time slots</span>
-                  </div>
+                  <label className="flex items-center gap-1.5 p-2 rounded-lg border border-slate-200">
+                    <input type="checkbox" checked={editCanChangeSchedule} onChange={e => setEditCanChangeSchedule(e.target.checked)} />
+                    <span className="text-xs font-bold">Schedule Change</span>
+                  </label>
 
                   {/* 4. Change Value */}
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                      <span>4. Change Value (৳)</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${editCanChangeValue ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
-                        {editCanChangeValue ? 'Active' : 'Locked'}
-                      </span>
-                    </label>
-                    <select
-                      value={editCanChangeValue ? 'allowed' : 'restricted'}
-                      onChange={(e) => setEditCanChangeValue(e.target.value === 'allowed')}
-                      className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
-                    >
-                      <option value="allowed">Allowed — Can edit order value (৳)</option>
-                      <option value="restricted">Restricted — Order value is locked</option>
-                    </select>
-                    <span className="text-[10px] text-slate-400 block mt-1">Modify total order amount</span>
-                  </div>
+                  <label className="flex items-center gap-1.5 p-2 rounded-lg border border-slate-200">
+                    <input type="checkbox" checked={editCanChangeValue} onChange={e => setEditCanChangeValue(e.target.checked)} />
+                    <span className="text-xs font-bold">Price Change</span>
+                  </label>
 
                   {/* 5. Add Profit */}
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                      <span>5. Add Profit (৳)</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${editCanAddProfit ? 'bg-purple-100 text-purple-800' : 'bg-red-100 text-red-800'}`}>
-                        {editCanAddProfit ? 'Active' : 'Locked'}
-                      </span>
-                    </label>
-                    <select
-                      value={editCanAddProfit ? 'allowed' : 'restricted'}
-                      onChange={(e) => setEditCanAddProfit(e.target.value === 'allowed')}
-                      className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
-                    >
-                      <option value="allowed">Allowed — Can set and customize profit</option>
-                      <option value="restricted">Restricted — Profit is auto/read-only</option>
-                    </select>
-                    <span className="text-[10px] text-slate-400 block mt-1">Input margin on completed bookings</span>
-                  </div>
+                  <label className="flex items-center gap-1.5 p-2 rounded-lg border border-slate-200">
+                    <input type="checkbox" checked={editCanAddProfit} onChange={e => setEditCanAddProfit(e.target.checked)} />
+                    <span className="text-xs font-bold">Profit</span>
+                  </label>
                 </div>
 
                 {/* Status-Wise Access Dropdown Section */}
