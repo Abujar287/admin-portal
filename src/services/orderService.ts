@@ -36,7 +36,14 @@ export class OrderService {
       const stored = localStorage.getItem(STORAGE_KEYS.AGENTS);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((a: AgentUser) => {
+            if (a.user === 'agent01') return { ...a, user: '1', pass: a.pass === 'agent01' ? '1' : a.pass, email: '1@portal.local' };
+            if (a.user === 'agent02') return { ...a, user: '2', pass: a.pass === 'agent02' ? '2' : a.pass, email: '2@portal.local' };
+            if (a.user === 'agent03') return { ...a, user: '3', pass: a.pass === 'agent03' ? '3' : a.pass, email: '3@portal.local' };
+            return a;
+          });
+        }
       }
     } catch {
       // fallback
@@ -88,8 +95,12 @@ export class OrderService {
               const gen = String(o.gender || 'Other');
               const crDt = String(o.create_date || o.createDate || '');
               const ch = String(o.order_channel || o.orderChannel || 'Acquisition');
-              const aId = String(o.agent_id || o.agentId || 'agent01');
-              const aNm = String(o.agent_name || o.agentName || 'Agent');
+              const aId = o.agent_id !== undefined && o.agent_id !== null && String(o.agent_id).trim() !== ''
+                ? String(o.agent_id).trim()
+                : (o.agentId ? String(o.agentId).trim() : '');
+              const aNm = o.agent_name !== undefined && o.agent_name !== null && String(o.agent_name).trim() !== ''
+                ? String(o.agent_name).trim()
+                : (o.agentName ? String(o.agentName).trim() : (aId ? `Agent ${aId}` : 'Agent'));
               const pCat = String(o.product_category || o.productCategory || 'Electronics');
               const pNm = String(o.product_name || o.productName || 'Product Item');
               const ct = String(o.city || 'Dhaka');
@@ -268,35 +279,48 @@ export class OrderService {
     const headers = hasHeader ? firstRow : [];
     const rows = hasHeader ? data.slice(1) : data;
 
-    const idxOrder    = headers.indexOf('order_id');
-    const idxCustId   = headers.indexOf('customer_id');
-    const idxCustCont = headers.indexOf('customer_mobile');
-    const idxCustName = headers.indexOf('customer_name');
-    const idxGender   = headers.indexOf('gender');
-    const idxCreateDt = headers.indexOf('create_date');
-    const idxChannel  = headers.indexOf('order_channel');
-    const idxAgentId  = headers.indexOf('agent_id');
-    const idxAgentNm  = headers.indexOf('agent_name');
-    const idxProdCat  = headers.indexOf('product_category');
-    const idxProdNm   = headers.indexOf('product_name');
-    const idxCity     = headers.indexOf('city');
-    const idxArea     = headers.indexOf('delivery_area');
-    const idxAddress  = headers.indexOf('address_details');
-    const idxSchedDt  = headers.indexOf('schedule_date');
-    const idxSchedTm  = headers.indexOf('schedule_time');
-    const idxValue    = headers.indexOf('order_value');
-    const idxStatus   = headers.indexOf('order_status');
-    const idxFollowup = headers.indexOf('followup_status');
-    const idxProfit   = headers.indexOf('profit');
-    const idxDelivDt  = headers.indexOf('delivered_date');
-    const idxCancDt   = headers.indexOf('cancelled_date');
-    const idxFollowDt = headers.indexOf('followup_date');
+    const findCol = (...candidates: string[]): number => {
+      for (const candidate of candidates) {
+        const normCand = candidate.toLowerCase().replace(/[\s_-]+/g, '');
+        const idx = headers.findIndex((h) => {
+          const normH = String(h || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
+          return normH === normCand || String(h || '').trim().toLowerCase() === candidate.toLowerCase();
+        });
+        if (idx !== -1) return idx;
+      }
+      return -1;
+    };
+
+    const idxOrder    = findCol('order_id', 'order id', 'orderid', 'id', 'order #');
+    const idxCustId   = findCol('customer_id', 'customer id', 'customerid', 'cust id');
+    const idxCustCont = findCol('customer_mobile', 'customer contact', 'customer phone', 'mobile', 'phone', 'contact');
+    const idxCustName = findCol('customer_name', 'customer name', 'customer', 'name');
+    const idxGender   = findCol('gender', 'sex');
+    const idxCreateDt = findCol('create_date', 'create date', 'created at', 'created_at', 'order date', 'date');
+    const idxChannel  = findCol('order_channel', 'order channel', 'channel', 'team');
+    const idxAgentId  = findCol('agent_id', 'agent id', 'agentid', 'agent code', 'agent user', 'agent');
+    const idxAgentNm  = findCol('agent_name', 'agent name', 'agentname');
+    const idxProdCat  = findCol('product_category', 'product category', 'category');
+    const idxProdNm   = findCol('product_name', 'product name', 'product', 'item');
+    const idxCity     = findCol('city', 'district');
+    const idxArea     = findCol('delivery_area', 'delivery area', 'area', 'zone');
+    const idxAddress  = findCol('address_details', 'address details', 'address');
+    const idxSchedDt  = findCol('schedule_date', 'schedule date', 'delivery date');
+    const idxSchedTm  = findCol('schedule_time', 'schedule time', 'time slot', 'delivery time');
+    const idxValue    = findCol('order_value', 'order value', 'amount', 'total', 'price', 'value');
+    const idxStatus   = findCol('order_status', 'order status', 'status');
+    const idxFollowup = findCol('followup_status', 'followup status', 'followup');
+    const idxProfit   = findCol('profit', 'net profit', 'margin');
+    const idxDelivDt  = findCol('delivered_date', 'delivered date');
+    const idxCancDt   = findCol('cancelled_date', 'cancelled date');
+    const idxFollowDt = findCol('followup_date', 'followup date');
 
     return rows
       .filter(row => {
         if (!row || !Array.isArray(row) || row.length === 0) return false;
-        const rawId = idxOrder !== -1 && row[idxOrder] !== undefined && row[idxOrder] !== null
-          ? String(row[idxOrder]).trim()
+        const targetIdx = idxOrder !== -1 ? idxOrder : 0;
+        const rawId = row[targetIdx] !== undefined && row[targetIdx] !== null
+          ? String(row[targetIdx]).trim()
           : '';
         // Strictly filter out any row without an explicit, valid order ID
         const lower = rawId.toLowerCase();
@@ -306,42 +330,52 @@ export class OrderService {
         return true;
       })
       .map((row) => {
-        const valOrEmpty = (idx: number, fallback = '') =>
-          idx !== -1 && row[idx] !== undefined && row[idx] !== null ? String(row[idx]).trim() : fallback;
+        const valOrEmpty = (idx: number, fallback = '', positionalIdx = -1) => {
+          if (idx !== -1 && row[idx] !== undefined && row[idx] !== null) {
+            const s = String(row[idx]).trim();
+            if (s !== '') return s;
+          }
+          if (positionalIdx !== -1 && row[positionalIdx] !== undefined && row[positionalIdx] !== null) {
+            const s = String(row[positionalIdx]).trim();
+            if (s !== '') return s;
+          }
+          return fallback;
+        };
 
-        const numOrZero = (idx: number) => {
-          if (idx === -1 || row[idx] === undefined || row[idx] === null) return 0;
-          const val = parseFloat(String(row[idx]).replace(/[^0-9.-]+/g, ''));
+        const numOrZero = (idx: number, positionalIdx = -1) => {
+          const raw = valOrEmpty(idx, '', positionalIdx);
+          if (!raw) return 0;
+          const val = parseFloat(raw.replace(/[^0-9.-]+/g, ''));
           return isNaN(val) ? 0 : val;
         };
 
-        const rawOrderId = valOrEmpty(idxOrder);
+        const rawOrderId = valOrEmpty(idxOrder, '', 0);
         const orderId = rawOrderId;
-        const orderVal = numOrZero(idxValue);
+        const orderVal = numOrZero(idxValue, 16);
         const profitVal = idxProfit !== -1 && row[idxProfit] !== undefined && row[idxProfit] !== ''
-          ? numOrZero(idxProfit)
+          ? numOrZero(idxProfit, 19)
           : Math.round(orderVal * 0.20);
 
-        const cId = valOrEmpty(idxCustId, '1');
-        const cName = valOrEmpty(idxCustName, 'Customer');
-        const cMobile = valOrEmpty(idxCustCont, '-');
-        const gen = valOrEmpty(idxGender, 'Other');
-        const crDt = valOrEmpty(idxCreateDt, new Date().toISOString().replace('T', ' ').slice(0, 19));
-        const ch = valOrEmpty(idxChannel, 'Acquisition');
-        const aId = valOrEmpty(idxAgentId, 'agent01');
-        const aNm = valOrEmpty(idxAgentNm, 'Agent 01');
-        const pCat = valOrEmpty(idxProdCat, 'Electronics');
-        const pNm = valOrEmpty(idxProdNm, 'Product Item');
-        const ct = valOrEmpty(idxCity, 'Dhaka');
-        const dArea = valOrEmpty(idxArea, 'Gulshan');
-        const addr = valOrEmpty(idxAddress, '-');
-        const scDt = valOrEmpty(idxSchedDt, new Date().toISOString().split('T')[0]);
-        const scTm = valOrEmpty(idxSchedTm, '11AM to 12PM');
-        const oSt = valOrEmpty(idxStatus, 'Pending');
-        const foSt = valOrEmpty(idxFollowup, 'Pending');
-        const delivDt = valOrEmpty(idxDelivDt, '');
-        const cancDt = valOrEmpty(idxCancDt, '');
-        const followDt = valOrEmpty(idxFollowDt, '');
+        const cId = valOrEmpty(idxCustId, '1', 1);
+        const cMobile = valOrEmpty(idxCustCont, '-', 2);
+        const cName = valOrEmpty(idxCustName, 'Customer', 3);
+        const gen = valOrEmpty(idxGender, 'Other', 4);
+        const crDt = valOrEmpty(idxCreateDt, new Date().toISOString().replace('T', ' ').slice(0, 19), 5);
+        const ch = valOrEmpty(idxChannel, 'Acquisition', 6);
+        const aId = valOrEmpty(idxAgentId, '1', 7);
+        const aNm = valOrEmpty(idxAgentNm, `Agent ${aId}`, 8);
+        const pCat = valOrEmpty(idxProdCat, 'Electronics', 9);
+        const pNm = valOrEmpty(idxProdNm, 'Product Item', 10);
+        const ct = valOrEmpty(idxCity, 'Dhaka', 11);
+        const dArea = valOrEmpty(idxArea, 'Gulshan', 12);
+        const addr = valOrEmpty(idxAddress, '-', 13);
+        const scDt = valOrEmpty(idxSchedDt, new Date().toISOString().split('T')[0], 14);
+        const scTm = valOrEmpty(idxSchedTm, '11AM to 12PM', 15);
+        const oSt = valOrEmpty(idxStatus, 'Pending', 17);
+        const foSt = valOrEmpty(idxFollowup, 'Pending', 18);
+        const delivDt = valOrEmpty(idxDelivDt, '', 20);
+        const cancDt = valOrEmpty(idxCancDt, '', 21);
+        const followDt = valOrEmpty(idxFollowDt, '', 22);
 
         return {
           order_id: orderId,
@@ -433,7 +467,7 @@ export class OrderService {
     const gen = String(newOrder.gender || 'Other');
     const crDate = String(newOrder.create_date || newOrder.createDate || new Date().toISOString().replace('T', ' ').slice(0, 19));
     const ch = String(newOrder.order_channel || newOrder.orderChannel || 'Acquisition');
-    const agId = String(newOrder.agent_id || newOrder.agentId || 'agent01');
+    const agId = String(newOrder.agent_id || newOrder.agentId || '1');
     const agNm = String(newOrder.agent_name || newOrder.agentName || 'Agent');
     const pCat = String(newOrder.product_category || newOrder.productCategory || 'Electronics');
     const pNm = String(newOrder.product_name || newOrder.productName || 'Product Item');
@@ -567,7 +601,7 @@ export class OrderService {
         orderValue: 1500,
         scheduleDate: new Date().toISOString().split('T')[0],
         scheduledTime: '11AM to 12PM',
-        updatedBy: 'agent01',
+        updatedBy: '1',
         timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
         action: 'Status Change',
         notes: 'Customer confirmed delivery schedule.'

@@ -22,6 +22,10 @@ import {
   Lock,
   Unlock,
   Eye,
+  EyeOff,
+  ChevronDown,
+  UserPlus,
+  Shield,
   X,
   Phone,
   Mail,
@@ -213,6 +217,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [newAllowedTabs, setNewAllowedTabs] = useState<AgentNavTab[]>(['summary', 'orders', 'followup', 'agent-performance', 'profiles']);
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [availableRoles, setAvailableRoles] = useState<string[]>(['Agent', 'Sr Agent', 'Team Leader']);
+  const [newCustomRoleInput, setNewCustomRoleInput] = useState('');
+  const [openAddAgentPopup, setOpenAddAgentPopup] = useState<'role' | 'team' | 'teamLeader' | 'accessControl' | null>(null);
+  const [showTablePasswords, setShowTablePasswords] = useState<Record<string, boolean>>({});
   const [selectedAgentDetails, setSelectedAgentDetails] = useState<AgentUser | null>(null);
 
   // Orders Tab Filters
@@ -765,6 +773,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     }
 
     onUpdateAgents(updated, true);
+    setOpenAddAgentPopup(null);
     setNewAgentUser('');
     setNewAgentPass('');
     setNewAgentName('');
@@ -781,24 +790,26 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setNewAllowedTabs(['summary', 'orders', 'agent-performance', 'profiles']);
   };
 
-  const handleEditAgent = (index: number) => {
-    const ag = agents[index];
-    setEditModalIndex(index);
+  const handleEditAgent = (agentOrIndex: AgentUser | number) => {
+    setOpenAddAgentPopup(null);
+    const ag = typeof agentOrIndex === 'number' ? agents[agentOrIndex] : agentOrIndex;
+    if (!ag) return;
+    const realIdx = typeof agentOrIndex === 'number' ? agentOrIndex : agents.findIndex(a => a.user === ag.user);
+    setEditModalIndex(realIdx >= 0 ? realIdx : 0);
     setEditingAgentModal(ag);
     setEditUser(ag.user);
     setEditPass(ag.pass);
     setEditName(ag.name || '');
+    setEditRole(ag.role || 'Agent');
     setEditTeam(ag.team || 'Acquisition');
-    setEditRole(ag.role === 'Team Leader' ? 'Team Leader' : 'Agent');
+    setEditContact(ag.contact || '');
+    setEditEmail(ag.email || '');
+    setEditBloodGroup(ag.bloodGroup || '');
+    setEditStatus(ag.status || 'active');
     const agTLs = Array.isArray(ag.teamLeaders) && ag.teamLeaders.length > 0
       ? ag.teamLeaders
       : (ag.teamLeaderId ? ag.teamLeaderId.split(',').map(s => s.trim()).filter(Boolean) : []);
     setEditTeamLeaders(agTLs);
-    setEditCustomTLInput('');
-    setEditContact(ag.contact || '');
-    setEditEmail(ag.email || '');
-    setEditBloodGroup(ag.bloodGroup || '');
-    setEditStatus(ag.status === 'deactivated' ? 'deactivated' : 'active');
     setEditCanCreate(ag.permissions?.canCreate ?? true);
     setEditCanUpdateStatus(ag.permissions?.canUpdateStatus ?? true);
     setEditCanChangeSchedule(ag.permissions?.canChangeSchedule ?? true);
@@ -809,10 +820,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         ? ag.permissions.allowedOrderStatuses
         : (ag.permissions?.canUpdateStatus !== false ? ['Pending', 'In Progress', 'Confirmed', 'Follow-up'] : [])
     );
-    const loadedTabs = ag.permissions?.allowedTabs && Array.isArray(ag.permissions.allowedTabs) && ag.permissions.allowedTabs.length > 0
-      ? ag.permissions.allowedTabs.map(t => (t === 'dashboard' ? 'agent-performance' : t))
-      : ['summary', 'orders', 'followup', 'agent-performance', 'profiles'];
-    setEditAllowedTabs(loadedTabs as AgentNavTab[]);
+    setEditAllowedTabs(
+      ag.permissions?.allowedTabs || ['summary', 'orders', 'followup', 'agent-performance', 'profiles']
+    );
   };
 
   const handleSaveEditedAgentModal = (e: React.FormEvent) => {
@@ -835,9 +845,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
     const assignedTLs = editTeamLeaders;
     const primaryTL = assignedTLs.length > 0 ? assignedTLs.join(', ') : '';
+    const targetUserId = editingAgentModal.user;
 
     const updated = agents.map((agent, idx) =>
-      idx === editModalIndex
+      (agent.user === targetUserId || idx === editModalIndex)
         ? {
             ...agent,
             user: u,
@@ -1551,621 +1562,27 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {/* TAB: USER DETAILS (AGENT DIRECTORY WITH DETAILS STORE) */}
           {activeTab === 'users' && (
             <div className="space-y-6">
-              {/* Add / Edit Agent Card */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="font-extrabold text-slate-900 text-base">
-                      {editingIndex !== null ? 'Edit Agent Profile & Permissions' : 'Add New Agent'}
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Configure credentials, team, role, assigned team leaders, and granular action permissions for this Agent ID.
-                    </p>
+              {/* 1-ROW ADD / EDIT AGENT CARD */}
+              <div id="add-edit-agent-card" className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs relative z-40">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
+                      <UserPlus className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-slate-900 text-sm">
+                        {editingIndex !== null ? `Edit Agent (@${newAgentUser})` : 'Add New Agent'}
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        All in 1 Row — Click Team, Team Leader, and Access Control to open configuration popups.
+                      </p>
+                    </div>
                   </div>
                   {editingIndex !== null && (
-                    <span className="text-xs font-bold px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-200">
-                      Editing: {newAgentUser}
-                    </span>
-                  )}
-                </div>
-
-                <form onSubmit={handleSaveAgent} className="space-y-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                        Agent Username (ID)
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={newAgentUser}
-                        onChange={(e) => setNewAgentUser(e.target.value)}
-                        placeholder="e.g. agent01"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                        Agent Full Name
-                      </label>
-                      <input
-                        type="text"
-                        value={newAgentName}
-                        onChange={(e) => setNewAgentName(e.target.value)}
-                        placeholder="Enter agent full name"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                        Password
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={newAgentPass}
-                        onChange={(e) => setNewAgentPass(e.target.value)}
-                        placeholder="Enter password"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                        Role
-                      </label>
-                      <select
-                        value={newAgentRole}
-                        onChange={(e) => setNewAgentRole(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white font-medium"
-                      >
-                        <option value="Agent">Agent (Regular)</option>
-                        <option value="Sr Agent">Sr Agent</option>
-                        <option value="Team Leader">Team Leader</option>
-                      </select>
-                    </div>
-
-                    <div className="sm:col-span-4 flex items-end gap-3">
-                      <div className="flex-1">
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                          Team Assignment
-                        </label>
-                        <select
-                          value={newAgentTeam}
-                          onChange={(e) => setNewAgentTeam(e.target.value)}
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
-                        >
-                          {availableChannels.map((team: string, idx: number) => (
-                            <option key={`team-avail-${team}-${idx}`} value={team}>
-                              {team}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="flex-1">
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                          Or Create New Team
-                        </label>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={newTeamName}
-                            onChange={(e) => setNewTeamName(e.target.value)}
-                            placeholder="New team name"
-                            className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (newTeamName.trim()) {
-                                handleAddChannel(newTeamName.trim());
-                              }
-                            }}
-                            className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold"
-                          >
-                            Add Team
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Multi-Select Team Leader(s) */}
-                    <div className="sm:col-span-4 bg-slate-50/90 rounded-2xl p-4 border border-slate-200">
-                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
-                        <div>
-                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-800">
-                            Assign Team Leader(s) <span className="text-indigo-600 font-extrabold normal-case">(Multiple Select Allowed)</span>
-                          </label>
-                          <p className="text-[11px] text-slate-500">
-                            Click to select one or multiple Team Leaders for this agent.
-                          </p>
-                        </div>
-                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
-                          {newAgentTeamLeaders.length} Selected
-                        </span>
-                      </div>
-
-                      {/* Selected TL Badges */}
-                      {newAgentTeamLeaders.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1.5 mb-3 p-2 bg-white rounded-xl border border-indigo-100">
-                          <span className="text-[11px] font-bold text-slate-500 mr-1">Assigned:</span>
-                          {newAgentTeamLeaders.map((tl) => (
-                            <span
-                              key={tl}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs"
-                            >
-                              <span>👔 {tl}</span>
-                              <button
-                                type="button"
-                                onClick={() => setNewAgentTeamLeaders(prev => prev.filter(x => x !== tl))}
-                                className="text-purple-400 hover:text-red-600 transition-colors cursor-pointer"
-                                title={`Remove ${tl}`}
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </span>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={() => setNewAgentTeamLeaders([])}
-                            className="text-[11px] text-red-600 hover:underline font-semibold ml-auto cursor-pointer"
-                          >
-                            Clear All
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Selectable Team Leader Cards */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-                        {availableTeamLeaders.map((tl) => {
-                          const isSelected = newAgentTeamLeaders.includes(tl);
-                          return (
-                            <label
-                              key={tl}
-                              className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs cursor-pointer transition-all select-none ${
-                                isSelected
-                                  ? 'bg-purple-100/70 border-purple-300 text-purple-950 font-bold shadow-2xs'
-                                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => {
-                                  if (isSelected) {
-                                    setNewAgentTeamLeaders(prev => prev.filter(x => x !== tl));
-                                  } else {
-                                    setNewAgentTeamLeaders(prev => [...prev, tl]);
-                                  }
-                                }}
-                                className="rounded text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer"
-                              />
-                              <span className="truncate" title={tl}>{tl}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-
-                      {/* Quick Add New Team Leader */}
-                      <div className="flex items-center gap-2 pt-2 border-t border-slate-200">
-                        <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">+ Custom TL:</span>
-                        <input
-                          type="text"
-                          value={newCustomTLInput}
-                          onChange={(e) => setNewCustomTLInput(e.target.value)}
-                          placeholder="Type new Team Leader name..."
-                          className="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-white focus:outline-hidden focus:border-indigo-600"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const trimmed = newCustomTLInput.trim();
-                            if (trimmed) {
-                              const updated = addTeamLeaderItem(trimmed);
-                              setTeamLeadersList([...updated]);
-                              if (!newAgentTeamLeaders.includes(trimmed)) {
-                                setNewAgentTeamLeaders(prev => [...prev, trimmed]);
-                              }
-                              setNewCustomTLInput('');
-                              showToast(`Team Leader "${trimmed}" added and selected!`);
-                            }
-                          }}
-                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer shrink-0"
-                        >
-                          + Add &amp; Select
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Individual Access & Permissions (Agent ID Wise) */}
-                  <div className="bg-slate-50/95 p-4 rounded-2xl border border-slate-200 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2.5">
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                          <ShieldCheck className="w-4 h-4 text-indigo-600" />
-                          Agent ID-Wise Permissions &amp; Access Controls
-                        </label>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          Set dropdown-based permissions and status-wise access for @{newAgentUser || 'agent'}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setNewCanCreate(true);
-                            setNewCanUpdateStatus(true);
-                            setNewCanChangeSchedule(true);
-                            setNewCanChangeValue(true);
-                            setNewCanAddProfit(true);
-                            setNewAllowedOrderStatuses(ORDER_STATUS_LIST);
-                          }}
-                          className="px-2.5 py-1 text-[11px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg border border-indigo-200 transition-colors cursor-pointer"
-                        >
-                          Full Access
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setNewCanCreate(true);
-                            setNewCanUpdateStatus(true);
-                            setNewCanChangeSchedule(true);
-                            setNewCanChangeValue(false);
-                            setNewCanAddProfit(false);
-                            setNewAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
-                          }}
-                          className="px-2.5 py-1 text-[11px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg border border-amber-200 transition-colors cursor-pointer"
-                        >
-                          ⭐ Standard (No Deliv/Canc)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setNewCanCreate(true);
-                            setNewCanUpdateStatus(false);
-                            setNewCanChangeSchedule(false);
-                            setNewCanChangeValue(false);
-                            setNewCanAddProfit(false);
-                            setNewAllowedOrderStatuses([]);
-                          }}
-                          className="px-2.5 py-1 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg border border-slate-200 transition-colors cursor-pointer"
-                        >
-                          Strictly Restricted
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* 5 Core Permissions in Dropdown Format */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {/* 1. Create Order */}
-                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-                        <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                          <span>1. Create Order</span>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${newCanCreate ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                            {newCanCreate ? 'Active' : 'Locked'}
-                          </span>
-                        </label>
-                        <select
-                          value={newCanCreate ? 'allowed' : 'restricted'}
-                          onChange={(e) => setNewCanCreate(e.target.value === 'allowed')}
-                          className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
-                        >
-                          <option value="allowed">Allowed — Can create new orders</option>
-                          <option value="restricted">Restricted — Cannot create orders</option>
-                        </select>
-                        <span className="text-[10px] text-slate-400 block mt-1">Book customer orders into system</span>
-                      </div>
-
-                      {/* 2. Status Update */}
-                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-                        <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                          <span>2. Status Update</span>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${newCanUpdateStatus ? 'bg-indigo-100 text-indigo-800' : 'bg-red-100 text-red-800'}`}>
-                            {newCanUpdateStatus ? 'Active' : 'Locked'}
-                          </span>
-                        </label>
-                        <select
-                          value={newCanUpdateStatus ? 'allowed' : 'restricted'}
-                          onChange={(e) => {
-                            const isAllowed = e.target.value === 'allowed';
-                            setNewCanUpdateStatus(isAllowed);
-                            if (isAllowed && newAllowedOrderStatuses.length === 0) {
-                              setNewAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
-                            }
-                          }}
-                          className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
-                        >
-                          <option value="allowed">Allowed — Can update order statuses</option>
-                          <option value="restricted">Restricted — Read-only order status</option>
-                        </select>
-                        <span className="text-[10px] text-slate-400 block mt-1">Change order and follow-up status</span>
-                      </div>
-
-                      {/* 3. Schedule Date & Time Slot Change */}
-                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-                        <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                          <span>3. Schedule Date &amp; Time Slot Change</span>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${newCanChangeSchedule ? 'bg-sky-100 text-sky-800' : 'bg-red-100 text-red-800'}`}>
-                            {newCanChangeSchedule ? 'Active' : 'Locked'}
-                          </span>
-                        </label>
-                        <select
-                          value={newCanChangeSchedule ? 'allowed' : 'restricted'}
-                          onChange={(e) => setNewCanChangeSchedule(e.target.value === 'allowed')}
-                          className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
-                        >
-                          <option value="allowed">Allowed — Can change schedule date &amp; slot</option>
-                          <option value="restricted">Restricted — Delivery schedule is locked</option>
-                        </select>
-                        <span className="text-[10px] text-slate-400 block mt-1">Reschedule delivery date and time slots</span>
-                      </div>
-
-                      {/* 4. Change Value */}
-                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-                        <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                          <span>4. Change Value (৳)</span>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${newCanChangeValue ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
-                            {newCanChangeValue ? 'Active' : 'Locked'}
-                          </span>
-                        </label>
-                        <select
-                          value={newCanChangeValue ? 'allowed' : 'restricted'}
-                          onChange={(e) => setNewCanChangeValue(e.target.value === 'allowed')}
-                          className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
-                        >
-                          <option value="allowed">Allowed — Can edit order value (৳)</option>
-                          <option value="restricted">Restricted — Order value is locked</option>
-                        </select>
-                        <span className="text-[10px] text-slate-400 block mt-1">Modify total order amount</span>
-                      </div>
-
-                      {/* 5. Add Profit */}
-                      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-                        <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                          <span>5. Add Profit (৳)</span>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${newCanAddProfit ? 'bg-purple-100 text-purple-800' : 'bg-red-100 text-red-800'}`}>
-                            {newCanAddProfit ? 'Active' : 'Locked'}
-                          </span>
-                        </label>
-                        <select
-                          value={newCanAddProfit ? 'allowed' : 'restricted'}
-                          onChange={(e) => setNewCanAddProfit(e.target.value === 'allowed')}
-                          className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 focus:bg-white focus:border-indigo-600 cursor-pointer"
-                        >
-                          <option value="allowed">Allowed — Can set and customize profit</option>
-                          <option value="restricted">Restricted — Profit is auto/read-only</option>
-                        </select>
-                        <span className="text-[10px] text-slate-400 block mt-1">Input margin on completed bookings</span>
-                      </div>
-                    </div>
-
-                    {/* Status-Wise Access Dropdown Section */}
-                    {newCanUpdateStatus && (
-                      <div className="bg-white p-4 rounded-xl border border-indigo-200 space-y-3 animate-fadeIn">
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 pb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                              <CheckSquare className="w-3.5 h-3.5 text-indigo-600" />
-                              Status-Wise Access Control (Dropdown)
-                            </span>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-800 border border-indigo-200">
-                              {newAllowedOrderStatuses.length} Statuses Permitted
-                            </span>
-                          </div>
-
-                          {/* Policy Preset Dropdown */}
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Policy Preset:</span>
-                            <select
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                if (val === 'all') setNewAllowedOrderStatuses([...getOrderStatuses()]);
-                                else if (val === 'standard') setNewAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
-                                else if (val === 'initial') setNewAllowedOrderStatuses(['Pending', 'In Progress']);
-                                else if (val === 'clear') setNewAllowedOrderStatuses([]);
-                              }}
-                              className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 text-slate-800 focus:bg-white cursor-pointer"
-                              defaultValue="standard"
-                            >
-                              <option value="standard">⭐ Standard (No Delivered &amp; Cancelled)</option>
-                              <option value="all">Full Access (All 7 Statuses Allowed)</option>
-                              <option value="initial">Initial Only (Pending &amp; In Progress)</option>
-                              <option value="clear">Clear All (Restricted)</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        {/* Dropdown to Add / Toggle Status */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                              Select Status from Dropdown to Grant / Revoke Access:
-                            </label>
-                            <select
-                              value=""
-                              onChange={(e) => {
-                                const st = e.target.value;
-                                if (!st) return;
-                                if (newAllowedOrderStatuses.includes(st)) {
-                                  setNewAllowedOrderStatuses(prev => prev.filter(x => x !== st));
-                                } else {
-                                  setNewAllowedOrderStatuses(prev => [...prev, st]);
-                                }
-                              }}
-                              className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-indigo-300 bg-indigo-50/40 text-indigo-900 focus:bg-white cursor-pointer"
-                            >
-                              <option value="">-- Choose Status from Dropdown to Toggle Access --</option>
-                              {getOrderStatuses().map((st) => {
-                                const isAllowed = newAllowedOrderStatuses.includes(st);
-                                const isSpecial = st.toLowerCase() === 'delivered' || st.toLowerCase() === 'cancelled';
-                                return (
-                                  <option key={`dd-new-${st}`} value={st}>
-                                    {isAllowed ? `✓ [Currently Permitted] ${st}` : `+ [Click to Allow] ${st}`} {isSpecial ? '(High Privilege / Admin)' : ''}
-                                  </option>
-                                );
-                              })}
-                            </select>
-                          </div>
-
-                          <div className="text-[11px] text-slate-500 leading-tight">
-                            Status-wise control prevents unauthorized completion or cancellation. 
-                            <strong className="text-emerald-700"> Delivered</strong> and <strong className="text-rose-700">Cancelled</strong> are excluded by default for standard agents.
-                          </div>
-                        </div>
-
-                        {/* Currently Permitted Status Badges */}
-                        <div className="pt-2 border-t border-slate-100">
-                          <span className="text-[11px] font-bold text-slate-600 block mb-1.5">
-                            Active Authorized Statuses ({newAllowedOrderStatuses.length}):
-                          </span>
-                          {newAllowedOrderStatuses.length === 0 ? (
-                            <span className="text-xs text-rose-600 italic">No statuses allowed. Agent cannot update order status.</span>
-                          ) : (
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              {newAllowedOrderStatuses.map((st) => {
-                                const isDeliv = st.toLowerCase() === 'delivered';
-                                const isCanc = st.toLowerCase() === 'cancelled';
-                                return (
-                                  <span
-                                    key={`active-new-${st}`}
-                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
-                                      isDeliv
-                                        ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
-                                        : isCanc
-                                        ? 'bg-rose-50 text-rose-900 border-rose-300'
-                                        : 'bg-indigo-50 text-indigo-900 border-indigo-200'
-                                    }`}
-                                  >
-                                    <span>✓ {st}</span>
-                                    {(isDeliv || isCanc) && (
-                                      <span className={`text-[9px] uppercase px-1 rounded ${isDeliv ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-200 text-rose-800'}`}>
-                                        Admin
-                                      </span>
-                                    )}
-                                    <button
-                                      type="button"
-                                      onClick={() => setNewAllowedOrderStatuses(prev => prev.filter(x => x !== st))}
-                                      className="text-slate-400 hover:text-red-600 cursor-pointer ml-0.5"
-                                      title={`Revoke ${st}`}
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Tab Visibility Access Controls (Dropdown & Selector) */}
-                    <div className="bg-white p-4 rounded-xl border border-sky-200 space-y-3 animate-fadeIn">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-100 pb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                            <Layers className="w-3.5 h-3.5 text-sky-600" />
-                            Agent Tab Visibility Access (Select Which Tabs to View)
-                          </span>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800 border border-sky-200">
-                            {newAllowedTabs.length} of {AGENT_MANAGEABLE_TABS.length} Tabs Visible
-                          </span>
-                        </div>
-
-                        {/* Preset Buttons */}
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setNewAllowedTabs(['summary', 'orders', 'agent-performance', 'profiles'])}
-                            className="px-2 py-0.5 text-[10px] font-bold bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-md border border-sky-200 transition-colors cursor-pointer"
-                          >
-                            All 4 Tabs
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setNewAllowedTabs(['orders'])}
-                            className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors cursor-pointer"
-                          >
-                            Orders Only
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setNewAllowedTabs(['orders', 'agent-performance'])}
-                            className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors cursor-pointer"
-                          >
-                            Orders + Perf
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Dropdown for quick Tab Toggle */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                            Dropdown to Toggle Tab Visibility:
-                          </label>
-                          <select
-                            value=""
-                            onChange={(e) => {
-                              const tab = e.target.value as AgentNavTab;
-                              if (!tab) return;
-                              if (newAllowedTabs.includes(tab)) {
-                                if (newAllowedTabs.length === 1) return; // keep at least 1 tab
-                                setNewAllowedTabs(prev => prev.filter(t => t !== tab));
-                              } else {
-                                setNewAllowedTabs(prev => [...prev, tab]);
-                              }
-                            }}
-                            className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-sky-300 bg-sky-50/40 text-sky-900 focus:bg-white cursor-pointer"
-                          >
-                            <option value="">-- Choose Tab from Dropdown to Toggle Visibility --</option>
-                            {AGENT_MANAGEABLE_TABS.map((tab) => (
-                              <option key={`opt-new-${tab.id}`} value={tab.id}>
-                                {newAllowedTabs.includes(tab.id)
-                                  ? `✓ [Currently Visible] ${tab.label} Tab`
-                                  : `+ [Click to Show] ${tab.label} Tab`}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Interactive Pill Badges to show active & click to toggle */}
-                        <div className="flex flex-wrap items-center gap-2 pt-1 sm:pt-4">
-                          {AGENT_MANAGEABLE_TABS.map((tab) => {
-                            const isSelected = newAllowedTabs.includes(tab.id);
-                            return (
-                              <button
-                                key={`tab-toggle-new-${tab.id}`}
-                                type="button"
-                                onClick={() => {
-                                  if (isSelected) {
-                                    if (newAllowedTabs.length === 1) return; // keep at least 1 tab
-                                    setNewAllowedTabs(prev => prev.filter(t => t !== tab.id));
-                                  } else {
-                                    setNewAllowedTabs(prev => [...prev, tab.id]);
-                                  }
-                                }}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
-                                  isSelected
-                                    ? 'bg-sky-500 text-white border-sky-600 shadow-xs'
-                                    : 'bg-slate-100 text-slate-400 border-slate-200 line-through'
-                                }`}
-                              >
-                                <span>{isSelected ? '✓' : '✗'}</span>
-                                <span>{tab.label}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-2 pt-1">
-                    {editingIndex !== null && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold px-2.5 py-1 bg-amber-50 text-amber-800 rounded-lg border border-amber-200">
+                        Editing Mode
+                      </span>
                       <button
                         type="button"
                         onClick={() => {
@@ -2173,8 +1590,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           setNewAgentUser('');
                           setNewAgentPass('');
                           setNewAgentName('');
-                          setNewAgentTeam('Acquisition');
                           setNewAgentRole('Agent');
+                          setNewAgentTeam('Acquisition');
+                          setNewAgentTeamLeaders([]);
                           setNewCanCreate(true);
                           setNewCanUpdateStatus(true);
                           setNewCanChangeSchedule(true);
@@ -2182,29 +1600,704 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           setNewCanAddProfit(true);
                           setNewAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
                         }}
-                        className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+                        className="text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
                       >
                         Cancel
                       </button>
-                    )}
-                    <button
-                      type="submit"
-                      className="py-2.5 px-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>{editingIndex !== null ? 'Update Agent Profile & Permissions' : 'Save & Add Agent'}</span>
-                    </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* THE 1 SINGLE ROW FORM */}
+                <form onSubmit={handleSaveAgent}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 items-end">
+                    {/* 1. user_id (2 cols) */}
+                    <div className="lg:col-span-2">
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        user_id <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. 1"
+                        value={newAgentUser}
+                        onChange={(e) => setNewAgentUser(e.target.value)}
+                        className="w-full px-3 py-2 text-xs font-mono font-bold rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100"
+                      />
+                    </div>
+
+                    {/* 2. user_name (2 cols) */}
+                    <div className="lg:col-span-2">
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        user_name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Rahim Ahmed"
+                        value={newAgentName}
+                        onChange={(e) => setNewAgentName(e.target.value)}
+                        className="w-full px-3 py-2 text-xs font-medium rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100"
+                      />
+                    </div>
+
+                    {/* 3. password (2 cols) */}
+                    <div className="lg:col-span-2">
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        password <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Password"
+                        value={newAgentPass}
+                        onChange={(e) => setNewAgentPass(e.target.value)}
+                        className="w-full px-3 py-2 text-xs font-mono font-bold rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100"
+                      />
+                    </div>
+
+                    {/* 4. role (1 col) - INLINE DROPDOWN */}
+                    <div className="lg:col-span-1 relative">
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        role
+                      </label>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setOpenAddAgentPopup(prev => prev === 'role' ? null : 'role');
+                        }}
+                        className={`w-full px-2.5 py-2 text-xs rounded-lg border text-left flex items-center justify-between font-semibold transition-all cursor-pointer shadow-2xs ${
+                          openAddAgentPopup === 'role'
+                            ? 'border-indigo-500 bg-indigo-50/50 text-indigo-900 ring-2 ring-indigo-200'
+                            : 'border-slate-300 bg-white hover:bg-slate-50 hover:border-indigo-400 text-slate-800'
+                        }`}
+                        title={newAgentRole || 'Select Role'}
+                      >
+                        <span className="truncate">{newAgentRole || 'Agent'}</span>
+                        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 ml-0.5 transition-transform duration-150 ${openAddAgentPopup === 'role' ? 'rotate-180 text-indigo-600' : ''}`} />
+                      </button>
+
+                      {/* Dropdown: Role Dropdown Menu */}
+                      {openAddAgentPopup === 'role' && (
+                        <div
+                          className="absolute top-full left-0 mt-1.5 w-64 sm:w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                              <Shield className="w-4 h-4 text-indigo-600" />
+                              <h4 className="font-extrabold text-sm text-slate-900">Select Role</h4>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenAddAgentPopup(null);
+                              }}
+                              className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {/* Existing Roles List */}
+                          <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                            {availableRoles.map((role) => {
+                              const isSelected = newAgentRole === role;
+                              const isTL = role === 'Team Leader';
+                              return (
+                                <button
+                                  key={`pop-role-${role}`}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setNewAgentRole(role);
+                                    setOpenAddAgentPopup(null);
+                                  }}
+                                  className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer border ${
+                                    isSelected
+                                      ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-bold'
+                                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      isTL ? 'bg-purple-100 text-purple-800' : 'bg-slate-100 text-slate-700'
+                                    }`}>
+                                      {role}
+                                    </span>
+                                  </div>
+                                  {isSelected && <Check className="w-4 h-4 text-indigo-600" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Add Role Option at Bottom */}
+                          <div className="pt-3 border-t border-slate-100 space-y-2">
+                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                              + Add New Role
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="Type new role..."
+                                value={newCustomRoleInput}
+                                onChange={(e) => setNewCustomRoleInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const trimmed = newCustomRoleInput.trim();
+                                    if (trimmed) {
+                                      if (!availableRoles.includes(trimmed)) {
+                                        setAvailableRoles(prev => [...prev, trimmed]);
+                                      }
+                                      setNewAgentRole(trimmed);
+                                      setNewCustomRoleInput('');
+                                      setOpenAddAgentPopup(null);
+                                    }
+                                  }
+                                }}
+                                className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:border-indigo-600 bg-white"
+                              />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const trimmed = newCustomRoleInput.trim();
+                                  if (trimmed) {
+                                    if (!availableRoles.includes(trimmed)) {
+                                      setAvailableRoles(prev => [...prev, trimmed]);
+                                    }
+                                    setNewAgentRole(trimmed);
+                                    setNewCustomRoleInput('');
+                                    setOpenAddAgentPopup(null);
+                                  }
+                                }}
+                                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors shadow-xs"
+                              >
+                                Add Role
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 5. team (2 cols) - INLINE DROPDOWN */}
+                    <div className="lg:col-span-2 relative">
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        team
+                      </label>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setOpenAddAgentPopup(prev => prev === 'team' ? null : 'team');
+                        }}
+                        className={`w-full px-3 py-2 text-xs rounded-lg border text-left flex items-center justify-between font-semibold transition-all cursor-pointer shadow-2xs ${
+                          openAddAgentPopup === 'team'
+                            ? 'border-indigo-500 bg-indigo-50/50 text-indigo-900 ring-2 ring-indigo-200'
+                            : 'border-slate-300 bg-white hover:bg-slate-50 hover:border-indigo-400 text-slate-800'
+                        }`}
+                      >
+                        <span className="truncate">{newAgentTeam || 'Select Team'}</span>
+                        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 ml-1 transition-transform duration-150 ${openAddAgentPopup === 'team' ? 'rotate-180 text-indigo-600' : ''}`} />
+                      </button>
+
+                      {/* Dropdown 1: Team Dropdown Menu */}
+                      {openAddAgentPopup === 'team' && (
+                        <div
+                          className="absolute top-full left-0 mt-1.5 w-72 sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                              <Building2 className="w-4 h-4 text-indigo-600" />
+                              <h4 className="font-extrabold text-sm text-slate-900">Select Team</h4>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenAddAgentPopup(null);
+                              }}
+                              className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {/* Existing Teams List */}
+                          <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
+                            {availableChannels.map((team) => {
+                              const isSelected = newAgentTeam === team;
+                              return (
+                                <button
+                                  key={`pop-team-${team}`}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setNewAgentTeam(team);
+                                    setOpenAddAgentPopup(null);
+                                  }}
+                                  className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer border ${
+                                    isSelected
+                                      ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-bold'
+                                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                                  }`}
+                                >
+                                  <span>{team}</span>
+                                  {isSelected && <Check className="w-4 h-4 text-indigo-600" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Add Team Option at Bottom */}
+                          <div className="pt-3 border-t border-slate-100 space-y-2">
+                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                              + Add New Team
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="Type new team name..."
+                                value={newTeamName}
+                                onChange={(e) => setNewTeamName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (newTeamName.trim()) {
+                                      handleAddChannel(newTeamName.trim());
+                                      setNewAgentTeam(newTeamName.trim());
+                                      setNewTeamName('');
+                                      setOpenAddAgentPopup(null);
+                                    }
+                                  }
+                                }}
+                                className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:border-indigo-600 bg-white"
+                              />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (newTeamName.trim()) {
+                                    handleAddChannel(newTeamName.trim());
+                                    setNewAgentTeam(newTeamName.trim());
+                                    setNewTeamName('');
+                                    setOpenAddAgentPopup(null);
+                                  }
+                                }}
+                                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors shadow-xs"
+                              >
+                                Add Team
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 6. team leader (1 col) - INLINE DROPDOWN */}
+                    <div className="lg:col-span-1 relative">
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        team leader
+                      </label>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setOpenAddAgentPopup(prev => prev === 'teamLeader' ? null : 'teamLeader');
+                        }}
+                        className={`w-full px-2 py-2 text-xs rounded-lg border text-left flex items-center justify-between font-semibold transition-all cursor-pointer shadow-2xs ${
+                          openAddAgentPopup === 'teamLeader'
+                            ? 'border-purple-500 bg-purple-50/50 text-purple-950 ring-2 ring-purple-200'
+                            : 'border-slate-300 bg-white hover:bg-slate-50 hover:border-purple-400 text-slate-800'
+                        }`}
+                        title={newAgentTeamLeaders.join(', ') || 'No Team Leader'}
+                      >
+                        <span className="truncate">
+                          {newAgentTeamLeaders.length > 0
+                            ? (newAgentTeamLeaders.length === 1 ? newAgentTeamLeaders[0] : `${newAgentTeamLeaders.length} TLs`)
+                            : 'Select TL'}
+                        </span>
+                        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 ml-1 transition-transform duration-150 ${openAddAgentPopup === 'teamLeader' ? 'rotate-180 text-purple-600' : ''}`} />
+                      </button>
+
+                      {/* Dropdown 2: Team Leader Dropdown Menu */}
+                      {openAddAgentPopup === 'teamLeader' && (
+                        <div
+                          className="absolute top-full left-0 sm:-left-24 lg:-left-32 mt-1.5 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                              <User className="w-4 h-4 text-purple-600" />
+                              <div>
+                                <h4 className="font-extrabold text-sm text-slate-900">Assign Team Leader(s)</h4>
+                                <p className="text-[11px] text-slate-500">Tik mark / select one or multiple Team Leaders</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenAddAgentPopup(null);
+                              }}
+                              className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {/* Selected badges */}
+                          {newAgentTeamLeaders.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5 p-2 bg-purple-50/60 rounded-xl border border-purple-100">
+                              <span className="text-[11px] font-bold text-purple-900 mr-1">Selected ({newAgentTeamLeaders.length}):</span>
+                              {newAgentTeamLeaders.map((tl) => (
+                                <span
+                                  key={`pop-badge-${tl}`}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold bg-white text-purple-700 border border-purple-200 shadow-2xs"
+                                >
+                                  <span>{tl}</span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setNewAgentTeamLeaders(prev => prev.filter(x => x !== tl));
+                                    }}
+                                    className="text-purple-400 hover:text-rose-600 cursor-pointer"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </span>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setNewAgentTeamLeaders([]);
+                                }}
+                                className="text-[11px] text-rose-600 hover:underline font-semibold ml-auto cursor-pointer"
+                              >
+                                Clear
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Checkbox list */}
+                          <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                            {availableTeamLeaders.map((tl) => {
+                              const isSelected = newAgentTeamLeaders.includes(tl);
+                              return (
+                                <label
+                                  key={`pop-tl-${tl}`}
+                                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs cursor-pointer border transition-colors ${
+                                    isSelected
+                                      ? 'bg-purple-50 border-purple-200 text-purple-950 font-bold'
+                                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 truncate">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => {
+                                        if (isSelected) {
+                                          setNewAgentTeamLeaders(prev => prev.filter(x => x !== tl));
+                                        } else {
+                                          setNewAgentTeamLeaders(prev => [...prev, tl]);
+                                        }
+                                      }}
+                                      className="rounded text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer"
+                                    />
+                                    <span className="truncate">{tl}</span>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+
+                          {/* Add Team Leader Option at Bottom */}
+                          <div className="pt-3 border-t border-slate-100 space-y-2">
+                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                              + Add New Team Leader
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="Type new TL name..."
+                                value={newCustomTLInput}
+                                onChange={(e) => setNewCustomTLInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const trimmed = newCustomTLInput.trim();
+                                    if (trimmed) {
+                                      const updated = addTeamLeaderItem(trimmed);
+                                      setTeamLeadersList([...updated]);
+                                      if (!newAgentTeamLeaders.includes(trimmed)) {
+                                        setNewAgentTeamLeaders(prev => [...prev, trimmed]);
+                                      }
+                                      setNewCustomTLInput('');
+                                    }
+                                  }
+                                }}
+                                className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:border-indigo-600 bg-white"
+                              />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const trimmed = newCustomTLInput.trim();
+                                  if (trimmed) {
+                                    const updated = addTeamLeaderItem(trimmed);
+                                    setTeamLeadersList([...updated]);
+                                    if (!newAgentTeamLeaders.includes(trimmed)) {
+                                      setNewAgentTeamLeaders(prev => [...prev, trimmed]);
+                                    }
+                                    setNewCustomTLInput('');
+                                  }
+                                }}
+                                className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors shadow-xs"
+                              >
+                                Add TL
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-100 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenAddAgentPopup(null);
+                              }}
+                              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+                            >
+                              Done
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 7. access control (1 col) - INLINE DROPDOWN */}
+                    <div className="lg:col-span-1 relative">
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        access control
+                      </label>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setOpenAddAgentPopup(prev => prev === 'accessControl' ? null : 'accessControl');
+                        }}
+                        className={`w-full px-2 py-2 text-xs rounded-lg border text-left flex items-center justify-between font-bold transition-all cursor-pointer shadow-2xs ${
+                          openAddAgentPopup === 'accessControl'
+                            ? 'border-indigo-500 bg-indigo-100 text-indigo-950 ring-2 ring-indigo-200'
+                            : 'border-slate-300 bg-white hover:bg-slate-50 hover:border-indigo-400 text-slate-800'
+                        }`}
+                        title="Access Control"
+                      >
+                        <span className="truncate">Permissions</span>
+                        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 ml-1 transition-transform duration-150 ${openAddAgentPopup === 'accessControl' ? 'rotate-180 text-indigo-600' : ''}`} />
+                      </button>
+
+                      {/* Dropdown: Access Control */}
+                      {openAddAgentPopup === 'accessControl' && (
+                        <div
+                          className="absolute top-full right-0 mt-1.5 w-72 sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                              <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                              <h4 className="font-extrabold text-sm text-slate-900">Access Control</h4>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenAddAgentPopup(null);
+                              }}
+                              className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {/* 1. Order Creation Access */}
+                          <div className="space-y-1">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                              Order Creation
+                            </span>
+                            <label className="flex items-center justify-between px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-800 transition-colors">
+                              <span>Create Order</span>
+                              <input
+                                type="checkbox"
+                                checked={newCanCreate}
+                                onChange={(e) => setNewCanCreate(e.target.checked)}
+                                className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                              />
+                            </label>
+                          </div>
+
+                          {/* 2. Placed Order Permissions */}
+                          <div className="space-y-1.5 pt-1">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                              Placed Order Permissions
+                            </span>
+                            <label className="flex items-center justify-between px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-800 transition-colors">
+                              <span>Schedule Change</span>
+                              <input
+                                type="checkbox"
+                                checked={newCanChangeSchedule}
+                                onChange={(e) => setNewCanChangeSchedule(e.target.checked)}
+                                className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                              />
+                            </label>
+
+                            <label className="flex items-center justify-between px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-800 transition-colors">
+                              <span>Price Change</span>
+                              <input
+                                type="checkbox"
+                                checked={newCanChangeValue}
+                                onChange={(e) => setNewCanChangeValue(e.target.checked)}
+                                className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                              />
+                            </label>
+
+                            <label className="flex items-center justify-between px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-800 transition-colors">
+                              <span>Profit</span>
+                              <input
+                                type="checkbox"
+                                checked={newCanAddProfit}
+                                onChange={(e) => setNewCanAddProfit(e.target.checked)}
+                                className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                              />
+                            </label>
+                          </div>
+
+                          {/* 3. Status Section */}
+                          <div className="pt-2 border-t border-slate-100 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={newCanUpdateStatus}
+                                  onChange={(e) => setNewCanUpdateStatus(e.target.checked)}
+                                  className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                                />
+                                <span>Status Update</span>
+                              </label>
+                              {newCanUpdateStatus && (
+                                <div className="flex items-center gap-1.5 text-[10px]">
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewAllowedOrderStatuses([...ORDER_STATUS_LIST])}
+                                    className="text-indigo-600 font-semibold hover:underline cursor-pointer"
+                                  >
+                                    All
+                                  </button>
+                                  <span className="text-slate-300">|</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewAllowedOrderStatuses([])}
+                                    className="text-slate-500 font-semibold hover:underline cursor-pointer"
+                                  >
+                                    Clear
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            {newCanUpdateStatus && (
+                              <div className="grid grid-cols-2 gap-1.5 pt-1 max-h-36 overflow-y-auto pr-1">
+                                {ORDER_STATUS_LIST.map((st) => {
+                                  const isChecked = newAllowedOrderStatuses.includes(st);
+                                  return (
+                                    <label
+                                      key={`status-chk-${st}`}
+                                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer transition-colors ${
+                                        isChecked
+                                          ? 'bg-indigo-50 border-indigo-200 text-indigo-950 font-bold'
+                                          : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                                      }`}
+                                    >
+                                      <span className="truncate">{st}</span>
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setNewAllowedOrderStatuses(prev => [...prev, st]);
+                                          } else {
+                                            setNewAllowedOrderStatuses(prev => prev.filter(x => x !== st));
+                                          }
+                                        }}
+                                        className="rounded text-indigo-600 w-3.5 h-3.5 cursor-pointer ml-1"
+                                      />
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-100">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenAddAgentPopup(null);
+                              }}
+                              className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer shadow-xs transition-colors"
+                            >
+                              Done
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 8. Action button (1 col) */}
+                    <div className="lg:col-span-1">
+                      <button
+                        type="submit"
+                        className="w-full py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1 whitespace-nowrap"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>{editingIndex !== null ? 'Save' : 'Add'}</span>
+                      </button>
+                    </div>
                   </div>
                 </form>
+
+                {/* Transparent Backdrop to dismiss any open dropdown by clicking anywhere outside */}
+                {openAddAgentPopup && (
+                  <div
+                    className="fixed inset-0 z-30 bg-transparent cursor-default"
+                    onClick={() => setOpenAddAgentPopup(null)}
+                  />
+                )}
               </div>
 
-              {/* User Details Table - Displays all details updated by agents */}
+              {/* USER DETAILS DIRECTORY TABLE (MATCHING COLUMNS) */}
               <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-                <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h3 className="font-extrabold text-slate-900 text-sm">User Details &amp; Directory</h3>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      Configure agent permissions, role assignments, passwords, and profile directory.
+                      Overview of registered agent credentials, assigned roles, team leaders, and action controls.
                     </p>
                   </div>
                   <span className="text-xs font-bold bg-indigo-100 text-indigo-800 px-2.5 py-1 rounded-full">
@@ -2212,40 +2305,187 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-                  {agents.map((agent, index) => {
-                    const isDeactivated = agent.status === 'deactivated';
-                    const isTL = agent.role === 'Team Leader';
-                    return (
-                      <div key={agent.user} className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col gap-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${isTL ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                              {agent.name?.charAt(0) || agent.user.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="font-bold text-sm text-slate-900">{agent.name || agent.user}</p>
-                              <p className="text-xs text-slate-500">@{agent.user}</p>
-                            </div>
-                          </div>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isDeactivated ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                            {isDeactivated ? 'Inactive' : 'Active'}
-                          </span>
-                        </div>
-                        <div className="text-xs space-y-1 text-slate-600">
-                          <p><strong>Team:</strong> {agent.team}</p>
-                          <p><strong>Role:</strong> {agent.role}</p>
-                          <p><strong>Contact:</strong> {agent.contact || 'N/A'}</p>
-                        </div>
-                        <div className="flex items-center gap-2 pt-2 border-t border-slate-100 mt-auto">
-                          <button onClick={() => handleEditAgent(index)} className="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold cursor-pointer">Edit</button>
-                          <button onClick={() => handleToggleAgentStatus(index)} className={`flex-1 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${isDeactivated ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-                            {isDeactivated ? 'Activate' : 'Deactivate'}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-100/80 text-slate-700 border-b border-slate-200 font-bold uppercase tracking-wider text-[11px]">
+                        <th className="py-3 px-3.5">user_id</th>
+                        <th className="py-3 px-3.5">user_name</th>
+                        <th className="py-3 px-3.5">password</th>
+                        <th className="py-3 px-3.5">role</th>
+                        <th className="py-3 px-3.5">team</th>
+                        <th className="py-3 px-3.5">team leader</th>
+                        <th className="py-3 px-3.5">access control</th>
+                        <th className="py-3 px-3.5">status</th>
+                        <th className="py-3 px-3.5 text-right">actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-800">
+                      {agents.map((agent, index) => {
+                        const isDeactivated = agent.status === 'deactivated';
+                        const isTL = agent.role === 'Team Leader';
+                        const isPassVisible = showTablePasswords[agent.user];
+                        const perms = agent.permissions || {
+                          canCreate: true,
+                          canUpdateStatus: true,
+                          canChangeSchedule: true,
+                          canChangeValue: true,
+                          canAddProfit: true,
+                          allowedOrderStatuses: ['Pending', 'In Progress', 'Confirmed', 'Follow-up']
+                        };
+                        const tlDisplay = Array.isArray(agent.teamLeaders) && agent.teamLeaders.length > 0
+                          ? agent.teamLeaders.join(', ')
+                          : (agent.teamLeaderId || '-');
+
+                        return (
+                          <tr
+                            key={`agent-row-${agent.user}-${index}`}
+                            className={`hover:bg-indigo-50/30 transition-colors ${editingIndex === index ? 'bg-indigo-50/60 font-semibold' : ''}`}
+                          >
+                            {/* user_id */}
+                            <td className="py-3 px-3.5 font-mono font-bold text-indigo-700 whitespace-nowrap">
+                              @{agent.user}
+                            </td>
+
+                            {/* user_name */}
+                            <td className="py-3 px-3.5 font-medium text-slate-900 whitespace-nowrap">
+                              {agent.name || agent.user}
+                            </td>
+
+                            {/* password */}
+                            <td className="py-3 px-3.5 font-mono text-slate-600 whitespace-nowrap">
+                              <div className="flex items-center gap-1.5">
+                                <span>{isPassVisible ? agent.pass : '••••••'}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowTablePasswords(prev => ({ ...prev, [agent.user]: !prev[agent.user] }))}
+                                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                                  title={isPassVisible ? 'Hide Password' : 'Show Password'}
+                                >
+                                  {isPassVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                </button>
+                              </div>
+                            </td>
+
+                            {/* role */}
+                            <td className="py-3 px-3.5 whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => handleEditAgent(agent)}
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-colors ${
+                                  isTL ? 'bg-purple-100 hover:bg-purple-200 text-purple-800' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                }`}
+                                title="Click to edit Agent in popup modal"
+                              >
+                                {agent.role || 'Agent'}
+                              </button>
+                            </td>
+
+                            {/* team */}
+                            <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-700">
+                              <button
+                                type="button"
+                                onClick={() => handleEditAgent(agent)}
+                                className="px-2.5 py-1 rounded-lg text-[11px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold border border-blue-100 transition-colors cursor-pointer"
+                                title="Click to edit Agent in popup modal"
+                              >
+                                {agent.team || 'Acquisition'}
+                              </button>
+                            </td>
+
+                            {/* team leader */}
+                            <td className="py-3 px-3.5 text-slate-600 max-w-[180px] truncate" title={tlDisplay}>
+                              <button
+                                type="button"
+                                onClick={() => handleEditAgent(agent)}
+                                className="text-left text-slate-600 hover:text-purple-700 max-w-[180px] truncate cursor-pointer transition-colors block"
+                                title={`Click to edit Agent in popup modal (${tlDisplay})`}
+                              >
+                                {tlDisplay}
+                              </button>
+                            </td>
+
+                            {/* access control badges */}
+                            <td className="py-3 px-3.5">
+                              <button
+                                type="button"
+                                onClick={() => handleEditAgent(agent)}
+                                className="flex flex-wrap gap-1 max-w-[280px] text-left cursor-pointer hover:opacity-80 transition-opacity"
+                                title="Click to edit Agent permissions in popup modal"
+                              >
+                                {perms.canCreate && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Order Creation: Full data input permitted">
+                                    ✓ Create
+                                  </span>
+                                )}
+                                {perms.canChangeSchedule && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200" title="Placed Orders: Schedule change permitted">
+                                    Schedule
+                                  </span>
+                                )}
+                                {perms.canChangeValue && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200" title="Placed Orders: Price/value change permitted">
+                                    Price
+                                  </span>
+                                )}
+                                {perms.canAddProfit && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200" title="Placed Orders: Profit edit permitted">
+                                    Profit
+                                  </span>
+                                )}
+                                {perms.canUpdateStatus && Array.isArray(perms.allowedOrderStatuses) && perms.allowedOrderStatuses.length > 0 && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200" title={`Placed Orders: Status updates allowed for: ${perms.allowedOrderStatuses.join(', ')}`}>
+                                    Status ({perms.allowedOrderStatuses.length})
+                                  </span>
+                                )}
+                              </button>
+                            </td>
+
+                            {/* status */}
+                            <td className="py-3 px-3.5 whitespace-nowrap">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                isDeactivated ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'
+                              }`}>
+                                {isDeactivated ? 'Inactive' : 'Active'}
+                              </span>
+                            </td>
+
+                            {/* actions */}
+                            <td className="py-3 px-3.5 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditAgent(agent)}
+                                  className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-2xs"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleAgentStatus(index)}
+                                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                                    isDeactivated ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
+                                  }`}
+                                >
+                                  {isDeactivated ? 'Activate' : 'Deactivate'}
+                                </button>
+                                {agents.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteAgent(index)}
+                                    className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer transition-colors"
+                                    title="Delete Agent"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -4877,15 +5117,15 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
             <div className="text-xs text-slate-600 space-y-1.5 shrink-0 bg-amber-50 p-3 rounded-xl border border-amber-200 text-amber-900">
               <p className="font-bold text-[12px] text-amber-950 flex items-center gap-1.5">
-                <span>⚠️ কেন হিস্টোরি বা ডাটা আপডেট হয়নি? / Why didn't history save previously?</span>
+                <span>⚠️ Why didn't history save previously? (Apps Script Update Required)</span>
               </p>
               <p className="text-[11px] leading-relaxed">
-                আপনার গুগল শীটে আগে ডিপ্লয় করা পুরানো স্ক্রিপ্টে শুধুমাত্র নতুন অর্ডার যুক্ত করার কোড ছিল। অর্ডার ভ্যালু, শিডিউল ও ফলোআপ স্ট্যাটাস আপডেট এবং <strong>'Followup'</strong> শীটে অডিট ট্রেইল হিস্টোরি স্টোর করতে নিচে দেওয়া নতুন <strong>Code.gs</strong> কোডটি ব্যবহার করতে হবে:
+                The previously deployed script in your Google Sheet only handled adding new orders. To enable order value, schedule, and follow-up status updates along with audit trail logging in the <strong>'Followup'</strong> sheet, update your <strong>Code.gs</strong> with the script below:
               </p>
               <ol className="list-decimal list-inside text-[11px] space-y-0.5 text-slate-800 font-medium pt-1">
-                <li>Google Sheet-এ <strong>Extensions &gt; Apps Script</strong> খুলুন।</li>
-                <li><strong>Code.gs</strong>-এর সব কোড মুছে নিচের কোড পেস্ট করে <strong>Save</strong> (💾) করুন।</li>
-                <li><strong>Deploy &gt; Manage deployments</strong> &gt; Edit (পেন্সিল) &gt; Version: <strong>"New version"</strong> সিলেক্ট করে <strong>Deploy</strong> করুন।</li>
+                <li>In your Google Sheet, open <strong>Extensions &gt; Apps Script</strong>.</li>
+                <li>Clear all existing code in <strong>Code.gs</strong>, paste the script below, and click <strong>Save</strong> (💾).</li>
+                <li>Click <strong>Deploy &gt; Manage deployments</strong> &gt; Edit (pencil icon) &gt; Version: <strong>"New version"</strong>, and click <strong>Deploy</strong>.</li>
               </ol>
             </div>
 
@@ -5411,322 +5651,189 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 </div>
               </div>
 
-              {/* Granular Access Controls */}
+              {/* Clean & Uncluttered Access Controls & Permissions */}
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2.5">
-                  <div>
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-800 block flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4 text-indigo-600" />
-                      Agent ID-Wise Permissions &amp; Access Controls
-                    </span>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Set dropdown-based permissions and status-wise access for @{editUser}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditCanCreate(true);
-                        setEditCanUpdateStatus(true);
-                        setEditCanChangeSchedule(true);
-                        setEditCanChangeValue(true);
-                        setEditCanAddProfit(true);
-                        setEditAllowedOrderStatuses(ORDER_STATUS_LIST);
-                      }}
-                      className="px-2.5 py-1 text-[11px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg border border-indigo-200 transition-colors cursor-pointer"
-                    >
-                      Full Access
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditCanCreate(true);
-                        setEditCanUpdateStatus(true);
-                        setEditCanChangeSchedule(true);
-                        setEditCanChangeValue(false);
-                        setEditCanAddProfit(false);
-                        setEditAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
-                      }}
-                      className="px-2.5 py-1 text-[11px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg border border-amber-200 transition-colors cursor-pointer"
-                    >
-                      ⭐ Standard (No Deliv/Canc)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditCanCreate(true);
-                        setEditCanUpdateStatus(false);
-                        setEditCanChangeSchedule(false);
-                        setEditCanChangeValue(false);
-                        setEditCanAddProfit(false);
-                        setEditAllowedOrderStatuses([]);
-                      }}
-                      className="px-2.5 py-1 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg border border-slate-200 transition-colors cursor-pointer"
-                    >
-                      Strictly Restricted
-                    </button>
+                <div className="flex items-center justify-between pb-2.5 border-b border-slate-200/80">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                        Access Control &amp; Permissions
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Configure permissions for agent <span className="font-semibold text-slate-700">@{editUser}</span>
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                {/* 5 Core Permissions in Dropdown Format */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {/* 1. Create Order */}
-                  <label className="flex items-center gap-1.5 p-2 rounded-lg border border-slate-200">
-                    <input type="checkbox" checked={editCanCreate} onChange={e => setEditCanCreate(e.target.checked)} />
-                    <span className="text-xs font-bold">Create Order</span>
-                  </label>
-
-                  {/* 2. Status Update */}
-                  <label className="flex items-center gap-1.5 p-2 rounded-lg border border-slate-200">
-                    <input type="checkbox" checked={editCanUpdateStatus} onChange={e => setEditCanUpdateStatus(e.target.checked)} />
-                    <span className="text-xs font-bold">Status Update</span>
-                  </label>
-
-                  {/* 3. Schedule Date & Time Slot Change */}
-                  <label className="flex items-center gap-1.5 p-2 rounded-lg border border-slate-200">
-                    <input type="checkbox" checked={editCanChangeSchedule} onChange={e => setEditCanChangeSchedule(e.target.checked)} />
-                    <span className="text-xs font-bold">Schedule Change</span>
-                  </label>
-
-                  {/* 4. Change Value */}
-                  <label className="flex items-center gap-1.5 p-2 rounded-lg border border-slate-200">
-                    <input type="checkbox" checked={editCanChangeValue} onChange={e => setEditCanChangeValue(e.target.checked)} />
-                    <span className="text-xs font-bold">Price Change</span>
-                  </label>
-
-                  {/* 5. Add Profit */}
-                  <label className="flex items-center gap-1.5 p-2 rounded-lg border border-slate-200">
-                    <input type="checkbox" checked={editCanAddProfit} onChange={e => setEditCanAddProfit(e.target.checked)} />
-                    <span className="text-xs font-bold">Profit</span>
+                {/* 1. Order Creation Access */}
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-1.5">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                    Order Creation Access
+                  </span>
+                  <label className="flex items-center justify-between px-3 py-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors">
+                    <div>
+                      <span className="text-xs font-bold text-slate-800 block">Create Order</span>
+                      <span className="text-[11px] text-slate-500">Allow agent to input order details and place new orders</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={editCanCreate}
+                      onChange={(e) => setEditCanCreate(e.target.checked)}
+                      className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                    />
                   </label>
                 </div>
 
-                {/* Status-Wise Access Dropdown Section */}
-                {editCanUpdateStatus && (
-                  <div className="bg-white p-4 rounded-xl border border-indigo-200 space-y-3 animate-fadeIn">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 pb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                          <CheckSquare className="w-3.5 h-3.5 text-indigo-600" />
-                          Status-Wise Access Control (Dropdown)
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-800 border border-indigo-200">
-                          {editAllowedOrderStatuses.length} Statuses Permitted
-                        </span>
-                      </div>
+                {/* 2. Placed Order Permissions */}
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-3">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                    Placed Order Permissions
+                  </span>
 
-                      {/* Policy Preset Dropdown */}
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Policy Preset:</span>
-                        <select
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === 'all') setEditAllowedOrderStatuses([...getOrderStatuses()]);
-                            else if (val === 'standard') setEditAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
-                            else if (val === 'initial') setEditAllowedOrderStatuses(['Pending', 'In Progress']);
-                            else if (val === 'clear') setEditAllowedOrderStatuses([]);
-                          }}
-                          className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 text-slate-800 focus:bg-white cursor-pointer"
-                          defaultValue="standard"
-                        >
-                          <option value="standard">⭐ Standard (No Delivered &amp; Cancelled)</option>
-                          <option value="all">Full Access (All 7 Statuses Allowed)</option>
-                          <option value="initial">Initial Only (Pending &amp; In Progress)</option>
-                          <option value="clear">Clear All (Restricted)</option>
-                        </select>
-                      </div>
-                    </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors">
+                      <span className="text-xs font-bold text-slate-800">Schedule Change</span>
+                      <input
+                        type="checkbox"
+                        checked={editCanChangeSchedule}
+                        onChange={(e) => setEditCanChangeSchedule(e.target.checked)}
+                        className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                      />
+                    </label>
 
-                    {/* Dropdown to Add / Toggle Status */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                          Select Status from Dropdown to Grant / Revoke Access:
-                        </label>
-                        <select
-                          value=""
-                          onChange={(e) => {
-                            const st = e.target.value;
-                            if (!st) return;
-                            if (editAllowedOrderStatuses.includes(st)) {
-                              setEditAllowedOrderStatuses(prev => prev.filter(x => x !== st));
-                            } else {
-                              setEditAllowedOrderStatuses(prev => [...prev, st]);
-                            }
-                          }}
-                          className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-indigo-300 bg-indigo-50/40 text-indigo-900 focus:bg-white cursor-pointer"
-                        >
-                          <option value="">-- Choose Status from Dropdown to Toggle Access --</option>
-                          {getOrderStatuses().map((st) => {
-                            const isAllowed = editAllowedOrderStatuses.includes(st);
-                            const isSpecial = st.toLowerCase() === 'delivered' || st.toLowerCase() === 'cancelled';
-                            return (
-                              <option key={`dd-edit-${st}`} value={st}>
-                                {isAllowed ? `✓ [Currently Permitted] ${st}` : `+ [Click to Allow] ${st}`} {isSpecial ? '(High Privilege / Admin)' : ''}
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
+                    <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors">
+                      <span className="text-xs font-bold text-slate-800">Price Change</span>
+                      <input
+                        type="checkbox"
+                        checked={editCanChangeValue}
+                        onChange={(e) => setEditCanChangeValue(e.target.checked)}
+                        className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                      />
+                    </label>
 
-                      <div className="text-[11px] text-slate-500 leading-tight">
-                        Status-wise control prevents unauthorized completion or cancellation. 
-                        <strong className="text-emerald-700"> Delivered</strong> and <strong className="text-rose-700">Cancelled</strong> are excluded by default for standard agents.
-                      </div>
-                    </div>
+                    <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors">
+                      <span className="text-xs font-bold text-slate-800">Profit</span>
+                      <input
+                        type="checkbox"
+                        checked={editCanAddProfit}
+                        onChange={(e) => setEditCanAddProfit(e.target.checked)}
+                        className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                      />
+                    </label>
+                  </div>
 
-                    {/* Currently Permitted Status Badges */}
-                    <div className="pt-2 border-t border-slate-100">
-                      <span className="text-[11px] font-bold text-slate-600 block mb-1.5">
-                        Active Authorized Statuses ({editAllowedOrderStatuses.length}):
-                      </span>
-                      {editAllowedOrderStatuses.length === 0 ? (
-                        <span className="text-xs text-rose-600 italic">No statuses allowed. Agent cannot update order status.</span>
-                      ) : (
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {editAllowedOrderStatuses.map((st) => {
-                            const isDeliv = st.toLowerCase() === 'delivered';
-                            const isCanc = st.toLowerCase() === 'cancelled';
-                            return (
-                              <span
-                                key={`active-edit-${st}`}
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
-                                  isDeliv
-                                    ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
-                                    : isCanc
-                                    ? 'bg-rose-50 text-rose-900 border-rose-300'
-                                    : 'bg-indigo-50 text-indigo-900 border-indigo-200'
-                                }`}
-                              >
-                                <span>✓ {st}</span>
-                                {(isDeliv || isCanc) && (
-                                  <span className={`text-[9px] uppercase px-1 rounded ${isDeliv ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-200 text-rose-800'}`}>
-                                    Admin
-                                  </span>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => setEditAllowedOrderStatuses(prev => prev.filter(x => x !== st))}
-                                  className="text-slate-400 hover:text-red-600 cursor-pointer ml-0.5"
-                                  title={`Revoke ${st}`}
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </span>
-                            );
-                          })}
+                  {/* Status Update with simple status checkboxes */}
+                  <div className="pt-2.5 border-t border-slate-100 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editCanUpdateStatus}
+                          onChange={(e) => setEditCanUpdateStatus(e.target.checked)}
+                          className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                        />
+                        <span>Status Update</span>
+                      </label>
+                      {editCanUpdateStatus && (
+                        <div className="flex items-center gap-2 text-[11px]">
+                          <button
+                            type="button"
+                            onClick={() => setEditAllowedOrderStatuses([...ORDER_STATUS_LIST])}
+                            className="text-indigo-600 font-semibold hover:underline cursor-pointer"
+                          >
+                            Select All
+                          </button>
+                          <span className="text-slate-300">|</span>
+                          <button
+                            type="button"
+                            onClick={() => setEditAllowedOrderStatuses([])}
+                            className="text-slate-500 font-semibold hover:underline cursor-pointer"
+                          >
+                            Clear
+                          </button>
                         </div>
                       )}
                     </div>
+
+                    {editCanUpdateStatus && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-1">
+                        {ORDER_STATUS_LIST.map((st) => {
+                          const isChecked = editAllowedOrderStatuses.includes(st);
+                          return (
+                            <label
+                              key={`edit-status-${st}`}
+                              className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer transition-colors ${
+                                isChecked
+                                  ? 'bg-indigo-50 border-indigo-200 text-indigo-950 font-bold'
+                                  : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                              }`}
+                            >
+                              <span className="truncate">{st}</span>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setEditAllowedOrderStatuses((prev) => [...prev, st]);
+                                  } else {
+                                    setEditAllowedOrderStatuses((prev) => prev.filter((x) => x !== st));
+                                  }
+                                }}
+                                className="rounded text-indigo-600 w-3.5 h-3.5 cursor-pointer ml-1"
+                              />
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
-                {/* Tab Visibility Access Controls (Dropdown & Selector) */}
-                <div className="bg-white p-4 rounded-xl border border-sky-200 space-y-3 animate-fadeIn">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-100 pb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                        <Layers className="w-3.5 h-3.5 text-sky-600" />
-                        Agent Tab Visibility Access (Select Which Tabs to View)
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800 border border-sky-200">
-                        {editAllowedTabs.length} of {AGENT_MANAGEABLE_TABS.length} Tabs Visible
-                      </span>
-                    </div>
-
-                    {/* Preset Buttons */}
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setEditAllowedTabs(['summary', 'orders', 'followup', 'agent-performance', 'profiles'])}
-                        className="px-2 py-0.5 text-[10px] font-bold bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-md border border-sky-200 transition-colors cursor-pointer"
-                      >
-                        All 5 Tabs
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditAllowedTabs(['orders'])}
-                        className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors cursor-pointer"
-                      >
-                        Orders Only
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditAllowedTabs(['orders', 'followup'])}
-                        className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors cursor-pointer"
-                      >
-                        Orders + Followup
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditAllowedTabs(['orders', 'agent-performance'])}
-                        className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors cursor-pointer"
-                      >
-                        Orders + Perf
-                      </button>
-                    </div>
+                {/* 3. Allowed Navigation Tabs */}
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                      Allowed Navigation Tabs
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setEditAllowedTabs(['summary', 'orders', 'followup', 'agent-performance', 'profiles'])}
+                      className="text-[11px] text-indigo-600 font-semibold hover:underline cursor-pointer"
+                    >
+                      Select All
+                    </button>
                   </div>
-
-                  {/* Dropdown for quick Tab Toggle */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Dropdown to Toggle Tab Visibility:
-                      </label>
-                      <select
-                        value=""
-                        onChange={(e) => {
-                          const tab = e.target.value as AgentNavTab;
-                          if (!tab) return;
-                          if (editAllowedTabs.includes(tab)) {
-                            if (editAllowedTabs.length === 1) return; // keep at least 1 tab
-                            setEditAllowedTabs(prev => prev.filter(t => t !== tab));
-                          } else {
-                            setEditAllowedTabs(prev => [...prev, tab]);
-                          }
-                        }}
-                        className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-sky-300 bg-sky-50/40 text-sky-900 focus:bg-white cursor-pointer"
-                      >
-                        <option value="">-- Choose Tab from Dropdown to Toggle Visibility --</option>
-                        {AGENT_MANAGEABLE_TABS.map((tab) => (
-                          <option key={`opt-edit-${tab.id}`} value={tab.id}>
-                            {editAllowedTabs.includes(tab.id)
-                              ? `✓ [Currently Visible] ${tab.label} Tab`
-                              : `+ [Click to Show] ${tab.label} Tab`}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Interactive Pill Badges to show active & click to toggle */}
-                    <div className="flex flex-wrap items-center gap-2 pt-1 sm:pt-4">
-                      {AGENT_MANAGEABLE_TABS.map((tab) => {
-                        const isSelected = editAllowedTabs.includes(tab.id);
-                        return (
-                          <button
-                            key={`tab-toggle-edit-${tab.id}`}
-                            type="button"
-                            onClick={() => {
-                              if (isSelected) {
-                                if (editAllowedTabs.length === 1) return; // keep at least 1 tab
-                                setEditAllowedTabs(prev => prev.filter(t => t !== tab.id));
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                    {AGENT_MANAGEABLE_TABS.map((tab) => {
+                      const isSelected = editAllowedTabs.includes(tab.id);
+                      return (
+                        <label
+                          key={`edit-tab-${tab.id}`}
+                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer transition-colors ${
+                            isSelected
+                              ? 'bg-sky-50 border-sky-200 text-sky-950 font-bold'
+                              : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                          }`}
+                        >
+                          <span className="truncate">{tab.label}</span>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setEditAllowedTabs((prev) => [...prev, tab.id]);
                               } else {
-                                setEditAllowedTabs(prev => [...prev, tab.id]);
+                                if (editAllowedTabs.length <= 1) return;
+                                setEditAllowedTabs((prev) => prev.filter((t) => t !== tab.id));
                               }
                             }}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
-                              isSelected
-                                ? 'bg-sky-500 text-white border-sky-600 shadow-xs'
-                                : 'bg-slate-100 text-slate-400 border-slate-200 line-through'
-                            }`}
-                          >
-                            <span>{isSelected ? '✓' : '✗'}</span>
-                            <span>{tab.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                            className="rounded text-sky-600 w-3.5 h-3.5 cursor-pointer ml-1"
+                          />
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

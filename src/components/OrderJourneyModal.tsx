@@ -259,7 +259,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                   <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>Quick Field Updates (একক আপডেট)</span>
+                  <span>Quick Field Updates</span>
                 </h3>
                 <span className="text-[10px] text-slate-400">Edit fields side-by-side</span>
               </div>

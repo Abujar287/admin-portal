@@ -40,6 +40,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
   const [orderValue, setOrderValue] = useState<string>('');
+  const [customProfit, setCustomProfit] = useState<string>('');
 
   // Compatibility aliases
   const customer_name = customerName;
@@ -72,6 +73,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     setRoad('');
     setBlock('');
     setOrderValue('');
+    setCustomProfit('');
     setScheduledTime('');
     setStatusMessage(null);
 
@@ -135,6 +137,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
     const addressDetails = addressParts.length > 0 ? addressParts.join(', ') : 'Not specified';
     const numValue = parseFloat(orderValue) || 0;
+    const finalProfit = customProfit !== '' ? parseFloat(customProfit) || 0 : calculatedProfit;
 
     const newOrderPayload = {
       customer_name: customerName.trim(),
@@ -155,7 +158,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       order_value: numValue,
       order_status: 'Pending',
       followup_status: 'Pending',
-      profit: 0
+      profit: finalProfit
     };
 
     try {
@@ -465,15 +468,27 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
               </div>
             </div>
 
-            {/* Profit preview */}
+            {/* Profit preview & edit */}
             <div className="p-2.5 bg-blue-50/70 rounded-lg border border-blue-100 flex items-center justify-between text-xs">
               <span className="flex items-center gap-1.5 text-blue-900 font-medium">
                 <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                Estimated Profit (20%):
+                Profit (৳) {customProfit === '' ? '(20% auto-calculated)' : '(Custom)'}:
               </span>
-              <strong className="text-emerald-700 font-bold">
-                ৳ {calculatedProfit.toLocaleString()}
-              </strong>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder={String(calculatedProfit)}
+                  value={customProfit}
+                  onChange={(e) => setCustomProfit(e.target.value)}
+                  title="Override profit if needed, or leave blank to use 20% auto calculation"
+                  className="w-24 px-2 py-1 text-xs font-bold text-emerald-800 bg-white border border-emerald-300 rounded-md text-right focus:outline-hidden focus:border-emerald-600"
+                />
+                <strong className="text-emerald-700 font-bold whitespace-nowrap">
+                  ৳ {(customProfit !== '' ? parseFloat(customProfit) || 0 : calculatedProfit).toLocaleString()}
+                </strong>
+              </div>
             </div>
           </div>
 

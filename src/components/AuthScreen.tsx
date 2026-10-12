@@ -64,7 +64,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                             (u.toLowerCase() === 'manager01' && (p === 'manager01' || p === 'Manager01'));
 
       if (!isCorrectPass) {
-        setError('Invalid Password! (ভুল পাসওয়ার্ড - সঠিক পাসওয়ার্ড দিন)');
+        setError('Invalid Password! Please enter the correct password.');
         return;
       }
 

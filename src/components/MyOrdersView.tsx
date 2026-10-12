@@ -25,6 +25,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { getOrderStatuses, ORDER_STATUS_LIST, TIME_SLOTS } from '../data/mockOrders';
+import { isOrderAssignedToAgent } from '../utils/agentMatching';
 
 interface MyOrdersViewProps {
   currentAgent: AgentUser;
@@ -78,11 +79,14 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
 
   const allowedStatuses = useMemo(() => {
     if (!perms.canUpdateStatus) return [];
-    if (perms.allowedOrderStatuses && Array.isArray(perms.allowedOrderStatuses) && perms.allowedOrderStatuses.length > 0) {
-      return perms.allowedOrderStatuses;
+    let list = perms.allowedOrderStatuses && Array.isArray(perms.allowedOrderStatuses) && perms.allowedOrderStatuses.length > 0
+      ? perms.allowedOrderStatuses
+      : getOrderStatuses();
+    if (perms.canCancel === false) {
+      list = list.filter(s => s.toLowerCase() !== 'cancelled');
     }
-    return getOrderStatuses();
-  }, [perms.canUpdateStatus, perms.allowedOrderStatuses]);
+    return list;
+  }, [perms.canUpdateStatus, perms.allowedOrderStatuses, perms.canCancel]);
 
   const canEditAnyField = perms.canUpdateStatus || perms.canChangeSchedule || perms.canChangeValue || perms.canAddProfit;
 
@@ -98,12 +102,10 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
     setOrderSaveMsg(null);
   };
 
-  // STRICTLY only this agent's orders (data isolation for agent portal)
+  // STRICTLY only this agent's orders (data isolation for agent portal with flexible matching)
   const myAgentOrders = useMemo(() => {
-    return orders.filter(
-      (o) => (o.agent_id || o.agentId || '').trim().toLowerCase() === (currentAgent?.user || '').trim().toLowerCase()
-    );
-  }, [orders, currentAgent?.user]);
+    return orders.filter((o) => isOrderAssignedToAgent(o, currentAgent));
+  }, [orders, currentAgent]);
 
   // Apply search and date filters
   const filteredOrders = useMemo(() => {
@@ -824,7 +826,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                           className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold text-slate-900 focus:outline-hidden focus:border-indigo-600 text-xs cursor-pointer"
                         >
                           {['Pending', 'Confirmed', 'Follow-up', 'Delivered', 'Cancelled'].map((st) => {
-                            const isAllowed = allowedStatuses.includes(st) || (st !== 'Delivered' && st !== 'Cancelled');
+                            const isAllowed = allowedStatuses.includes(st);
                             return (
                               <option
                                 key={`opt-fu-${st}`}

@@ -182,11 +182,24 @@ export default function App() {
         canCancel: true
       };
 
+      // Check schedule change permission
+      if (updates.schedule_date !== undefined || updates.scheduleDate !== undefined || updates.schedule_time !== undefined || updates.scheduledTime !== undefined) {
+        if (perms.canChangeSchedule === false) {
+          showToast('Access Denied: You do not have permission to change delivery schedule after order placement.');
+          return;
+        }
+      }
+
       // Check status update permission and allowed statuses
       const requestedStatus = updates.order_status || updates.orderStatus || updates.followup_status || updates.followupStatus;
       if (requestedStatus) {
         if (perms.canUpdateStatus === false) {
-          showToast('Access Denied: You do not have permission to update status.');
+          showToast('Access Denied: You do not have permission to update status after order placement.');
+          return;
+        }
+
+        if (String(requestedStatus).toLowerCase() === 'cancelled' && perms.canCancel === false) {
+          showToast('Access Denied: You do not have permission to cancel orders.');
           return;
         }
 
@@ -203,7 +216,7 @@ export default function App() {
       // Check change value permission
       if (updates.order_value !== undefined || updates.orderValue !== undefined) {
         if (perms.canChangeValue === false) {
-          showToast('Access Denied: You do not have permission to change order value.');
+          showToast('Access Denied: You do not have permission to change price/order value after order placement.');
           return;
         }
       }
@@ -211,7 +224,7 @@ export default function App() {
       // Check add profit permission
       if (updates.profit !== undefined && updates.profit !== null && String(updates.profit) !== '') {
         if (perms.canAddProfit === false) {
-          showToast('Access Denied: You do not have permission to modify profit.');
+          showToast('Access Denied: You do not have permission to modify profit after order placement.');
           return;
         }
       }
@@ -249,7 +262,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased overflow-hidden select-none">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased overflow-hidden">
       {/* Toast popup */}
       {toastMessage && (
         <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xl flex items-center gap-2 border border-slate-700 animate-fadeIn">
