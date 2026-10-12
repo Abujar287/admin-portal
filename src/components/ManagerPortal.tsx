@@ -75,6 +75,7 @@ import {
   ORDER_STATUS_LIST,
 } from '../data/mockOrders';
 import { OrderJourneyModal } from './OrderJourneyModal';
+import { SelectionModal } from './SelectionModal';
 
 export const AGENT_MANAGEABLE_TABS: { id: AgentNavTab; label: string; description: string }[] = [
   { id: 'summary', label: 'Summary', description: 'Analytics, KPI metrics & sales summary' },
@@ -140,6 +141,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [modalScheduleDate, setModalScheduleDate] = useState<string>('');
   const [modalScheduledTime, setModalScheduledTime] = useState<string>('');
   const [modalNotes, setModalNotes] = useState<string>('');
+  const [editingAgent, setEditingAgent] = useState<AgentUser | null>(null);
+  const [editingField, setEditingField] = useState<'role' | 'team' | null>(null);
   const [isSavingStatus, setIsSavingStatus] = useState<boolean>(false);
   const [showAppsScriptModal, setShowAppsScriptModal] = useState<boolean>(false);
   const [copiedScript, setCopiedScript] = useState<boolean>(false);
@@ -2209,218 +2212,40 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   </span>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
-                        <th className="py-3 px-3.5 whitespace-nowrap">Agent ID</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Full Name</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Password</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Role</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Team</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Assigned TL</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Individual Permissions</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Contact</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Email</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Blood</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Status</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap text-center">Manager Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-800">
-                      {agents.map((agent, index) => {
-                        const isDeactivated = agent.status === 'deactivated';
-                        const isTL = agent.role === 'Team Leader';
-                        const perms = agent.permissions || {
-                          canCreate: true,
-                          canUpdateStatus: true,
-                          canChangeSchedule: true,
-                          canChangeValue: true,
-                          canAddProfit: true,
-                          allowedOrderStatuses: ['Pending', 'In Progress', 'Confirmed', 'Follow-up'],
-                          allowedTabs: ['summary', 'orders', 'followup', 'agent-performance', 'profiles']
-                        };
-
-                        const tabsCount = perms.allowedTabs ? perms.allowedTabs.length : 5;
-
-                        return (
-                          <tr key={agent.user} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="py-3 px-3.5 font-bold text-slate-900 whitespace-nowrap">
-                              {agent.user}
-                            </td>
-                            <td className="py-3 px-3.5 font-medium whitespace-nowrap text-slate-800">
-                              {agent.name || '-'}
-                            </td>
-                            <td className="py-3 px-3.5 font-mono text-slate-600 whitespace-nowrap">
-                              <span className="bg-slate-100 px-2 py-0.5 rounded-md text-[11px] font-bold">
-                                {agent.pass}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3.5 whitespace-nowrap">
-                              {isTL ? (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200">
-                                  Team Leader
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                  Agent
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3 px-3.5 whitespace-nowrap">
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                                {agent.team}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3.5 whitespace-nowrap">
-                              {agent.teamLeaders && agent.teamLeaders.length > 0 ? (
-                                <div className="flex flex-wrap gap-1 max-w-[200px]">
-                                  {agent.teamLeaders.map((tl, i) => (
-                                    <span key={i} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                                      👔 {tl}
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : agent.teamLeaderId ? (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                                  👔 {agent.teamLeaderId}
-                                </span>
-                              ) : (
-                                <span className="text-slate-400 text-[11px] italic">Unassigned</span>
-                              )}
-                            </td>
-                            <td className="py-3 px-3.5 whitespace-nowrap">
-                              <div className="flex items-center gap-1">
-                                <span
-                                  title={perms.canCreate ? 'Can Create Orders: YES' : 'Can Create Orders: NO'}
-                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${perms.canCreate ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-400 line-through'}`}
-                                >
-                                  Create
-                                </span>
-                                <span
-                                  title={perms.canUpdateStatus ? `Can Update Status: YES (Allowed: ${(perms.allowedOrderStatuses || []).join(', ') || 'All'})` : 'Can Update Status: NO'}
-                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${perms.canUpdateStatus ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' : 'bg-slate-100 text-slate-400 line-through'}`}
-                                >
-                                  {perms.canUpdateStatus ? `Status (${(perms.allowedOrderStatuses || []).length})` : 'Status'}
-                                </span>
-                                {perms.canUpdateStatus && perms.allowedOrderStatuses && !perms.allowedOrderStatuses.includes('Delivered') && !perms.allowedOrderStatuses.includes('Cancelled') && (
-                                  <span
-                                    title="Delivered & Cancelled restricted for this agent"
-                                    className="px-1 py-0.5 rounded text-[9px] font-extrabold bg-amber-50 text-amber-800 border border-amber-300"
-                                  >
-                                    No Deliv/Canc
-                                  </span>
-                                )}
-                                <span
-                                  title={perms.canChangeSchedule ? 'Can Change Schedule Date & Time Slot: YES' : 'Can Change Schedule Date & Time Slot: NO'}
-                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${perms.canChangeSchedule ? 'bg-sky-100 text-sky-800 border border-sky-200' : 'bg-slate-100 text-slate-400 line-through'}`}
-                                >
-                                  Schedule
-                                </span>
-                                <span
-                                  title={perms.canChangeValue ? 'Can Change Value: YES' : 'Can Change Value: NO'}
-                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${perms.canChangeValue ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-400 line-through'}`}
-                                >
-                                  Value
-                                </span>
-                                <span
-                                  title={perms.canAddProfit ? 'Can Add Profit: YES' : 'Can Add Profit: NO'}
-                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${perms.canAddProfit ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-400 line-through'}`}
-                                >
-                                  Profit
-                                </span>
-                                <span
-                                  title={`Visible Tabs: ${(perms.allowedTabs || ['summary', 'orders', 'followup', 'agent-performance', 'profiles']).join(', ')}`}
-                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${tabsCount === 5 ? 'bg-sky-100 text-sky-800 border border-sky-200' : 'bg-amber-100 text-amber-800 border border-amber-300'}`}
-                                >
-                                  Tabs ({tabsCount}/5)
-                                </span>
-                              </div>
-                            </td>
-                            <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600">
-                              {agent.contact || '-'}
-                            </td>
-                            <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">
-                              {agent.email || '-'}
-                            </td>
-                            <td className="py-3 px-3.5 whitespace-nowrap">
-                              {agent.bloodGroup ? (
-                                <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-red-50 text-red-700 border border-red-200">
-                                  {agent.bloodGroup}
-                                </span>
-                              ) : (
-                                '-'
-                              )}
-                            </td>
-                            <td className="py-3 px-3.5 whitespace-nowrap">
-                              {isDeactivated ? (
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-red-800 border border-red-200 flex items-center gap-1 w-fit">
-                                  <Lock className="w-3 h-3" /> Deactivated (3 fails)
-                                </span>
-                              ) : (
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1 w-fit">
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Active
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3 px-3.5 whitespace-nowrap text-center space-x-1.5">
-                              {/* Edit Profile & Permissions */}
-                              <button
-                                onClick={() => handleEditAgent(index)}
-                                title="Edit Credentials & Permissions"
-                                className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-md font-semibold text-[11px] cursor-pointer inline-flex items-center gap-1"
-                              >
-                                <Edit2 className="w-3 h-3" />
-                                <span>Edit</span>
-                              </button>
-
-                              {/* Activate / Deactivate button */}
-                              <button
-                                onClick={() => handleToggleAgentStatus(index)}
-                                title={isDeactivated ? 'Reactivate Agent Account' : 'Deactivate Agent'}
-                                className={`px-2.5 py-1 rounded-md font-bold text-[11px] cursor-pointer inline-flex items-center gap-1 transition-all ${
-                                  isDeactivated
-                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                                    : 'bg-amber-100 hover:bg-amber-200 text-amber-900'
-                                }`}
-                              >
-                                {isDeactivated ? (
-                                  <>
-                                    <Unlock className="w-3 h-3" />
-                                    <span>Activate</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Lock className="w-3 h-3" />
-                                    <span>Deactivate</span>
-                                  </>
-                                )}
-                              </button>
-
-                              {/* View full card */}
-                              <button
-                                onClick={() => setSelectedAgentDetails(agent)}
-                                title="View Full Profile Card"
-                                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-semibold text-[11px] cursor-pointer inline-flex items-center gap-1"
-                              >
-                                <Eye className="w-3 h-3" />
-                              </button>
-
-                              {/* Delete */}
-                              <button
-                                onClick={() => handleDeleteAgent(index)}
-                                disabled={agents.length <= 1}
-                                title="Delete Agent"
-                                className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-800 rounded-md font-semibold text-[11px] cursor-pointer inline-flex items-center gap-1 disabled:opacity-40"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                  {agents.map((agent, index) => {
+                    const isDeactivated = agent.status === 'deactivated';
+                    const isTL = agent.role === 'Team Leader';
+                    return (
+                      <div key={agent.user} className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${isTL ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                              {agent.name?.charAt(0) || agent.user.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-bold text-sm text-slate-900">{agent.name || agent.user}</p>
+                              <p className="text-xs text-slate-500">@{agent.user}</p>
+                            </div>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isDeactivated ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                            {isDeactivated ? 'Inactive' : 'Active'}
+                          </span>
+                        </div>
+                        <div className="text-xs space-y-1 text-slate-600">
+                          <p><strong>Team:</strong> {agent.team}</p>
+                          <p><strong>Role:</strong> {agent.role}</p>
+                          <p><strong>Contact:</strong> {agent.contact || 'N/A'}</p>
+                        </div>
+                        <div className="flex items-center gap-2 pt-2 border-t border-slate-100 mt-auto">
+                          <button onClick={() => handleEditAgent(index)} className="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold cursor-pointer">Edit</button>
+                          <button onClick={() => handleToggleAgentStatus(index)} className={`flex-1 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${isDeactivated ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                            {isDeactivated ? 'Activate' : 'Deactivate'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -2570,8 +2395,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 <div className="overflow-x-auto overflow-y-auto max-h-[60vh]">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="bg-gradient-to-r from-indigo-700 to-purple-800 text-white sticky top-0 z-10 font-bold">
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">order_id</th>
+                      <tr className="bg-gradient-to-r from-indigo-700 to-purple-800 text-white sticky top-0 z-20 font-bold">
+                        <th className="py-3.5 px-3.5 whitespace-nowrap sticky left-0 z-30 bg-indigo-800 border-r border-indigo-600">order_id</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">customer_id</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">customer_mobile</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">customer_name</th>
@@ -2608,7 +2433,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           return (
                             <tr key={`manager-ord-${ord.order_id || ord.id || idx}-${idx}`} className="hover:bg-indigo-50/40 transition-colors">
 
-                              <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-indigo-700">
+                              <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-indigo-700 sticky left-0 z-10 bg-white border-r border-slate-100">
                                 <button
                                   type="button"
                                   onClick={() => setViewJourneyOrder(ord)}
@@ -4250,42 +4075,44 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
           {/* TAB: PROFILES */}
           {activeTab === 'profiles' && (
-            <div className="max-w-4xl space-y-6">
-              {/* Account Details */}
+            <div className="max-w-6xl space-y-6">
               <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs">
                 <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center font-bold text-indigo-700">
-                      <User className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-slate-900 text-base">Manager Profile &amp; Account</h3>
-                      <p className="text-xs text-slate-400">Authenticated administrative session credentials</p>
-                    </div>
-                  </div>
-                  <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Active Session
-                  </span>
+                  <h3 className="font-extrabold text-slate-900 text-lg">Agent User Access Management</h3>
+                  <button className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700">Add New Agent</button>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                    <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">
-                      Username
-                    </p>
-                    <p className="text-lg font-extrabold text-slate-900 font-mono">
-                      {currentManager.user}
-                    </p>
-                  </div>
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                    <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">
-                      Role &amp; Privilege
-                    </p>
-                    <p className="text-lg font-extrabold text-indigo-700">
-                      {currentManager.role}
-                    </p>
-                  </div>
+                
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead>
+                      <tr className="text-slate-500 uppercase border-b border-slate-100">
+                        <th className="py-3 px-2 whitespace-nowrap">Agent ID</th>
+                        <th className="py-3 px-2 whitespace-nowrap">Agent Name</th>
+                        <th className="py-3 px-2 whitespace-nowrap">Password</th>
+                        <th className="py-3 px-2 whitespace-nowrap">Role</th>
+                        <th className="py-3 px-2 whitespace-nowrap">Team Assigned</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {agents.map((agent, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="py-3 px-2 font-mono text-slate-700 whitespace-nowrap">{agent.user}</td>
+                          <td className="py-3 px-2 font-bold text-slate-900 whitespace-nowrap">{agent.name}</td>
+                          <td className="py-3 px-2 font-mono text-slate-400 whitespace-nowrap">••••••••</td>
+                          <td className="py-3 px-2 whitespace-nowrap">
+                             <button onClick={() => { setEditingAgent(agent); setEditingField('role'); }} className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md font-bold hover:bg-indigo-100">
+                              {agent.role || 'Set Role'}
+                             </button>
+                          </td>
+                          <td className="py-3 px-2 whitespace-nowrap">
+                             <button onClick={() => { setEditingAgent(agent); setEditingField('team'); }} className="px-2 py-1 bg-purple-50 text-purple-700 rounded-md font-bold hover:bg-purple-100">
+                              {agent.team || 'Assign Team'}
+                             </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -4313,34 +4140,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
                       <div>
-                        <h5 className="font-bold text-xs text-slate-800">Order Details CSV</h5>
-                        <p className="text-[11px] text-slate-500">{orders.length} orders loaded</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => handlePreviewCsv(orders, 'Order Details CSV Preview', 'orders_export.csv')} className="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold cursor-pointer">Preview</button>
-                        <button onClick={() => handleExportCsv(orders, 'orders_export.csv')} className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer">Download</button>
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-                      <div>
                         <h5 className="font-bold text-xs text-slate-800">Followup History CSV</h5>
                         <p className="text-[11px] text-slate-500">{followupHistory.length} audit logs</p>
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => handlePreviewCsv(followupHistory, 'Followup History CSV Preview', 'followup_history_export.csv')} className="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold cursor-pointer">Preview</button>
                         <button onClick={() => handleExportCsv(followupHistory, 'followup_history_export.csv')} className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer">Download</button>
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-                      <div>
-                        <h5 className="font-bold text-xs text-slate-800">Agent Directory CSV</h5>
-                        <p className="text-[11px] text-slate-500">{agents.length} accounts</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => handlePreviewCsv(agents, 'Agent Directory CSV Preview', 'agents_directory_export.csv')} className="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold cursor-pointer">Preview</button>
-                        <button onClick={() => handleExportCsv(agents, 'agents_directory_export.csv')} className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer">Download</button>
                       </div>
                     </div>
                   </div>
@@ -6020,6 +5825,24 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Edit Agent Modal */}
+      {editingAgent && editingField && (
+        <SelectionModal 
+          title={`Edit ${editingField === 'role' ? 'Role' : 'Team'}`}
+          options={editingField === 'role' ? ['Agent', 'Team Leader', 'Sr Agent'] : getTeamsList()}
+          selected={editingField === 'role' ? (editingAgent.role || '') : (editingAgent.team || '')}
+          onSelect={(value) => {
+            const updatedAgents = agents.map(a => a.user === editingAgent.user ? { ...a, [editingField === 'role' ? 'role' : 'team']: value } : a);
+            onUpdateAgents(updatedAgents);
+          }}
+          onAdd={(value) => {
+             const updatedAgents = agents.map(a => a.user === editingAgent.user ? { ...a, [editingField === 'role' ? 'role' : 'team']: value } : a);
+            onUpdateAgents(updatedAgents);
+          }}
+          onClose={() => { setEditingAgent(null); setEditingField(null); }}
+        />
       )}
     </div>
   );

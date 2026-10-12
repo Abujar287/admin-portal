@@ -716,13 +716,9 @@ export class OrderService {
       const changedParts: string[] = [];
       if (priceChanged) changedParts.push('price');
       if (profitChanged) changedParts.push('profit');
-      if (schedDateChanged && schedTimeChanged) {
-        changedParts.push('schedule date & time');
-      } else if (schedDateChanged) {
-        changedParts.push('schedule');
-      } else if (schedTimeChanged) {
-        changedParts.push('schedule time');
-      }
+      if (schedDateChanged && schedTimeChanged) changedParts.push('schedule date & time');
+      else if (schedDateChanged) changedParts.push('schedule');
+      else if (schedTimeChanged) changedParts.push('schedule time');
       if (statusChanged) changedParts.push('status');
 
       if (changedParts.length === 0) {
@@ -738,6 +734,12 @@ export class OrderService {
       } else {
         actionStr = `(${changedParts.join(', ')}) change`;
       }
+
+      // Generate status change string only if status changed, otherwise include update notes
+      let statusChangeText = statusChanged ? `${prevFo} -> ${finalFollowupStatus || prevFo}` : '';
+      if (!statusChanged && schedDateChanged) statusChangeText = `(Schedule Date updated to ${schedDate})`;
+      else if (!statusChanged && schedTimeChanged) statusChangeText = `(Schedule Time updated to ${schedTime})`;
+      else if (!statusChanged) statusChangeText = 'No Status Change';
 
       historyItem = {
         id: nextId,
@@ -774,8 +776,15 @@ export class OrderService {
         params.append('action_name', actionStr);
         params.append('actionName', actionStr);
         const prevFo = existingOrder?.followup_status || existingOrder?.followupStatus || 'Pending';
-        const newFo = finalFollowupStatus || prevFo;
-        const statusChangeText = `${prevFo} -> ${newFo}`;
+        const statusChanged = finalFollowupStatus !== undefined && finalFollowupStatus !== prevFo;
+        const scDtToSync = updates.schedule_date !== undefined ? updates.schedule_date : updates.scheduleDate;
+        const scTmToSync = updates.schedule_time !== undefined ? updates.schedule_time : updates.scheduledTime;
+        const schedDateChanged = scDtToSync !== undefined && scDtToSync !== (existingOrder?.schedule_date || existingOrder?.scheduleDate || '');
+        const schedTimeChanged = scTmToSync !== undefined && scTmToSync !== (existingOrder?.schedule_time || existingOrder?.scheduledTime || '');
+        const schedDate = scDtToSync || (existingOrder?.schedule_date || existingOrder?.scheduleDate || '');
+        const schedTime = scTmToSync || (existingOrder?.schedule_time || existingOrder?.scheduledTime || '');
+
+        const statusChangeText = statusChanged ? `${prevFo} -> ${finalFollowupStatus || prevFo}` : (schedDateChanged ? `(Schedule Date updated to ${schedDate})` : (schedTimeChanged ? `(Schedule Time updated to ${schedTime})` : 'No Status Change'));
         params.append('status_change', statusChangeText);
         params.append('statusChange', statusChangeText);
         if (finalFollowupStatus) {
@@ -799,12 +808,11 @@ export class OrderService {
         params.append('cancelledDate', newCancelledDate || '');
         params.append('followup_date', newFollowupDate || '');
         params.append('followupDate', newFollowupDate || '');
-        const scDtToSync = updates.schedule_date !== undefined ? updates.schedule_date : updates.scheduleDate;
+        // Use already defined variables scDtToSync/scTmToSync
         if (scDtToSync !== undefined) {
           params.append('schedule_date', scDtToSync);
           params.append('scheduleDate', scDtToSync);
         }
-        const scTmToSync = updates.schedule_time !== undefined ? updates.schedule_time : updates.scheduledTime;
         if (scTmToSync !== undefined) {
           params.append('schedule_time', scTmToSync);
           params.append('scheduledTime', scTmToSync);
