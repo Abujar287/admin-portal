@@ -333,4 +333,179 @@ function getRecentDateTimeStr(daysAgo: number, hoursOffset: number = 0): string 
   return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
 }
 
-export const INITIAL_ORDERS: OrderItem[] = [];
+export const INITIAL_ORDERS: OrderItem[] = (() => {
+  const generatedOrders: OrderItem[] = [];
+  const channels = ['Website', 'Facebook', 'WhatsApp', 'Instagram', 'Phone'];
+  const agentPairs = [
+    { agent_id: '6', agent_name: 'rtn01' },
+    { agent_id: '22', agent_name: 'fb02' },
+    { agent_id: '1', agent_name: 'Agent 1' },
+    { agent_id: '2', agent_name: 'Agent 2' },
+    { agent_id: '3', agent_name: 'Agent 3' },
+    { agent_id: 'agent01', agent_name: 'agent01' },
+    { agent_id: 'agent02', agent_name: 'agent02' }
+  ];
+  const categories = ['Home & Kitchen', 'Beauty', 'Electronics', 'Fashion', 'Health'];
+  const products: Record<string, string[]> = {
+    'Home & Kitchen': ['blender', 'cooker', 'knife set', 'air fryer', 'water filter'],
+    'Beauty': ['perfume', 'lipstick', 'face serum', 'moisturizer', 'sunscreen'],
+    'Electronics': ['smartphone', 'bluetooth speaker', 'smartwatch', 'power bank', 'earbuds'],
+    'Fashion': ['t-shirt', 'jeans', 'sneakers', 'jacket', 'sunglasses'],
+    'Health': ['vitamins', 'protein powder', 'bp monitor', 'glucometer', 'multivitamin']
+  };
+  const cities = ['Dhaka', 'Chittagong', 'Sylhet', 'Khulna', 'Jashore'];
+  const areas: Record<string, string[]> = {
+    'Dhaka': ['Gulshan', 'Banani', 'Dhanmondi', 'Mirpur', 'Uttara', 'Badda'],
+    'Chittagong': ['Agrabad', 'Khulshi', 'Nasirabad', 'Halishahar'],
+    'Sylhet': ['Zindabazar', 'Amberkhana', 'Upashahar'],
+    'Khulna': ['Sonadanga', 'Khalishpur', 'Boyra'],
+    'Jashore': ['Chowrasta', 'Palbari', 'New Market']
+  };
+  const statuses = ['Pending', 'In Progress', 'Confirmed', 'Follow-up', 'Delivered', 'Cancelled', 'Returned'];
+  const followups = ['Pending', 'In Progress', 'Completed', 'Follow-up'];
+  const genders = ['Male', 'Female', 'Other'];
+
+  // Include the two specific requested sample orders as #1 and #2
+  generatedOrders.push({
+    order_id: '1',
+    id: '1',
+    customer_id: '103',
+    customerId: '103',
+    customer_mobile: '1339345092',
+    customerContact: '1339345092',
+    customer_name: 'customer103',
+    customerName: 'customer103',
+    gender: 'Male',
+    create_date: '2026-10-07 2:03:04',
+    createDate: '2026-10-07 2:03:04',
+    order_channel: 'Website',
+    orderChannel: 'Website',
+    agent_id: '6',
+    agentId: '6',
+    agent_name: 'rtn01',
+    agentName: 'rtn01',
+    product_category: 'Home & Kitchen',
+    productCategory: 'Home & Kitchen',
+    product_name: 'blender',
+    productName: 'blender',
+    city: 'Sylhet',
+    delivery_area: 'Zindabazar',
+    deliveryArea: 'Zindabazar',
+    address_details: 'Flat: 1, House: 152, Road: 28, Block: A',
+    addressDetails: 'Flat: 1, House: 152, Road: 28, Block: A',
+    schedule_date: '08-Oct-26',
+    scheduleDate: '08-Oct-26',
+    schedule_time: '8PM to 9PM',
+    scheduledTime: '8PM to 9PM',
+    order_value: 11237,
+    orderValue: 11237,
+    order_status: 'Pending',
+    orderStatus: 'Pending',
+    followup_status: 'In Progress',
+    followupStatus: 'In Progress',
+    profit: 2247
+  });
+
+  generatedOrders.push({
+    order_id: '2',
+    id: '2',
+    customer_id: '2933',
+    customerId: '2933',
+    customer_mobile: '1455176955',
+    customerContact: '1455176955',
+    customer_name: 'customer2933',
+    customerName: 'customer2933',
+    gender: 'Male',
+    create_date: '2026-09-14 20:06:56',
+    createDate: '2026-09-14 20:06:56',
+    order_channel: 'Facebook',
+    orderChannel: 'Facebook',
+    agent_id: '22',
+    agentId: '22',
+    agent_name: 'fb02',
+    agentName: 'fb02',
+    product_category: 'Beauty',
+    productCategory: 'Beauty',
+    product_name: 'perfume',
+    productName: 'perfume',
+    city: 'Khulna',
+    delivery_area: 'Sonadanga',
+    deliveryArea: 'Sonadanga',
+    address_details: 'Flat: 5, House: 109, Road: 22, Block: C',
+    addressDetails: 'Flat: 5, House: 109, Road: 22, Block: C',
+    schedule_date: '21-Sep-26',
+    scheduleDate: '21-Sep-26',
+    schedule_time: '10AM to 11AM',
+    scheduledTime: '10AM to 11AM',
+    order_value: 256,
+    orderValue: 256,
+    order_status: 'Pending',
+    orderStatus: 'Pending',
+    followup_status: 'Pending',
+    followupStatus: 'Pending',
+    profit: 51
+  });
+
+  for (let i = 3; i <= 5000; i++) {
+    const agentPair = agentPairs[(i - 1) % agentPairs.length];
+    const cat = categories[(i - 1) % categories.length];
+    const prodList = products[cat];
+    const prod = prodList[(i - 1) % prodList.length];
+    const city = cities[(i - 1) % cities.length];
+    const areaList = areas[city];
+    const area = areaList[(i - 1) % areaList.length];
+    const status = statuses[(i * 3) % statuses.length];
+    const followup = followups[(i * 7) % followups.length];
+    const gender = genders[i % genders.length];
+    const channel = channels[(i * 5) % channels.length];
+
+    const custId = String(1000 + i);
+    const mobile = String(1300000000 + (i * 137) % 899999999);
+    const custName = `customer${1000 + i}`;
+    const orderValue = 200 + (i * 43) % 15000;
+    const profit = Math.round(orderValue * 0.2);
+
+    generatedOrders.push({
+      order_id: String(i),
+      id: String(i),
+      customer_id: custId,
+      customerId: custId,
+      customer_mobile: mobile,
+      customerContact: mobile,
+      customer_name: custName,
+      customerName: custName,
+      gender,
+      create_date: getRecentDateTimeStr(i % 30, i % 24),
+      createDate: getRecentDateTimeStr(i % 30, i % 24),
+      order_channel: channel,
+      orderChannel: channel,
+      agent_id: agentPair.agent_id,
+      agentId: agentPair.agent_id,
+      agent_name: agentPair.agent_name,
+      agentName: agentPair.agent_name,
+      product_category: cat,
+      productCategory: cat,
+      product_name: prod,
+      productName: prod,
+      city,
+      delivery_area: area,
+      deliveryArea: area,
+      address_details: `Flat: ${i % 5 + 1}, House: ${i % 200 + 1}, Road: ${i % 50 + 1}, Block: ${String.fromCharCode(65 + (i % 4))}`,
+      addressDetails: `Flat: ${i % 5 + 1}, House: ${i % 200 + 1}, Road: ${i % 50 + 1}, Block: ${String.fromCharCode(65 + (i % 4))}`,
+      schedule_date: getRecentDateStr((i % 15) - 5),
+      scheduleDate: getRecentDateStr((i % 15) - 5),
+      schedule_time: '11AM to 12PM',
+      scheduledTime: '11AM to 12PM',
+      order_value: orderValue,
+      orderValue: orderValue,
+      order_status: status,
+      orderStatus: status,
+      followup_status: followup,
+      followupStatus: followup,
+      profit
+    });
+  }
+
+  return generatedOrders;
+})();
+

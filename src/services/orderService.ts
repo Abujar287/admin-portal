@@ -31,18 +31,20 @@ export class OrderService {
     localStorage.setItem(STORAGE_KEYS.SCRIPT_URL, url.trim());
   }
 
+  private static resolveAgentName(aId: string, sheetNm?: string): string {
+    if (sheetNm !== undefined && sheetNm !== null) {
+      return String(sheetNm).trim();
+    }
+    return '';
+  }
+
   static getAgents(): AgentUser[] {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.AGENTS);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((a: AgentUser) => {
-            if (a.user === 'agent01') return { ...a, user: '1', pass: a.pass === 'agent01' ? '1' : a.pass, email: '1@portal.local' };
-            if (a.user === 'agent02') return { ...a, user: '2', pass: a.pass === 'agent02' ? '2' : a.pass, email: '2@portal.local' };
-            if (a.user === 'agent03') return { ...a, user: '3', pass: a.pass === 'agent03' ? '3' : a.pass, email: '3@portal.local' };
-            return a;
-          });
+          return parsed;
         }
       }
     } catch {
@@ -95,12 +97,13 @@ export class OrderService {
               const gen = String(o.gender || 'Other');
               const crDt = String(o.create_date || o.createDate || '');
               const ch = String(o.order_channel || o.orderChannel || 'Acquisition');
-              const aId = o.agent_id !== undefined && o.agent_id !== null && String(o.agent_id).trim() !== ''
+              let aId = o.agent_id !== undefined && o.agent_id !== null && String(o.agent_id).trim() !== ''
                 ? String(o.agent_id).trim()
                 : (o.agentId ? String(o.agentId).trim() : '');
-              const aNm = o.agent_name !== undefined && o.agent_name !== null && String(o.agent_name).trim() !== ''
+              const rawANm = o.agent_name !== undefined && o.agent_name !== null && String(o.agent_name).trim() !== ''
                 ? String(o.agent_name).trim()
-                : (o.agentName ? String(o.agentName).trim() : (aId ? `Agent ${aId}` : 'Agent'));
+                : (o.agentName ? String(o.agentName).trim() : '');
+              const aNm = this.resolveAgentName(aId, rawANm);
               const pCat = String(o.product_category || o.productCategory || 'Electronics');
               const pNm = String(o.product_name || o.productName || 'Product Item');
               const ct = String(o.city || 'Dhaka');
@@ -162,15 +165,16 @@ export class OrderService {
                 followup_date: fDt,
                 followupDate: fDt
               };
-            })
-            .filter((o: any) => !['1001', '1002', '1003', '1004', '1005', '1006', '1007', '1008'].includes(String(o.order_id)));
-          return normalized;
+            });
+          if (normalized.length > 0) return normalized;
         }
       }
     } catch {
       // fallback
     }
-    return [];
+    // If nothing stored or empty, return INITIAL_ORDERS and save to storage
+    localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(INITIAL_ORDERS));
+    return INITIAL_ORDERS;
   }
 
   static saveLocalOrders(orders: OrderItem[]): void {
@@ -246,8 +250,10 @@ export class OrderService {
 
     // Extract from sheet orders
     orders.forEach(o => {
-      const cleanId = (o.agent_id || (o as any).agentId || '').trim();
-      if (cleanId && !agentMap.has(cleanId.toLowerCase())) {
+      const cleanId = String(o.agent_id || (o as any).agentId || '').trim();
+      if (!cleanId) return;
+
+      if (!agentMap.has(cleanId.toLowerCase())) {
         agentMap.set(cleanId.toLowerCase(), {
           user: cleanId,
           pass: cleanId, // default pass same as user id
@@ -362,8 +368,9 @@ export class OrderService {
         const gen = valOrEmpty(idxGender, 'Other', 4);
         const crDt = valOrEmpty(idxCreateDt, new Date().toISOString().replace('T', ' ').slice(0, 19), 5);
         const ch = valOrEmpty(idxChannel, 'Acquisition', 6);
-        const aId = valOrEmpty(idxAgentId, '1', 7);
-        const aNm = valOrEmpty(idxAgentNm, `Agent ${aId}`, 8);
+        const aId = valOrEmpty(idxAgentId, '', 7);
+        const rawANm = valOrEmpty(idxAgentNm, '', 8);
+        const aNm = this.resolveAgentName(aId, rawANm);
         const pCat = valOrEmpty(idxProdCat, 'Electronics', 9);
         const pNm = valOrEmpty(idxProdNm, 'Product Item', 10);
         const ct = valOrEmpty(idxCity, 'Dhaka', 11);
@@ -468,7 +475,8 @@ export class OrderService {
     const crDate = String(newOrder.create_date || newOrder.createDate || new Date().toISOString().replace('T', ' ').slice(0, 19));
     const ch = String(newOrder.order_channel || newOrder.orderChannel || 'Acquisition');
     const agId = String(newOrder.agent_id || newOrder.agentId || '1');
-    const agNm = String(newOrder.agent_name || newOrder.agentName || 'Agent');
+    const rawAgNm = String(newOrder.agent_name || newOrder.agentName || '');
+    const agNm = this.resolveAgentName(agId, rawAgNm);
     const pCat = String(newOrder.product_category || newOrder.productCategory || 'Electronics');
     const pNm = String(newOrder.product_name || newOrder.productName || 'Product Item');
     const ct = String(newOrder.city || 'Dhaka');
