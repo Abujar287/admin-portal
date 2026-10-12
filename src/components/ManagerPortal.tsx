@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import { AgentUser, ManagerUser, OrderItem, DateFilterType, FollowupHistoryItem, AgentPermissions, AgentNavTab } from '../types';
 import { OrderService } from '../services/orderService';
 import { 
@@ -575,6 +576,16 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     link.click();
     document.body.removeChild(link);
   };
+
+  const handleExportXlsx = (data: any[], filename: string) => {
+    if (data.length === 0) return;
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    XLSX.writeFile(wb, filename.replace('.csv', '.xlsx'));
+  };
+
+  const [openExportMenuId, setOpenExportMenuId] = useState<string | null>(null);
 
   const handleAddChannel = (channel: string) => {
     addOrderChannel(channel);
@@ -2430,6 +2441,20 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
                     <span>🔄 Refresh Data</span>
                   </button>
+                  <div className="relative">
+                    <button
+                      onClick={() => setOpenExportMenuId(openExportMenuId === 'orders' ? null : 'orders')}
+                      className="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span>📥 Export</span>
+                    </button>
+                    {openExportMenuId === 'orders' && (
+                      <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-1 w-24">
+                        <button onClick={() => { handleExportCsv(filteredOrders, 'orders.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 rounded">CSV</button>
+                        <button onClick={() => { handleExportXlsx(filteredOrders, 'orders.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 rounded">XLSX</button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-4">
@@ -2546,7 +2571,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-gradient-to-r from-indigo-700 to-purple-800 text-white sticky top-0 z-10 font-bold">
-                        <th className="py-3.5 px-3 whitespace-nowrap text-center">Journey &amp; Details</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">order_id</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">customer_id</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">customer_mobile</th>
@@ -2574,7 +2598,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <tbody className="divide-y divide-slate-100 text-slate-800">
                       {filteredOrders.length === 0 ? (
                         <tr>
-                          <td colSpan={23} className="text-center py-12 text-slate-400 font-semibold">
+                          <td colSpan={22} className="text-center py-12 text-slate-400 font-semibold">
                             No orders found matching filters.
                           </td>
                         </tr>
@@ -2589,10 +2613,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                   type="button"
                                   onClick={() => setViewJourneyOrder(ord)}
                                   className="hover:underline text-indigo-700 hover:text-indigo-900 flex items-center gap-1 cursor-pointer font-bold"
-                                  title="Click to view full order details & journey"
+                                  title="Click to open order details"
                                 >
                                   <span>#{ord.order_id || ord.id}</span>
-                                  <ExternalLink className="w-3 h-3 text-indigo-400" />
                                 </button>
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-800">
@@ -2655,46 +2678,19 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                 </span>
                               </td>
                               <td className="py-2.5 px-3.5 whitespace-nowrap">
-                                <div className="flex items-center gap-1.5">
-                                  <select
-                                    value={ord.followup_status || 'Pending'}
-                                    onChange={(e) => {
-                                      const newStatus = e.target.value;
-                                      onUpdateOrderStatus?.(
-                                        ord.order_id,
-                                        {
-                                          followup_status: newStatus,
-                                          order_status: newStatus === 'Delivered' ? 'Delivered' : ord.order_status
-                                        },
-                                        currentManager.name || currentManager.user || 'Manager'
-                                      );
-                                    }}
-                                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold border transition-all cursor-pointer ${
-                                      ord.followup_status === 'Delivered'
-                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                                        : ord.followup_status === 'Cancelled'
-                                        ? 'bg-red-50 text-red-800 border-red-300'
-                                        : ord.followup_status === 'Confirmed'
-                                        ? 'bg-blue-50 text-blue-800 border-blue-300'
-                                        : ord.followup_status === 'Follow-up'
-                                        ? 'bg-purple-50 text-purple-800 border-purple-300'
-                                        : 'bg-amber-50 text-amber-800 border-amber-300'
-                                    }`}
-                                  >
-                                    <option value="Pending">Pending</option>
-                                    <option value="Confirmed">Confirmed</option>
-                                    <option value="Follow-up">Follow-up</option>
-                                    <option value="Delivered">Delivered</option>
-                                    <option value="Cancelled">Cancelled</option>
-                                  </select>
-                                  <button
-                                    onClick={() => setViewJourneyOrder(ord)}
-                                    title="Open Full Order Details, Activity Journey & Edit"
-                                    className="p-1 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-900 transition-colors cursor-pointer"
-                                  >
-                                    <Edit2 className="w-3 h-3" />
-                                  </button>
-                                </div>
+                                <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold border ${
+                                    ord.followup_status === 'Delivered'
+                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                      : ord.followup_status === 'Cancelled'
+                                      ? 'bg-red-50 text-red-800 border-red-300'
+                                      : ord.followup_status === 'Confirmed'
+                                      ? 'bg-blue-50 text-blue-800 border-blue-300'
+                                      : ord.followup_status === 'Follow-up'
+                                      ? 'bg-purple-50 text-purple-800 border-purple-300'
+                                      : 'bg-amber-50 text-amber-800 border-amber-300'
+                                  }`}>
+                                  {ord.followup_status || 'Pending'}
+                                </span>
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-bold text-emerald-600">
                                 {ord.profit && ord.profit > 0 ? `৳ ${(ord.profit || 0).toLocaleString()}` : '-'}
@@ -3377,9 +3373,23 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       <Layers className="w-4 h-4 text-indigo-600" />
                       <span>Channel Wise Summary</span>
                     </h4>
-                    <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">
-                      {summaryStats.channelSummary.length} Channels
-                    </span>
+                    <div className="flex items-center gap-2 relative">
+                      <button
+                        onClick={() => setOpenExportMenuId(openExportMenuId === 'channel' ? null : 'channel')}
+                        className="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer text-slate-700"
+                      >
+                        📥 Export
+                      </button>
+                      {openExportMenuId === 'channel' && (
+                        <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-1 w-24">
+                          <button onClick={() => { handleExportCsv(summaryStats.channelSummary, 'channel_summary.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 rounded">CSV</button>
+                          <button onClick={() => { handleExportXlsx(summaryStats.channelSummary, 'channel_summary.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 rounded">XLSX</button>
+                        </div>
+                      )}
+                      <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">
+                        {summaryStats.channelSummary.length} Channels
+                      </span>
+                    </div>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs text-left">
@@ -3585,9 +3595,23 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       <FileText className="w-4 h-4 text-indigo-600" />
                       <span>Category Wise Summary</span>
                     </h4>
-                    <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">
-                      {summaryStats.categorySummary.length} Categories
-                    </span>
+                    <div className="flex items-center gap-2 relative">
+                      <button
+                        onClick={() => setOpenExportMenuId(openExportMenuId === 'category' ? null : 'category')}
+                        className="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer text-slate-700"
+                      >
+                        📥 Export
+                      </button>
+                      {openExportMenuId === 'category' && (
+                        <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-1 w-24">
+                          <button onClick={() => { handleExportCsv(summaryStats.categorySummary, 'category_summary.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 rounded">CSV</button>
+                          <button onClick={() => { handleExportXlsx(summaryStats.categorySummary, 'category_summary.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 rounded">XLSX</button>
+                        </div>
+                      )}
+                      <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">
+                        {summaryStats.categorySummary.length} Categories
+                      </span>
+                    </div>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs text-left">
@@ -3793,9 +3817,23 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       <Building2 className="w-4 h-4 text-indigo-600" />
                       <span>City Wise Summary</span>
                     </h4>
-                    <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">
-                      {summaryStats.citySummary.length} Cities
-                    </span>
+                    <div className="flex items-center gap-2 relative">
+                      <button
+                        onClick={() => setOpenExportMenuId(openExportMenuId === 'city' ? null : 'city')}
+                        className="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer text-slate-700"
+                      >
+                        📥 Export
+                      </button>
+                      {openExportMenuId === 'city' && (
+                        <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-1 w-24">
+                          <button onClick={() => { handleExportCsv(summaryStats.citySummary, 'city_summary.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 rounded">CSV</button>
+                          <button onClick={() => { handleExportXlsx(summaryStats.citySummary, 'city_summary.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 rounded">XLSX</button>
+                        </div>
+                      )}
+                      <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">
+                        {summaryStats.citySummary.length} Cities
+                      </span>
+                    </div>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs text-left">
