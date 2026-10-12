@@ -4,7 +4,7 @@ export const INITIAL_AGENTS: AgentUser[] = [
   { 
     user: '1', 
     pass: '1', 
-    name: 'Agent 1', 
+    name: 'aqn01', 
     team: 'Acquisition', 
     teamLeaderId: 'MD Abujar',
     teamLeaders: ['MD Abujar'],
@@ -333,40 +333,8 @@ function getRecentDateTimeStr(daysAgo: number, hoursOffset: number = 0): string 
   return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
 }
 
-export const INITIAL_ORDERS: OrderItem[] = (() => {
-  const generatedOrders: OrderItem[] = [];
-  const channels = ['Website', 'Facebook', 'WhatsApp', 'Instagram', 'Phone'];
-  const agentPairs = [
-    { agent_id: '6', agent_name: 'rtn01' },
-    { agent_id: '22', agent_name: 'fb02' },
-    { agent_id: '1', agent_name: 'Agent 1' },
-    { agent_id: '2', agent_name: 'Agent 2' },
-    { agent_id: '3', agent_name: 'Agent 3' },
-    { agent_id: 'agent01', agent_name: 'agent01' },
-    { agent_id: 'agent02', agent_name: 'agent02' }
-  ];
-  const categories = ['Home & Kitchen', 'Beauty', 'Electronics', 'Fashion', 'Health'];
-  const products: Record<string, string[]> = {
-    'Home & Kitchen': ['blender', 'cooker', 'knife set', 'air fryer', 'water filter'],
-    'Beauty': ['perfume', 'lipstick', 'face serum', 'moisturizer', 'sunscreen'],
-    'Electronics': ['smartphone', 'bluetooth speaker', 'smartwatch', 'power bank', 'earbuds'],
-    'Fashion': ['t-shirt', 'jeans', 'sneakers', 'jacket', 'sunglasses'],
-    'Health': ['vitamins', 'protein powder', 'bp monitor', 'glucometer', 'multivitamin']
-  };
-  const cities = ['Dhaka', 'Chittagong', 'Sylhet', 'Khulna', 'Jashore'];
-  const areas: Record<string, string[]> = {
-    'Dhaka': ['Gulshan', 'Banani', 'Dhanmondi', 'Mirpur', 'Uttara', 'Badda'],
-    'Chittagong': ['Agrabad', 'Khulshi', 'Nasirabad', 'Halishahar'],
-    'Sylhet': ['Zindabazar', 'Amberkhana', 'Upashahar'],
-    'Khulna': ['Sonadanga', 'Khalishpur', 'Boyra'],
-    'Jashore': ['Chowrasta', 'Palbari', 'New Market']
-  };
-  const statuses = ['Pending', 'In Progress', 'Confirmed', 'Follow-up', 'Delivered', 'Cancelled', 'Returned'];
-  const followups = ['Pending', 'In Progress', 'Completed', 'Follow-up'];
-  const genders = ['Male', 'Female', 'Other'];
-
-  // Include the two specific requested sample orders as #1 and #2
-  generatedOrders.push({
+export const INITIAL_ORDERS: OrderItem[] = [
+  {
     order_id: '1',
     id: '1',
     customer_id: '103',
@@ -380,10 +348,10 @@ export const INITIAL_ORDERS: OrderItem[] = (() => {
     createDate: '2026-10-07 2:03:04',
     order_channel: 'Website',
     orderChannel: 'Website',
-    agent_id: '6',
-    agentId: '6',
-    agent_name: 'rtn01',
-    agentName: 'rtn01',
+    agent_id: '1',
+    agentId: '1',
+    agent_name: 'aqn01',
+    agentName: 'aqn01',
     product_category: 'Home & Kitchen',
     productCategory: 'Home & Kitchen',
     product_name: 'blender',
@@ -393,8 +361,8 @@ export const INITIAL_ORDERS: OrderItem[] = (() => {
     deliveryArea: 'Zindabazar',
     address_details: 'Flat: 1, House: 152, Road: 28, Block: A',
     addressDetails: 'Flat: 1, House: 152, Road: 28, Block: A',
-    schedule_date: '08-Oct-26',
-    scheduleDate: '08-Oct-26',
+    schedule_date: '2026-10-08',
+    scheduleDate: '2026-10-08',
     schedule_time: '8PM to 9PM',
     scheduledTime: '8PM to 9PM',
     order_value: 11237,
@@ -404,9 +372,126 @@ export const INITIAL_ORDERS: OrderItem[] = (() => {
     followup_status: 'In Progress',
     followupStatus: 'In Progress',
     profit: 2247
-  });
-
-  generatedOrders.push({
+  },
+  {
+    order_id: '3',
+    id: '3',
+    customer_id: '1003',
+    customerId: '1003',
+    customer_mobile: '1300000411',
+    customerContact: '1300000411',
+    customer_name: 'customer1003',
+    customerName: 'customer1003',
+    gender: 'Male',
+    create_date: '2026-10-09 14:42:00',
+    createDate: '2026-10-09 14:42:00',
+    order_channel: 'Website',
+    orderChannel: 'Website',
+    agent_id: '1',
+    agentId: '1',
+    agent_name: 'aqn01',
+    agentName: 'aqn01',
+    product_category: 'Electronics',
+    productCategory: 'Electronics',
+    product_name: 'smartphone',
+    productName: 'smartphone',
+    city: 'Dhaka',
+    delivery_area: 'Gulshan',
+    deliveryArea: 'Gulshan',
+    address_details: 'House 12, Road 5, Block D',
+    addressDetails: 'House 12, Road 5, Block D',
+    schedule_date: '2026-10-10',
+    scheduleDate: '2026-10-10',
+    schedule_time: '11AM to 12PM',
+    scheduledTime: '11AM to 12PM',
+    order_value: 15400,
+    orderValue: 15400,
+    order_status: 'Confirmed',
+    orderStatus: 'Confirmed',
+    followup_status: 'Confirmed',
+    followupStatus: 'Confirmed',
+    profit: 3080
+  },
+  {
+    order_id: '10',
+    id: '10',
+    customer_id: '1010',
+    customerId: '1010',
+    customer_mobile: '1300001370',
+    customerContact: '1300001370',
+    customer_name: 'customer1010',
+    customerName: 'customer1010',
+    gender: 'Female',
+    create_date: '2026-10-02 07:42:00',
+    createDate: '2026-10-02 07:42:00',
+    order_channel: 'Website',
+    orderChannel: 'Website',
+    agent_id: '1',
+    agentId: '1',
+    agent_name: 'aqn01',
+    agentName: 'aqn01',
+    product_category: 'Health',
+    productCategory: 'Health',
+    product_name: 'vitamins',
+    productName: 'vitamins',
+    city: 'Chittagong',
+    delivery_area: 'Agrabad',
+    deliveryArea: 'Agrabad',
+    address_details: 'Building 4, Agrabad Commercial Area',
+    addressDetails: 'Building 4, Agrabad Commercial Area',
+    schedule_date: '2026-10-04',
+    scheduleDate: '2026-10-04',
+    schedule_time: '2PM to 3PM',
+    scheduledTime: '2PM to 3PM',
+    order_value: 3450,
+    orderValue: 3450,
+    order_status: 'Delivered',
+    orderStatus: 'Delivered',
+    followup_status: 'Delivered',
+    followupStatus: 'Delivered',
+    profit: 690,
+    delivered_date: '2026-10-04 15:30:00'
+  },
+  {
+    order_id: '17',
+    id: '17',
+    customer_id: '1017',
+    customerId: '1017',
+    customer_mobile: '1300002329',
+    customerContact: '1300002329',
+    customer_name: 'customer1017',
+    customerName: 'customer1017',
+    gender: 'Other',
+    create_date: '2026-09-25 00:42:00',
+    createDate: '2026-09-25 00:42:00',
+    order_channel: 'Website',
+    orderChannel: 'Website',
+    agent_id: '1',
+    agentId: '1',
+    agent_name: 'aqn01',
+    agentName: 'aqn01',
+    product_category: 'Beauty',
+    productCategory: 'Beauty',
+    product_name: 'perfume',
+    productName: 'perfume',
+    city: 'Sylhet',
+    delivery_area: 'Amberkhana',
+    deliveryArea: 'Amberkhana',
+    address_details: 'House 8, Amberkhana Point',
+    addressDetails: 'House 8, Amberkhana Point',
+    schedule_date: '2026-09-27',
+    scheduleDate: '2026-09-27',
+    schedule_time: '4PM to 5PM',
+    scheduledTime: '4PM to 5PM',
+    order_value: 2900,
+    orderValue: 2900,
+    order_status: 'Confirmed',
+    orderStatus: 'Confirmed',
+    followup_status: 'Confirmed',
+    followupStatus: 'Confirmed',
+    profit: 580
+  },
+  {
     order_id: '2',
     id: '2',
     customer_id: '2933',
@@ -420,10 +505,10 @@ export const INITIAL_ORDERS: OrderItem[] = (() => {
     createDate: '2026-09-14 20:06:56',
     order_channel: 'Facebook',
     orderChannel: 'Facebook',
-    agent_id: '22',
-    agentId: '22',
-    agent_name: 'fb02',
-    agentName: 'fb02',
+    agent_id: '2',
+    agentId: '2',
+    agent_name: 'Agent 2',
+    agentName: 'Agent 2',
     product_category: 'Beauty',
     productCategory: 'Beauty',
     product_name: 'perfume',
@@ -433,8 +518,8 @@ export const INITIAL_ORDERS: OrderItem[] = (() => {
     deliveryArea: 'Sonadanga',
     address_details: 'Flat: 5, House: 109, Road: 22, Block: C',
     addressDetails: 'Flat: 5, House: 109, Road: 22, Block: C',
-    schedule_date: '21-Sep-26',
-    scheduleDate: '21-Sep-26',
+    schedule_date: '2026-09-21',
+    scheduleDate: '2026-09-21',
     schedule_time: '10AM to 11AM',
     scheduledTime: '10AM to 11AM',
     order_value: 256,
@@ -444,68 +529,6 @@ export const INITIAL_ORDERS: OrderItem[] = (() => {
     followup_status: 'Pending',
     followupStatus: 'Pending',
     profit: 51
-  });
-
-  for (let i = 3; i <= 5000; i++) {
-    const agentPair = agentPairs[(i - 1) % agentPairs.length];
-    const cat = categories[(i - 1) % categories.length];
-    const prodList = products[cat];
-    const prod = prodList[(i - 1) % prodList.length];
-    const city = cities[(i - 1) % cities.length];
-    const areaList = areas[city];
-    const area = areaList[(i - 1) % areaList.length];
-    const status = statuses[(i * 3) % statuses.length];
-    const followup = followups[(i * 7) % followups.length];
-    const gender = genders[i % genders.length];
-    const channel = channels[(i * 5) % channels.length];
-
-    const custId = String(1000 + i);
-    const mobile = String(1300000000 + (i * 137) % 899999999);
-    const custName = `customer${1000 + i}`;
-    const orderValue = 200 + (i * 43) % 15000;
-    const profit = Math.round(orderValue * 0.2);
-
-    generatedOrders.push({
-      order_id: String(i),
-      id: String(i),
-      customer_id: custId,
-      customerId: custId,
-      customer_mobile: mobile,
-      customerContact: mobile,
-      customer_name: custName,
-      customerName: custName,
-      gender,
-      create_date: getRecentDateTimeStr(i % 30, i % 24),
-      createDate: getRecentDateTimeStr(i % 30, i % 24),
-      order_channel: channel,
-      orderChannel: channel,
-      agent_id: agentPair.agent_id,
-      agentId: agentPair.agent_id,
-      agent_name: agentPair.agent_name,
-      agentName: agentPair.agent_name,
-      product_category: cat,
-      productCategory: cat,
-      product_name: prod,
-      productName: prod,
-      city,
-      delivery_area: area,
-      deliveryArea: area,
-      address_details: `Flat: ${i % 5 + 1}, House: ${i % 200 + 1}, Road: ${i % 50 + 1}, Block: ${String.fromCharCode(65 + (i % 4))}`,
-      addressDetails: `Flat: ${i % 5 + 1}, House: ${i % 200 + 1}, Road: ${i % 50 + 1}, Block: ${String.fromCharCode(65 + (i % 4))}`,
-      schedule_date: getRecentDateStr((i % 15) - 5),
-      scheduleDate: getRecentDateStr((i % 15) - 5),
-      schedule_time: '11AM to 12PM',
-      scheduledTime: '11AM to 12PM',
-      order_value: orderValue,
-      orderValue: orderValue,
-      order_status: status,
-      orderStatus: status,
-      followup_status: followup,
-      followupStatus: followup,
-      profit
-    });
   }
-
-  return generatedOrders;
-})();
+];
 

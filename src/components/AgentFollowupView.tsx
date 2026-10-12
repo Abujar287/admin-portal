@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { AgentUser, OrderItem, FollowupHistoryItem } from '../types';
 import { TIME_SLOTS } from '../data/mockOrders';
+import { isOrderAssignedToAgent } from '../utils/agentMatching';
 import {
   History,
   RotateCw,
@@ -68,12 +69,8 @@ export const AgentFollowupView: React.FC<AgentFollowupViewProps> = ({
 
   // Filter orders relevant to this agent
   const myAgentOrders = useMemo(() => {
-    return orders.filter(
-      (o) =>
-        (o.agent_id || o.agentId || '').trim().toLowerCase() === (currentAgent.user || '').trim().toLowerCase() ||
-        (o.agent_name || o.agentName || '').trim().toLowerCase() === (currentAgent.name || '').trim().toLowerCase()
-    );
-  }, [orders, currentAgent.user, currentAgent.name]);
+    return orders.filter((o) => isOrderAssignedToAgent(o, currentAgent));
+  }, [orders, currentAgent]);
 
   // Handle order selection
   const handleSelectOrder = (orderId: string) => {

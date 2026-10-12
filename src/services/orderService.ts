@@ -6,12 +6,12 @@ export const DEFAULT_SCRIPT_URL =
   'https://script.google.com/macros/s/AKfycbznJBoaggkUhg0ztkcmJpEyeaiuJRVRJX7oItiIgzWqhNPkYIbG3zjnEe2Hn1voDFFg/exec';
 
 const STORAGE_KEYS = {
-  ORDERS: 'agent_portal_orders_v2',
-  AGENTS: 'agentUsers',
-  TEAMS: 'agent_portal_teams_v1',
+  ORDERS: 'agent_portal_orders_v3',
+  AGENTS: 'agentUsers_v3',
+  TEAMS: 'agent_portal_teams_v3',
   SCRIPT_URL: 'agent_portal_script_url',
   LAST_SYNC: 'agent_portal_last_sync',
-  FOLLOWUP_HISTORY: 'agent_portal_followup_history'
+  FOLLOWUP_HISTORY: 'agent_portal_followup_history_v3'
 };
 
 export interface SyncStatus {
@@ -200,14 +200,13 @@ export class OrderService {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 9000); // 9s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
 
-      const res = await fetch(scriptUrl, {
+      const res = await fetch(`/api/fetch-orders?url=${encodeURIComponent(scriptUrl)}`, {
         method: 'GET',
         headers: {
-          'Accept': 'application/json, text/plain, */*'
+          'Accept': 'application/json'
         },
-        redirect: 'follow',
         signal: controller.signal
       });
       clearTimeout(timeoutId);
@@ -216,9 +215,17 @@ export class OrderService {
         throw new Error(`HTTP ${res.status}`);
       }
 
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        const parsed = this.parseGoogleSheetRows(data);
+      const jsonRes = await res.json();
+      let rawData = jsonRes.data;
+      if (rawData && typeof rawData === 'object' && !Array.isArray(rawData)) {
+        if (Array.isArray(rawData.orders)) rawData = rawData.orders;
+        else if (Array.isArray(rawData.rows)) rawData = rawData.rows;
+        else if (Array.isArray(rawData.data)) rawData = rawData.data;
+        else if (Array.isArray(rawData.values)) rawData = rawData.values;
+      }
+
+      if (Array.isArray(rawData) && rawData.length > 0) {
+        const parsed = this.parseGoogleSheetRows(rawData);
         if (parsed.length > 0) {
           // Sync agents dynamically discovered in the Google Sheet
           this.syncAgentsFromOrders(parsed);
@@ -233,7 +240,7 @@ export class OrderService {
       return { orders: localOrders, source: 'local_storage' };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn('Google Script fetch failed (falling back to resilient local cache):', msg);
+      console.warn('Google Script proxy fetch failed (falling back to local cache):', msg);
       return { orders: localOrders, source: 'local_storage', error: msg };
     }
   }
@@ -272,7 +279,79 @@ export class OrderService {
    * Parses 2D array from Google Apps Script doGet(e):
    * var rows = sheet.getDataRange().getValues();
    */
-  private static parseGoogleSheetRows(data: any[][]): OrderItem[] {
+  private static parseGoogleSheetRows(data: any): OrderItem[] {
+    if (!data) return [];
+
+    // If data is an array of JSON objects (e.g. [{ order_id: '1', ... }])
+    if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object' && !Array.isArray(data[0])) {
+      return data.map((o: any, i: number) => {
+        const oId = String(o.order_id || o.orderId || o.id || (i + 1));
+        const cId = String(o.customer_id || o.customerId || '1');
+        const cMobile = String(o.customer_mobile || o.customerContact || o.phone || o.mobile || '-');
+        const cName = String(o.customer_name || o.customerName || o.customer || 'Customer');
+        const gen = String(o.gender || 'Other');
+        const crDt = String(o.create_date || o.createDate || o.createdAt || new Date().toISOString().replace('T', ' ').slice(0, 19));
+        const ch = String(o.order_channel || o.orderChannel || o.channel || 'Website');
+        const aId = String(o.agent_id || o.agentId || o.agent || '1');
+        const aName = String(o.agent_name || o.agentName || `Agent ${aId}`);
+        const pCat = String(o.product_category || o.productCategory || o.category || 'Electronics');
+        const pNm = String(o.product_name || o.productName || o.product || 'Product Item');
+        const ct = String(o.city || 'Dhaka');
+        const dArea = String(o.delivery_area || o.deliveryArea || o.area || 'Gulshan');
+        const addr = String(o.address_details || o.addressDetails || o.address || '-');
+        const scDt = String(o.schedule_date || o.scheduleDate || '');
+        const scTm = String(o.schedule_time || o.scheduledTime || o.scheduleTime || '11AM to 12PM');
+        const oVal = Number(o.order_value ?? o.orderValue ?? o.amount ?? o.price ?? 0);
+        const oSt = String(o.order_status || o.orderStatus || o.status || 'Pending');
+        const foSt = String(o.followup_status || o.followupStatus || o.followup || 'Pending');
+        const pr = Number(o.profit ?? Math.round(oVal * 0.20));
+
+        return {
+          order_id: oId,
+          id: oId,
+          customer_id: cId,
+          customerId: cId,
+          customer_mobile: cMobile,
+          customerContact: cMobile,
+          customer_name: cName,
+          customerName: cName,
+          gender: gen,
+          create_date: crDt,
+          createDate: crDt,
+          order_channel: ch,
+          orderChannel: ch,
+          agent_id: aId,
+          agentId: aId,
+          agent_name: aName,
+          agentName: aName,
+          product_category: pCat,
+          productCategory: pCat,
+          product_name: pNm,
+          productName: pNm,
+          city: ct,
+          delivery_area: dArea,
+          deliveryArea: dArea,
+          address_details: addr,
+          addressDetails: addr,
+          schedule_date: scDt,
+          scheduleDate: scDt,
+          schedule_time: scTm,
+          scheduledTime: scTm,
+          order_value: oVal,
+          orderValue: oVal,
+          order_status: oSt,
+          orderStatus: oSt,
+          followup_status: foSt,
+          followupStatus: foSt,
+          profit: pr,
+          delivered_date: String(o.delivered_date || o.deliveredDate || ''),
+          deliveredDate: String(o.delivered_date || o.deliveredDate || ''),
+          cancelled_date: String(o.cancelled_date || o.cancelledDate || ''),
+          cancelledDate: String(o.cancelled_date || o.cancelledDate || '')
+        };
+      });
+    }
+
     if (!Array.isArray(data) || data.length === 0) return [];
 
     let hasHeader = false;
@@ -541,41 +620,42 @@ export class OrderService {
 
     if (scriptUrl) {
       try {
-        const params = new URLSearchParams();
-        params.append('order_id', fullOrder.order_id);
-        params.append('customer_id', fullOrder.customer_id);
-        params.append('customer_mobile', fullOrder.customer_mobile);
-        params.append('customer_name', fullOrder.customer_name);
-        params.append('gender', fullOrder.gender);
-        params.append('create_date', fullOrder.create_date);
-        params.append('order_channel', fullOrder.order_channel);
-        params.append('agent_id', fullOrder.agent_id);
-        params.append('agent_name', fullOrder.agent_name);
-        params.append('product_category', fullOrder.product_category);
-        params.append('product_name', fullOrder.product_name);
-        params.append('city', fullOrder.city);
-        params.append('delivery_area', fullOrder.delivery_area);
-        params.append('address_details', fullOrder.address_details);
-        params.append('schedule_date', fullOrder.schedule_date);
-        params.append('schedule_time', fullOrder.schedule_time);
-        params.append('order_value', String(fullOrder.order_value));
-        params.append('order_status', fullOrder.order_status);
-        params.append('followup_status', fullOrder.followup_status);
-        params.append('profit', String(fullOrder.profit));
-        params.append('delivered_date', fullOrder.delivered_date || '');
-        params.append('cancelled_date', fullOrder.cancelled_date || '');
+        const bodyData = {
+          url: scriptUrl,
+          order_id: fullOrder.order_id,
+          customer_id: fullOrder.customer_id,
+          customer_mobile: fullOrder.customer_mobile,
+          customer_name: fullOrder.customer_name,
+          gender: fullOrder.gender,
+          create_date: fullOrder.create_date,
+          order_channel: fullOrder.order_channel,
+          agent_id: fullOrder.agent_id,
+          agent_name: fullOrder.agent_name,
+          product_category: fullOrder.product_category,
+          product_name: fullOrder.product_name,
+          city: fullOrder.city,
+          delivery_area: fullOrder.delivery_area,
+          address_details: fullOrder.address_details,
+          schedule_date: fullOrder.schedule_date,
+          schedule_time: fullOrder.schedule_time,
+          order_value: String(fullOrder.order_value),
+          order_status: fullOrder.order_status,
+          followup_status: fullOrder.followup_status,
+          profit: String(fullOrder.profit),
+          delivered_date: fullOrder.delivered_date || '',
+          cancelled_date: fullOrder.cancelled_date || ''
+        };
 
-        await fetch(scriptUrl, {
+        await fetch('/api/proxy-script', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
+            'Content-Type': 'application/json'
           },
-          body: params.toString(),
-          mode: 'no-cors'
+          body: JSON.stringify(bodyData)
         });
         remoteSynced = true;
       } catch (err) {
-        console.warn('Google Apps Script doPost error:', err);
+        console.warn('Google Apps Script doPost proxy error:', err);
       }
     }
 
@@ -809,14 +889,6 @@ export class OrderService {
 
     if (scriptUrl) {
       try {
-        const params = new URLSearchParams();
-        params.append('action', 'updateFollowup');
-        params.append('order_id', String(orderId));
-        params.append('orderId', String(orderId));
-        params.append('followup_id', String(nextFollowupId));
-        params.append('followupId', String(nextFollowupId));
-        params.append('action_name', actionStr);
-        params.append('actionName', actionStr);
         const prevFo = existingOrder?.followup_status || existingOrder?.followupStatus || 'Pending';
         const statusChanged = finalFollowupStatus !== undefined && finalFollowupStatus !== prevFo;
         const scDtToSync = updates.schedule_date !== undefined ? updates.schedule_date : updates.scheduleDate;
@@ -827,62 +899,73 @@ export class OrderService {
         const schedTime = scTmToSync || (existingOrder?.schedule_time || existingOrder?.scheduledTime || '');
 
         const statusChangeText = statusChanged ? `${prevFo} -> ${finalFollowupStatus || prevFo}` : (schedDateChanged ? `(Schedule Date updated to ${schedDate})` : (schedTimeChanged ? `(Schedule Time updated to ${schedTime})` : 'No Status Change'));
-        params.append('status_change', statusChangeText);
-        params.append('statusChange', statusChangeText);
-        if (finalFollowupStatus) {
-          params.append('followup_status', finalFollowupStatus);
-          params.append('followupStatus', finalFollowupStatus);
-        }
-        params.append('order_status', finalOrderStatus);
-        params.append('orderStatus', finalOrderStatus);
+
         const orderValToSync = updates.order_value !== undefined ? updates.order_value : updates.orderValue;
-        if (orderValToSync !== undefined) {
-          params.append('order_value', String(orderValToSync));
-          params.append('orderValue', String(orderValToSync));
-        }
         const finalProfitParam = isCancelled ? 0 : (updates.profit !== undefined ? updates.profit : (orderValToSync !== undefined ? Number(orderValToSync) * 0.20 : undefined));
-        if (finalProfitParam !== undefined) {
-          params.append('profit', String(finalProfitParam));
+
+        const bodyData: Record<string, string> = {
+          url: scriptUrl,
+          action: 'updateFollowup',
+          order_id: String(orderId),
+          orderId: String(orderId),
+          followup_id: String(nextFollowupId),
+          followupId: String(nextFollowupId),
+          action_name: actionStr,
+          actionName: actionStr,
+          status_change: statusChangeText,
+          statusChange: statusChangeText,
+          order_status: finalOrderStatus,
+          orderStatus: finalOrderStatus,
+          delivered_date: newDeliveredDate || '',
+          deliveredDate: newDeliveredDate || '',
+          cancelled_date: newCancelledDate || '',
+          cancelledDate: newCancelledDate || '',
+          followup_date: newFollowupDate || '',
+          followupDate: newFollowupDate || '',
+          updated_by: updatedBy,
+          updatedBy: updatedBy,
+          notes: notes,
+          remarks: notes,
+          timestamp: currentTimestamp
+        };
+
+        if (finalFollowupStatus) {
+          bodyData.followup_status = finalFollowupStatus;
+          bodyData.followupStatus = finalFollowupStatus;
         }
-        params.append('delivered_date', newDeliveredDate || '');
-        params.append('deliveredDate', newDeliveredDate || '');
-        params.append('cancelled_date', newCancelledDate || '');
-        params.append('cancelledDate', newCancelledDate || '');
-        params.append('followup_date', newFollowupDate || '');
-        params.append('followupDate', newFollowupDate || '');
-        // Use already defined variables scDtToSync/scTmToSync
+        if (orderValToSync !== undefined) {
+          bodyData.order_value = String(orderValToSync);
+          bodyData.orderValue = String(orderValToSync);
+        }
+        if (finalProfitParam !== undefined) {
+          bodyData.profit = String(finalProfitParam);
+        }
         if (scDtToSync !== undefined) {
-          params.append('schedule_date', scDtToSync);
-          params.append('scheduleDate', scDtToSync);
+          bodyData.schedule_date = scDtToSync;
+          bodyData.scheduleDate = scDtToSync;
         }
         if (scTmToSync !== undefined) {
-          params.append('schedule_time', scTmToSync);
-          params.append('scheduledTime', scTmToSync);
-          params.append('scheduleTime', scTmToSync);
+          bodyData.schedule_time = scTmToSync;
+          bodyData.scheduledTime = scTmToSync;
+          bodyData.scheduleTime = scTmToSync;
         }
-        params.append('updated_by', updatedBy);
-        params.append('updatedBy', updatedBy);
-        params.append('notes', notes);
-        params.append('remarks', notes);
         if (existingOrder) {
-          params.append('customer_name', existingOrder.customer_name || existingOrder.customerName || '');
-          params.append('customerName', existingOrder.customer_name || existingOrder.customerName || '');
-          params.append('customer_mobile', existingOrder.customer_mobile || existingOrder.customerContact || '');
-          params.append('customerContact', existingOrder.customer_mobile || existingOrder.customerContact || '');
+          bodyData.customer_name = existingOrder.customer_name || existingOrder.customerName || '';
+          bodyData.customerName = existingOrder.customer_name || existingOrder.customerName || '';
+          bodyData.customer_mobile = existingOrder.customer_mobile || existingOrder.customerContact || '';
+          bodyData.customerContact = existingOrder.customer_mobile || existingOrder.customerContact || '';
         }
-        params.append('timestamp', currentTimestamp);
 
-        await fetch(scriptUrl, {
+        await fetch('/api/proxy-script', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
+            'Content-Type': 'application/json'
           },
-          body: params.toString(),
-          mode: 'no-cors'
+          body: JSON.stringify(bodyData)
         });
         remoteSynced = true;
       } catch (err) {
-        console.warn('Google Apps Script status update error:', err);
+        console.warn('Google Apps Script status update proxy error:', err);
       }
     }
 

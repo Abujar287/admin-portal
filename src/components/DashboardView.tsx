@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { AgentUser, OrderItem, DateFilterType, FollowupHistoryItem } from '../types';
+import { isOrderAssignedToAgent } from '../utils/agentMatching';
 import { RotateCw, CheckCircle2, Clock, Award, Layers, Calendar, XCircle } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -68,10 +69,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // STRICTLY filter only for this agent
   const myAgentOrders = useMemo(() => {
-    return orders.filter(
-      (o) => (o.agent_id || o.agentId || '').trim().toLowerCase() === (currentAgent?.user || '').trim().toLowerCase()
-    );
-  }, [orders, currentAgent?.user]);
+    return orders.filter((o) => isOrderAssignedToAgent(o, currentAgent));
+  }, [orders, currentAgent]);
 
   // Helper map for latest Delivered Date and Cancelled Date from followup history or order item
   const orderDeliveredDateMap = useMemo(() => {

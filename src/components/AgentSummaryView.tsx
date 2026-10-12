@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { AgentUser, OrderItem, DateFilterType, FollowupHistoryItem } from '../types';
+import { isOrderAssignedToAgent } from '../utils/agentMatching';
 import {
   BarChart2,
   Calendar,
@@ -34,6 +35,11 @@ export const AgentSummaryView: React.FC<AgentSummaryViewProps> = ({
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [breakdownTab, setBreakdownTab] = useState<'channel' | 'category' | 'city' | 'status'>('channel');
+
+  // STRICTLY filter only for this agent
+  const myAgentOrders = useMemo(() => {
+    return orders.filter((o) => isOrderAssignedToAgent(o, currentAgent));
+  }, [orders, currentAgent]);
 
   // Helper date checker
   const matchDate = (dateVal: string, filterType: DateFilterType, startVal: string, endVal: string): boolean => {
@@ -83,7 +89,7 @@ export const AgentSummaryView: React.FC<AgentSummaryViewProps> = ({
   // Maps for delivered and cancelled dates
   const orderDeliveredDateMap = useMemo(() => {
     const map = new Map<string, string>();
-    orders.forEach((o) => {
+    myAgentOrders.forEach((o) => {
       if (o.delivered_date) map.set(String(o.id || o.order_id), o.delivered_date);
     });
     followupHistory.forEach((h) => {
@@ -92,11 +98,11 @@ export const AgentSummaryView: React.FC<AgentSummaryViewProps> = ({
       }
     });
     return map;
-  }, [orders, followupHistory]);
+  }, [myAgentOrders, followupHistory]);
 
   const orderCancelledDateMap = useMemo(() => {
     const map = new Map<string, string>();
-    orders.forEach((o) => {
+    myAgentOrders.forEach((o) => {
       if (o.cancelled_date) map.set(String(o.id || o.order_id), o.cancelled_date);
     });
     followupHistory.forEach((h) => {
@@ -105,7 +111,7 @@ export const AgentSummaryView: React.FC<AgentSummaryViewProps> = ({
       }
     });
     return map;
-  }, [orders, followupHistory]);
+  }, [myAgentOrders, followupHistory]);
 
   // Aggregate stats
   const stats = useMemo(() => {
@@ -123,7 +129,7 @@ export const AgentSummaryView: React.FC<AgentSummaryViewProps> = ({
     const cityMap: Record<string, { total: number; delivered: number; cancelled: number; value: number }> = {};
     const statusMap: Record<string, { count: number; value: number }> = {};
 
-    orders.forEach((o) => {
+    myAgentOrders.forEach((o) => {
       const oid = String(o.id || o.order_id);
       const cDate = o.create_date || o.createDate || o.createdAt || '';
       const dDate = orderDeliveredDateMap.get(oid) || '';
@@ -206,7 +212,7 @@ export const AgentSummaryView: React.FC<AgentSummaryViewProps> = ({
       cityMap,
       statusMap
     };
-  }, [orders, dateFilter, startDate, endDate, orderDeliveredDateMap, orderCancelledDateMap]);
+  }, [myAgentOrders, dateFilter, startDate, endDate, orderDeliveredDateMap, orderCancelledDateMap]);
 
   return (
     <div className="space-y-6">
@@ -349,7 +355,7 @@ export const AgentSummaryView: React.FC<AgentSummaryViewProps> = ({
           </div>
 
           <span className="text-xs text-slate-400 font-medium">
-            Showing breakdown for {orders.length} total orders
+            Showing breakdown for {myAgentOrders.length} total orders
           </span>
         </div>
 
