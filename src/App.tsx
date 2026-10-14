@@ -28,10 +28,15 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Orders State (synced from Google Sheet)
-  const [orders, setOrders] = useState<OrderItem[]>(() => OrderService.getLocalOrders());
+  const [orders, setOrders] = useState<OrderItem[]>([]);
   const [followupHistory, setFollowupHistory] = useState<FollowupHistoryItem[]>(() => OrderService.getFollowupHistory());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    OrderService.getLocalOrders().then(setOrders);
+  }, []);
+
 
   // Check saved session on mount (using sessionStorage so testing logins doesn't stick accidentally)
   useEffect(() => {
@@ -60,7 +65,11 @@ export default function App() {
     }
   }, []);
 
-  // Initial fetch from Google Apps Script
+  // Immediate initial fetch from Google Sheet on mount
+  useEffect(() => {
+    loadOrdersData(true);
+  }, []);
+
   useEffect(() => {
     if (currentSession) {
       loadOrdersData(false);
@@ -81,12 +90,17 @@ export default function App() {
     setIsRefreshing(true);
     try {
       const res = await OrderService.fetchOrders(forceRefresh);
-      setOrders(res.orders);
-      if (forceRefresh) {
-        showToast('Sheet data refreshed successfully!');
+      if (res.orders && res.orders.length > 0) {
+        setOrders(res.orders);
       }
-    } catch {
-      // fallback
+      if (forceRefresh) {
+        showToast(`Synced ${res.orders.length} orders from Google Sheet!`);
+      }
+      if (res.error) {
+        console.warn('Sync error:', res.error);
+      }
+    } catch (err: any) {
+      console.error('loadOrdersData error:', err);
     } finally {
       setIsRefreshing(false);
     }

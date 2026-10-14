@@ -54,6 +54,8 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
   const [filterFollowupStatus, setFilterFollowupStatus] = useState<string>('all');
   const [searchType, setSearchType] = useState<string>('order_id');
   const [searchValue, setSearchValue] = useState('');
+  const [agentPage, setAgentPage] = useState<number>(1);
+  const agentPageSize = 50;
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
@@ -148,7 +150,14 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
     });
   }, [myAgentOrders, filterCreateDate, filterScheduleDate, filterFollowupStatus, searchType, searchValue]);
 
+  const totalAgentPages = useMemo(() => Math.max(1, Math.ceil(filteredOrders.length / agentPageSize)), [filteredOrders.length]);
+  const paginatedOrders = useMemo(() => {
+    const start = (agentPage - 1) * agentPageSize;
+    return filteredOrders.slice(start, start + agentPageSize);
+  }, [filteredOrders, agentPage]);
+
   const handleClearFilters = () => {
+    setAgentPage(1);
     setFilterCreateDate('');
     setFilterScheduleDate('');
     setFilterFollowupStatus('all');
@@ -469,6 +478,36 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Bar for Agent */}
+        {totalAgentPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 bg-slate-50 border-t border-slate-200 text-xs">
+            <span className="text-slate-600 font-medium">
+              Showing <strong>{(agentPage - 1) * agentPageSize + 1}</strong> - <strong>{Math.min(agentPage * agentPageSize, filteredOrders.length)}</strong> of <strong>{filteredOrders.length}</strong> orders (Page {agentPage} of {totalAgentPages})
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={agentPage <= 1}
+                onClick={() => setAgentPage(p => Math.max(1, p - 1))}
+                className="px-3 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 text-xs font-bold text-slate-700 cursor-pointer shadow-2xs"
+              >
+                Previous
+              </button>
+              <span className="px-3 py-1 bg-blue-700 text-white font-bold rounded-lg shadow-xs">
+                {agentPage}
+              </span>
+              <button
+                type="button"
+                disabled={agentPage >= totalAgentPages}
+                onClick={() => setAgentPage(p => Math.min(totalAgentPages, p + 1))}
+                className="px-3 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 text-xs font-bold text-slate-700 cursor-pointer shadow-2xs"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Order Details & Access-Controlled Action Modal */}

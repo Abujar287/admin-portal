@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { AgentUser, ManagerUser, OrderItem, DateFilterType, FollowupHistoryItem, AgentPermissions, AgentNavTab } from '../types';
 import { OrderService } from '../services/orderService';
@@ -120,14 +120,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const isTeamLeader = currentManager.role === 'Team Leader';
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTabState] = useState<
-    'profiles' | 'users' | 'orders' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping'
+    'profiles' | 'users' | 'orders' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping' | 'sheet-connection'
   >(() => {
     const saved = sessionStorage.getItem('manager_active_tab') as any;
     if (saved && saved !== 'followup') return saved;
     return isTeamLeader ? 'summary' : 'users';
   });
 
-  const setActiveTab = (tab: 'profiles' | 'users' | 'orders' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping') => {
+  const setActiveTab = (tab: 'profiles' | 'users' | 'orders' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping' | 'sheet-connection') => {
     sessionStorage.setItem('manager_active_tab', tab);
     setActiveTabState(tab);
   };
@@ -199,6 +199,55 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setModalNotes('');
   };
 
+  // Google Sheet Connection & Dynamic Tabs State
+  const [sheetUrlInput, setSheetUrlInput] = useState<string>(() => OrderService.getScriptUrl());
+  const [isConnectingSheet, setIsConnectingSheet] = useState<boolean>(false);
+  const [connectedSheetTabs, setConnectedSheetTabs] = useState<string[]>(['Orders', 'Followup', 'Summary', 'Agent Performance', 'Profiles', 'History']);
+  const [connectedSheetStatus, setConnectedSheetStatus] = useState<'idle' | 'connected' | 'error'>('connected');
+  const [connectedSheetError, setConnectedSheetError] = useState<string | null>(null);
+
+  const handleConnectSheet = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const url = sheetUrlInput.trim();
+    if (!url) {
+      showToast('Please enter a valid Google Sheet or Apps Script URL.');
+      return;
+    }
+    setIsConnectingSheet(true);
+    setConnectedSheetError(null);
+    try {
+      OrderService.setScriptUrl(url);
+      const res = await OrderService.fetchSheetTabsAndOrders(url);
+      if (res.tabs && res.tabs.length > 0) {
+        setConnectedSheetTabs(res.tabs);
+      }
+      if (res.orders && res.orders.length > 0 && onUpdateOrders) {
+        onUpdateOrders(res.orders);
+      }
+      setConnectedSheetStatus('connected');
+      showToast(`Successfully connected to Google Sheet! Found ${res.tabs?.length || 3} tabs & ${res.orders.length} orders synced.`);
+      await onRefreshOrders();
+    } catch (err: any) {
+      setConnectedSheetStatus('error');
+      setConnectedSheetError(err.message || 'Connection failed');
+      showToast('Connection failed: Check sheet permissions or URL.');
+    } finally {
+      setIsConnectingSheet(false);
+    }
+  };
+
+  // Auto-discover tabs on mount if default sheet is connected
+  useEffect(() => {
+    OrderService.fetchSheetTabsAndOrders().then(res => {
+      if (res.tabs && res.tabs.length > 0) {
+        setConnectedSheetTabs(res.tabs);
+      }
+      if (res.orders && res.orders.length > 0 && orders.length <= 10 && onUpdateOrders) {
+        onUpdateOrders(res.orders);
+      }
+    }).catch(() => {});
+  }, []);
+
   // Agent Management Form State (with no demo names)
   const [newAgentUser, setNewAgentUser] = useState('');
   const [newAgentPass, setNewAgentPass] = useState('');
@@ -237,6 +286,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [contactSearch, setContactSearch] = useState('');
   const [searchType, setSearchType] = useState<string>('order_id');
   const [searchValue, setSearchValue] = useState('');
+  const [orderPage, setOrderPage] = useState<number>(1);
+  const [orderPageSize, setOrderPageSize] = useState<number | 'all'>(50);
 
   // Single Summary Date Filter State
   const [summaryDateFilter, setSummaryDateFilter] = useState<DateFilterType>('all');
@@ -996,6 +1047,33 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     filterFollowupStatus
   ]);
 
+  // Reset page when filters change
+  useEffect(() => {
+    setOrderPage(1);
+  }, [
+    orderCreateFilter,
+    orderCreateStart,
+    orderCreateEnd,
+    orderScheduleFilter,
+    orderScheduleStart,
+    orderScheduleEnd,
+    searchType,
+    searchValue,
+    filterFollowupStatus
+  ]);
+
+  const totalOrderPages = useMemo(() => {
+    if (orderPageSize === 'all') return 1;
+    return Math.max(1, Math.ceil(filteredOrders.length / (orderPageSize as number)));
+  }, [filteredOrders.length, orderPageSize]);
+
+  const paginatedOrders = useMemo(() => {
+    if (orderPageSize === 'all') return filteredOrders;
+    const size = orderPageSize as number;
+    const start = (orderPage - 1) * size;
+    return filteredOrders.slice(start, start + size);
+  }, [filteredOrders, orderPage, orderPageSize]);
+
   // Summary Metrics & Aggregations with single date filter
   const orderDeliveredDateMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -1407,6 +1485,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
         <nav className="flex-1 space-y-1.5">
           <button
+            onClick={() => setActiveTab('sheet-connection')}
+            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+              activeTab === 'sheet-connection'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                : 'text-slate-300 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            {isSidebarOpen && <span>Google Sheet &amp; Tabs</span>}
+          </button>
+
+          <button
             onClick={() => setActiveTab('summary')}
             className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
               activeTab === 'summary'
@@ -1535,6 +1625,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             </span>
             <span className="text-slate-300">•</span>
             <h1 className="text-lg font-extrabold text-slate-900 capitalize">
+              {activeTab === 'sheet-connection' && 'Google Sheet & Dynamic Tabs Hub'}
               {activeTab === 'users' && 'User Details (Agent Directory)'}
               {activeTab === 'orders' && 'All Orders Database'}
               {activeTab === 'summary' && 'Analytics & Summary'}
@@ -1559,6 +1650,182 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
         {/* Scrollable Workspace */}
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* TAB: GOOGLE SHEET & DYNAMIC TABS */}
+          {activeTab === 'sheet-connection' && (
+            <div className="space-y-6 max-w-5xl mx-auto">
+              <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
+                <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="relative z-10 space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold border border-emerald-500/30 shadow-inner">
+                      <FileSpreadsheet className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-extrabold tracking-tight">Google Sheet Connection &amp; Dynamic Tabs Hub</h2>
+                      <p className="text-xs text-indigo-200 mt-0.5">
+                        Connect any Google Sheet or Apps Script link to instantly sync orders and discover all available tabs.
+                      </p>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleConnectSheet} className="space-y-4 pt-2">
+                    <div>
+                      <label className="block text-xs font-bold text-indigo-200 uppercase tracking-wider mb-2">
+                        Google Sheet Link / Apps Script Web App URL
+                      </label>
+                      <div className="flex gap-3">
+                        <input
+                          type="url"
+                          required
+                          placeholder="https://script.google.com/macros/s/.../exec or Google Sheet URL"
+                          value={sheetUrlInput}
+                          onChange={(e) => setSheetUrlInput(e.target.value)}
+                          className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-xs font-mono text-white placeholder-indigo-300/50 focus:outline-hidden focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all"
+                        />
+                        <button
+                          type="submit"
+                          disabled={isConnectingSheet}
+                          className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer shrink-0 disabled:opacity-50"
+                        >
+                          <RotateCw className={`w-4 h-4 ${isConnectingSheet ? 'animate-spin' : ''}`} />
+                          <span>{isConnectingSheet ? 'Connecting...' : 'Connect Sheet'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+
+                  {connectedSheetStatus === 'connected' && (
+                    <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-white/10">
+                      <div className="flex items-center gap-2.5">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Connected &amp; Live</span>
+                        </span>
+                        <span className="text-xs text-slate-300">
+                          Total Orders Synced: <strong className="text-white font-extrabold">{orders.length}</strong>
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onRefreshOrders()}
+                        className="text-xs font-semibold text-indigo-300 hover:text-white underline cursor-pointer"
+                      >
+                        Force Resync Data
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* DISCOVERED TABS GRID */}
+              <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 text-base">Discovered Sheet Tabs ({connectedSheetTabs.length})</h3>
+                    <p className="text-xs text-slate-500">
+                      Click any tab below to instantly switch to that workspace view.
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold px-3 py-1 bg-indigo-50 text-indigo-700 rounded-lg">
+                    Live Sync Active
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                  {connectedSheetTabs.map((tabName, idx) => {
+                    const normalized = tabName.toLowerCase();
+                    let targetTabKey: any = 'orders';
+                    if (normalized.includes('summary')) targetTabKey = 'summary';
+                    else if (normalized.includes('performance') || normalized.includes('agent')) targetTabKey = 'agent-performance';
+                    else if (normalized.includes('profile')) targetTabKey = 'profiles';
+                    else if (normalized.includes('setting')) targetTabKey = 'settings';
+                    else if (normalized.includes('mapping')) targetTabKey = 'category-mapping';
+                    else targetTabKey = 'orders';
+
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => setActiveTab(targetTabKey)}
+                        className="p-5 rounded-2xl border border-slate-200 hover:border-indigo-500 bg-slate-50/50 hover:bg-indigo-50/30 transition-all cursor-pointer group shadow-xs hover:shadow-md flex flex-col justify-between"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-xs">
+                            📋
+                          </div>
+                          <span className="text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 bg-white text-slate-600 rounded-lg border border-slate-200">
+                            Sheet Tab
+                          </span>
+                        </div>
+                        <div>
+                          <h4 className="font-extrabold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
+                            {tabName}
+                          </h4>
+                          <p className="text-xs text-slate-500 mt-1">
+                            Click to open {targetTabKey === 'orders' ? 'Orders Database' : targetTabKey} workspace.
+                          </p>
+                        </div>
+                        <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between text-xs font-bold text-indigo-600">
+                          <span>Open Workspace</span>
+                          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* APPS SCRIPT SETUP GUIDE FOR FULL SYNC */}
+              <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                      ⚡
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-slate-900 text-sm">How to Sync All Data &amp; Multi-Tabs Properly</h3>
+                      <p className="text-xs text-slate-500">
+                        Direct Google Sheet links only export the first tab. To sync all tabs (Orders, Followup, etc.), deploy our Apps Script web app URL.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const code = `function doGet(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  var allData = {};
+  sheets.forEach(function(sh) {
+    var name = sh.getName();
+    var values = sh.getDataRange().getValues();
+    allData[name] = values;
+  });
+  return ContentService.createTextOutput(JSON.stringify({
+    success: true,
+    tabs: sheets.map(function(s){ return s.getName(); }),
+    data: allData
+  })).setMimeType(ContentService.MimeType.JSON);
+}`;
+                      navigator.clipboard.writeText(code);
+                      showToast('Apps Script code copied to clipboard!');
+                    }}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copy Apps Script Code</span>
+                  </button>
+                </div>
+
+                <ol className="list-decimal list-inside text-xs text-slate-600 space-y-2 pl-1">
+                  <li>Open your Google Sheet, click <strong>Extensions &gt; Apps Script</strong>.</li>
+                  <li>Paste the copied code above into the script editor and save (<code className="bg-slate-100 px-1.5 py-0.5 rounded">Ctrl + S</code>).</li>
+                  <li>Click <strong>Deploy &gt; New deployment</strong>, select type <strong>Web app</strong>.</li>
+                  <li>Set <em>Execute as: Me</em> and <em>Who has access: Anyone</em>, then click Deploy.</li>
+                  <li>Paste the resulting Web App URL (<code className="bg-slate-100 px-1.5 py-0.5 rounded">.../exec</code>) in the input box above and click <strong>Connect Sheet</strong>.</li>
+                </ol>
+              </div>
+            </div>
+          )}
+
           {/* TAB: USER DETAILS (AGENT DIRECTORY WITH DETAILS STORE) */}
           {activeTab === 'users' && (
             <div className="space-y-6">
@@ -2625,8 +2892,79 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   </div>
                 </div>
 
-                <div className="text-[11px] text-slate-500 pt-1">
-                  Showing <strong>{filteredOrders.length}</strong> of <strong>{orders.length}</strong> total sheet orders
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 pt-2 border-t border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-700">
+                      Showing <strong>{filteredOrders.length === 0 ? 0 : (orderPage - 1) * (orderPageSize === 'all' ? filteredOrders.length : (orderPageSize as number)) + 1}</strong> - <strong>{orderPageSize === 'all' ? filteredOrders.length : Math.min(orderPage * (orderPageSize as number), filteredOrders.length)}</strong> of <strong>{filteredOrders.length}</strong> orders
+                    </span>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-slate-500 font-mono text-[11px] bg-indigo-50 text-indigo-700 font-bold px-2.5 py-0.5 rounded-full border border-indigo-200">
+                      Sheet Total: {orders.length}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase">Rows:</span>
+                      <select
+                        value={orderPageSize}
+                        onChange={(e) => {
+                          const val = e.target.value === 'all' ? 'all' : Number(e.target.value);
+                          setOrderPageSize(val);
+                          setOrderPage(1);
+                        }}
+                        className="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 shadow-2xs"
+                      >
+                        <option value={50}>50 / page</option>
+                        <option value={100}>100 / page</option>
+                        <option value={200}>200 / page</option>
+                        <option value={500}>500 / page</option>
+                        <option value="all">All ({filteredOrders.length})</option>
+                      </select>
+                    </div>
+
+                    {orderPageSize !== 'all' && totalOrderPages > 1 && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          disabled={orderPage <= 1}
+                          onClick={() => setOrderPage(1)}
+                          className="px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 disabled:opacity-30 text-xs font-bold text-slate-700 cursor-pointer"
+                          title="First Page"
+                        >
+                          «
+                        </button>
+                        <button
+                          type="button"
+                          disabled={orderPage <= 1}
+                          onClick={() => setOrderPage(p => Math.max(1, p - 1))}
+                          className="px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 disabled:opacity-30 text-xs font-bold text-slate-700 cursor-pointer"
+                        >
+                          Prev
+                        </button>
+                        <span className="px-2 text-xs font-medium text-slate-600">
+                          <strong>{orderPage}</strong> / {totalOrderPages}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={orderPage >= totalOrderPages}
+                          onClick={() => setOrderPage(p => Math.min(totalOrderPages, p + 1))}
+                          className="px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 disabled:opacity-30 text-xs font-bold text-slate-700 cursor-pointer"
+                        >
+                          Next
+                        </button>
+                        <button
+                          type="button"
+                          disabled={orderPage >= totalOrderPages}
+                          onClick={() => setOrderPage(totalOrderPages)}
+                          className="px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 disabled:opacity-30 text-xs font-bold text-slate-700 cursor-pointer"
+                          title="Last Page"
+                        >
+                          »
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -2668,7 +3006,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           </td>
                         </tr>
                       ) : (
-                        filteredOrders.map((ord, idx) => {
+                        paginatedOrders.map((ord, idx) => {
                           const isDelivered = (ord.followup_status || ord.followupStatus || '').toLowerCase() === 'delivered';
                           return (
                             <tr key={`manager-ord-${ord.order_id || ord.id || idx}-${idx}`} className="hover:bg-indigo-50/40 transition-colors">
@@ -2773,6 +3111,52 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     </tbody>
                   </table>
                 </div>
+
+                {/* Bottom Pagination Bar */}
+                {totalOrderPages > 1 && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 bg-slate-50 border-t border-slate-200 text-xs">
+                    <span className="text-slate-600 font-medium">
+                      Showing page <strong>{orderPage}</strong> of <strong>{totalOrderPages}</strong> ({filteredOrders.length} total orders)
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={orderPage <= 1}
+                        onClick={() => setOrderPage(1)}
+                        className="px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 text-xs font-bold text-slate-700 cursor-pointer shadow-2xs"
+                      >
+                        « First
+                      </button>
+                      <button
+                        type="button"
+                        disabled={orderPage <= 1}
+                        onClick={() => setOrderPage(p => Math.max(1, p - 1))}
+                        className="px-3 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 text-xs font-bold text-slate-700 cursor-pointer shadow-2xs"
+                      >
+                        Previous
+                      </button>
+                      <span className="px-3 py-1 bg-indigo-600 text-white font-bold rounded shadow-xs">
+                        {orderPage}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={orderPage >= totalOrderPages}
+                        onClick={() => setOrderPage(p => Math.min(totalOrderPages, p + 1))}
+                        className="px-3 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 text-xs font-bold text-slate-700 cursor-pointer shadow-2xs"
+                      >
+                        Next
+                      </button>
+                      <button
+                        type="button"
+                        disabled={orderPage >= totalOrderPages}
+                        onClick={() => setOrderPage(totalOrderPages)}
+                        className="px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 text-xs font-bold text-slate-700 cursor-pointer shadow-2xs"
+                      >
+                        Last »
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

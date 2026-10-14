@@ -1,9 +1,10 @@
 import { AgentUser, DateFilterType, OrderItem, FollowupHistoryItem } from '../types';
 import { INITIAL_AGENTS, INITIAL_ORDERS } from '../data/mockOrders';
+import * as XLSX from 'xlsx';
 
 export const DEFAULT_SCRIPT_URL =
   (import.meta.env?.VITE_GOOGLE_SCRIPT_URL as string) ||
-  'https://script.google.com/macros/s/AKfycbznJBoaggkUhg0ztkcmJpEyeaiuJRVRJX7oItiIgzWqhNPkYIbG3zjnEe2Hn1voDFFg/exec';
+  'https://docs.google.com/spreadsheets/d/1CKnS6A3okk6igZRIQCcBCJPEo-J56xwXTYJL8Dg5AiA/edit';
 
 const STORAGE_KEYS = {
   ORDERS: 'agent_portal_orders_v3',
@@ -22,13 +23,112 @@ export interface SyncStatus {
   isLive: boolean;
 }
 
+let memoryOrders: OrderItem[] | null = null;
+
+// IndexedDB storage for full 5,000+ orders cache
+const IDB_NAME = 'admin_portal_db_v1';
+const IDB_STORE = 'orders_store';
+
+function openOrdersDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      return reject(new Error('IndexedDB not supported'));
+    }
+    const request = indexedDB.open(IDB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function idbSaveOrders(orders: OrderItem[]): Promise<void> {
+  try {
+    const db = await openOrdersDb();
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(orders, 'cached_orders');
+  } catch (e) {
+    console.warn('idbSaveOrders error:', e);
+  }
+}
+
+async function idbGetOrders(): Promise<OrderItem[] | null> {
+  try {
+    const db = await openOrdersDb();
+    return new Promise((resolve) => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).get('cached_orders');
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  } catch {
+    return null;
+  }
+}
+
 export class OrderService {
   static getScriptUrl(): string {
-    return localStorage.getItem(STORAGE_KEYS.SCRIPT_URL) || DEFAULT_SCRIPT_URL;
+    const saved = localStorage.getItem(STORAGE_KEYS.SCRIPT_URL);
+    if (!saved) {
+      localStorage.setItem(STORAGE_KEYS.SCRIPT_URL, DEFAULT_SCRIPT_URL);
+      return DEFAULT_SCRIPT_URL;
+    }
+    return saved;
   }
 
   static setScriptUrl(url: string): void {
     localStorage.setItem(STORAGE_KEYS.SCRIPT_URL, url.trim());
+  }
+
+  static async fetchSheetTabsAndOrders(scriptUrl?: string): Promise<{ tabs: string[]; orders: OrderItem[]; source: 'google_sheets' | 'local_storage'; error?: string }> {
+    const url = scriptUrl || this.getScriptUrl();
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const res = await fetch(`/api/fetch-orders?url=${encodeURIComponent(url || DEFAULT_SCRIPT_URL)}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json, text/csv, */*' },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const jsonRes = await res.json();
+      if (!jsonRes.success || jsonRes.error) {
+        throw new Error(jsonRes.error || `HTTP ${res.status}`);
+      }
+      const data = jsonRes.data;
+
+      const tabs: string[] = Array.isArray(jsonRes.tabs) && jsonRes.tabs.length > 0
+        ? jsonRes.tabs
+        : ['orders', 'Sheet5', 'Followup'];
+
+      let rawOrders = data;
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        if (Array.isArray(data.orders)) rawOrders = data.orders;
+        else if (Array.isArray(data.rows)) rawOrders = data.rows;
+        else if (Array.isArray(data.data)) rawOrders = data.data;
+        else if (Array.isArray(data.values)) rawOrders = data.values;
+      }
+
+      const parsed = this.parseGoogleSheetRows(rawOrders);
+      if (parsed.length > 0) {
+        this.saveLocalOrders(parsed);
+        try {
+          this.syncAgentsFromOrders(parsed);
+        } catch {}
+      }
+      const local = await this.getLocalOrders();
+      return { tabs, orders: parsed.length > 0 ? parsed : local, source: 'google_sheets' };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { tabs: ['orders', 'Sheet5', 'Followup'], orders: await this.getLocalOrders(), source: 'local_storage', error: msg };
+    }
   }
 
   private static resolveAgentName(aId: string, sheetNm?: string): string {
@@ -55,7 +155,11 @@ export class OrderService {
   }
 
   static saveAgents(agents: AgentUser[]): void {
-    localStorage.setItem(STORAGE_KEYS.AGENTS, JSON.stringify(agents));
+    try {
+      localStorage.setItem(STORAGE_KEYS.AGENTS, JSON.stringify(agents));
+    } catch (e) {
+      console.warn('LocalStorage quota limit reached for agents:', e);
+    }
   }
 
   static getTeams(): { name: string; teamLeaderName?: string; teamLeaderId?: string }[] {
@@ -81,104 +185,38 @@ export class OrderService {
     localStorage.setItem(STORAGE_KEYS.TEAMS, JSON.stringify(teams));
   }
 
-  static getLocalOrders(): OrderItem[] {
+  static async getLocalOrders(): Promise<OrderItem[]> {
+    if (memoryOrders && memoryOrders.length > 0) {
+      return memoryOrders;
+    }
+    const idbOrders = await idbGetOrders();
+    if (idbOrders && idbOrders.length > 0) {
+      memoryOrders = idbOrders;
+      return idbOrders;
+    }
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.ORDERS);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Normalize every order to include all 22 official sheet properties + compatibility aliases
-          const normalized = parsed
-            .map((o: any) => {
-              const oId = String(o.order_id || o.id || '');
-              const cId = String(o.customer_id || o.customerId || '1');
-              const cMobile = String(o.customer_mobile || o.customerContact || '-');
-              const cName = String(o.customer_name || o.customerName || 'Customer');
-              const gen = String(o.gender || 'Other');
-              const crDt = String(o.create_date || o.createDate || '');
-              const ch = String(o.order_channel || o.orderChannel || 'Acquisition');
-              let aId = o.agent_id !== undefined && o.agent_id !== null && String(o.agent_id).trim() !== ''
-                ? String(o.agent_id).trim()
-                : (o.agentId ? String(o.agentId).trim() : '');
-              const rawANm = o.agent_name !== undefined && o.agent_name !== null && String(o.agent_name).trim() !== ''
-                ? String(o.agent_name).trim()
-                : (o.agentName ? String(o.agentName).trim() : '');
-              const aNm = this.resolveAgentName(aId, rawANm);
-              const pCat = String(o.product_category || o.productCategory || 'Electronics');
-              const pNm = String(o.product_name || o.productName || 'Product Item');
-              const ct = String(o.city || 'Dhaka');
-              const dArea = String(o.delivery_area || o.deliveryArea || 'Gulshan');
-              const addr = String(o.address_details || o.addressDetails || '-');
-              const scDt = String(o.schedule_date || o.scheduleDate || '');
-              const scTm = String(o.schedule_time || o.scheduledTime || '11AM to 12PM');
-              const oVal = Number(o.order_value ?? o.orderValue ?? 0);
-              const oSt = String(o.order_status || o.orderStatus || 'Pending');
-              const foSt = String(o.followup_status || o.followupStatus || 'Pending');
-              const pr = Number(o.profit ?? 0);
-              const dDt = String(o.delivered_date || o.deliveredDate || '');
-              const caDt = String(o.cancelled_date || o.cancelledDate || '');
-              const fDt = String(o.followup_date || o.followupDate || '');
-
-              return {
-                ...o,
-                order_id: oId,
-                id: oId,
-                customer_id: cId,
-                customerId: cId,
-                customer_mobile: cMobile,
-                customerContact: cMobile,
-                customer_name: cName,
-                customerName: cName,
-                gender: gen,
-                create_date: crDt,
-                createDate: crDt,
-                order_channel: ch,
-                orderChannel: ch,
-                agent_id: aId,
-                agentId: aId,
-                agent_name: aNm,
-                agentName: aNm,
-                product_category: pCat,
-                productCategory: pCat,
-                product_name: pNm,
-                productName: pNm,
-                city: ct,
-                delivery_area: dArea,
-                deliveryArea: dArea,
-                address_details: addr,
-                addressDetails: addr,
-                schedule_date: scDt,
-                scheduleDate: scDt,
-                schedule_time: scTm,
-                scheduledTime: scTm,
-                order_value: oVal,
-                orderValue: oVal,
-                order_status: oSt,
-                orderStatus: oSt,
-                followup_status: foSt,
-                followupStatus: foSt,
-                profit: pr,
-                delivered_date: dDt,
-                deliveredDate: dDt,
-                cancelled_date: caDt,
-                cancelledDate: caDt,
-                followup_date: fDt,
-                followupDate: fDt
-              };
-            });
-          if (normalized.length > 0) return normalized;
+          memoryOrders = parsed;
+          return parsed;
         }
       }
     } catch {
       // fallback
     }
-    // If nothing stored or empty, return INITIAL_ORDERS and save to storage
-    localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(INITIAL_ORDERS));
     return INITIAL_ORDERS;
   }
 
   static saveLocalOrders(orders: OrderItem[]): void {
-    localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
+    memoryOrders = orders;
+    idbSaveOrders(orders);
+    try {
+      localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders.slice(0, 100)));
+    } catch (e) {
+      console.warn('LocalStorage quota limit reached (safely stored in IndexedDB):', e);
+    }
   }
 
   static resetOrdersToMock(): OrderItem[] {
@@ -187,22 +225,17 @@ export class OrderService {
   }
 
   /**
-   * Fetches orders directly from Google Apps Script Web App:
-   * URL: https://script.google.com/macros/s/AKfycbznJBoaggkUhg0ztkcmJpEyeaiuJRVRJX7oItiIgzWqhNPkYIbG3zjnEe2Hn1voDFFg/exec
+   * Fetches orders directly from Google Sheet orders tab via server proxy
    */
   static async fetchOrders(forceRefresh = false): Promise<{ orders: OrderItem[]; source: 'google_sheets' | 'local_storage'; error?: string }> {
     const scriptUrl = this.getScriptUrl();
-    const localOrders = this.getLocalOrders();
-
-    if (!scriptUrl) {
-      return { orders: localOrders, source: 'local_storage' };
-    }
+    const localOrders = await this.getLocalOrders();
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
-      const res = await fetch(`/api/fetch-orders?url=${encodeURIComponent(scriptUrl)}`, {
+      const res = await fetch(`/api/fetch-orders?url=${encodeURIComponent(scriptUrl || DEFAULT_SCRIPT_URL)}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json'
@@ -228,11 +261,17 @@ export class OrderService {
         const parsed = this.parseGoogleSheetRows(rawData);
         if (parsed.length > 0) {
           // Sync agents dynamically discovered in the Google Sheet
-          this.syncAgentsFromOrders(parsed);
+          try {
+            this.syncAgentsFromOrders(parsed);
+          } catch (e) {
+            console.warn('Agent sync skipped:', e);
+          }
 
           // Strictly use parsed sheet orders as source of truth
           this.saveLocalOrders(parsed);
-          localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString());
+          try {
+            localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString());
+          } catch (e) {}
 
           return { orders: parsed, source: 'google_sheets' };
         }
@@ -240,7 +279,12 @@ export class OrderService {
       return { orders: localOrders, source: 'local_storage' };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn('Google Script proxy fetch failed (falling back to local cache):', msg);
+      console.warn('Google Sheet fetch failed (checking IndexedDB cache):', msg);
+      const idbOrders = await idbGetOrders();
+      if (idbOrders && idbOrders.length > 0) {
+        memoryOrders = idbOrders;
+        return { orders: idbOrders, source: 'local_storage', error: msg };
+      }
       return { orders: localOrders, source: 'local_storage', error: msg };
     }
   }
@@ -282,9 +326,28 @@ export class OrderService {
   private static parseGoogleSheetRows(data: any): OrderItem[] {
     if (!data) return [];
 
+    let rowsData = data;
+    if (typeof data === 'string') {
+      try {
+        const workbook = XLSX.read(data, { type: 'string' });
+        let targetSheetName = workbook.SheetNames[0];
+        const foundOrdersSheet = workbook.SheetNames.find(name => {
+          const lower = name.toLowerCase().trim();
+          return lower === 'orders' || lower === 'order';
+        });
+        if (foundOrdersSheet) {
+          targetSheetName = foundOrdersSheet;
+        }
+        const worksheet = workbook.Sheets[targetSheetName];
+        rowsData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      } catch {
+        rowsData = data.split('\n').map((r: string) => r.split(','));
+      }
+    }
+
     // If data is an array of JSON objects (e.g. [{ order_id: '1', ... }])
-    if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object' && !Array.isArray(data[0])) {
-      return data.map((o: any, i: number) => {
+    if (Array.isArray(rowsData) && rowsData.length > 0 && typeof rowsData[0] === 'object' && !Array.isArray(rowsData[0])) {
+      return rowsData.map((o: any, i: number) => {
         const oId = String(o.order_id || o.orderId || o.id || (i + 1));
         const cId = String(o.customer_id || o.customerId || '1');
         const cMobile = String(o.customer_mobile || o.customerContact || o.phone || o.mobile || '-');
@@ -352,17 +415,17 @@ export class OrderService {
       });
     }
 
-    if (!Array.isArray(data) || data.length === 0) return [];
+    if (!Array.isArray(rowsData) || rowsData.length === 0) return [];
 
     let hasHeader = false;
-    const firstRow = data[0].map(h => String(h || '').trim().toLowerCase());
+    const firstRow = rowsData[0].map(h => String(h || '').trim().toLowerCase());
 
     if (firstRow.some(col => col.includes('order') || col.includes('customer') || col.includes('agent') || col.includes('date'))) {
       hasHeader = true;
     }
 
     const headers = hasHeader ? firstRow : [];
-    const rows = hasHeader ? data.slice(1) : data;
+    const rows = hasHeader ? rowsData.slice(1) : rowsData;
 
     const findCol = (...candidates: string[]): number => {
       for (const candidate of candidates) {
@@ -401,20 +464,22 @@ export class OrderService {
     const idxFollowDt = findCol('followup_date', 'followup date');
 
     return rows
-      .filter(row => {
+      .filter((row, rowIndex) => {
         if (!row || !Array.isArray(row) || row.length === 0) return false;
+        const hasContent = row.some(cell => cell !== undefined && cell !== null && String(cell).trim() !== '');
+        if (!hasContent) return false;
+
         const targetIdx = idxOrder !== -1 ? idxOrder : 0;
         const rawId = row[targetIdx] !== undefined && row[targetIdx] !== null
           ? String(row[targetIdx]).trim()
           : '';
-        // Strictly filter out any row without an explicit, valid order ID
         const lower = rawId.toLowerCase();
-        if (!rawId || rawId === '-' || lower === 'null' || lower === 'undefined' || lower === 'order id' || lower.includes('total')) {
+        if (lower === 'order id' || lower === 'order_id' || lower.includes('total') || (rowIndex === 0 && (lower.includes('name') || lower.includes('customer')))) {
           return false;
         }
         return true;
       })
-      .map((row) => {
+      .map((row, index) => {
         const valOrEmpty = (idx: number, fallback = '', positionalIdx = -1) => {
           if (idx !== -1 && row[idx] !== undefined && row[idx] !== null) {
             const s = String(row[idx]).trim();
@@ -435,7 +500,9 @@ export class OrderService {
         };
 
         const rawOrderId = valOrEmpty(idxOrder, '', 0);
-        const orderId = rawOrderId;
+        const orderId = rawOrderId && rawOrderId !== '-' && rawOrderId.toLowerCase() !== 'null' && rawOrderId.toLowerCase() !== 'undefined'
+          ? rawOrderId
+          : String(1001 + index);
         const orderVal = numOrZero(idxValue, 16);
         const profitVal = idxProfit !== -1 && row[idxProfit] !== undefined && row[idxProfit] !== ''
           ? numOrZero(idxProfit, 19)
@@ -518,7 +585,7 @@ export class OrderService {
   static async createOrder(
     newOrder: any
   ): Promise<{ success: boolean; order: OrderItem; remoteSynced: boolean }> {
-    const localOrders = this.getLocalOrders();
+    const localOrders = await this.getLocalOrders();
 
     let nextNum = 1;
     if (localOrders.length > 0) {
@@ -726,7 +793,7 @@ export class OrderService {
     updatedBy: string = 'manager',
     notes: string = ''
   ): Promise<{ updatedOrders: OrderItem[]; historyItem?: FollowupHistoryItem; remoteSynced: boolean }> {
-    const orders = this.getLocalOrders();
+    const orders = (await this.getLocalOrders()) || [];
     const existingOrder = orders.find((ord) => String(ord.order_id || ord.id) === String(orderId));
 
     const finalOrderStatus = updates.order_status || updates.orderStatus || existingOrder?.order_status || existingOrder?.orderStatus || 'Pending';
@@ -752,7 +819,7 @@ export class OrderService {
       newFollowupDate = updates.followup_date || updates.followupDate || currentTimestamp;
     }
 
-    const updated = orders.map((ord) => {
+    const updated = (orders || []).map((ord) => {
       if (String(ord.order_id || ord.id) === String(orderId)) {
         const orderVal = updates.order_value !== undefined 
           ? Number(updates.order_value) 
@@ -983,7 +1050,7 @@ export class OrderService {
     previousStatus: string,
     undoneBy?: string
   ): Promise<{ updatedOrders: OrderItem[]; updatedHistory: FollowupHistoryItem[] }> {
-    const orders = this.getLocalOrders();
+    const orders = await this.getLocalOrders();
     const history = this.getFollowupHistory();
     const targetItem = history.find((h) => String(h.id) === String(historyId));
     const existingOrder = orders.find((ord) => String(ord.order_id || ord.id) === String(orderId));
@@ -1105,7 +1172,7 @@ export class OrderService {
 
 function doGet(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("Sheet1") || ss.getSheets()[0];
+  var sheet = ss.getSheetByName("orders") || ss.getSheets()[0];
   var rows = sheet.getDataRange().getValues();
   
   return ContentService.createTextOutput(JSON.stringify(rows))
@@ -1114,7 +1181,8 @@ function doGet(e) {
 
 function doPost(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var mainSheet = ss.getSheetByName("Sheet1") || ss.getSheets()[0];
+  var mainSheet = ss.getSheetByName("orders") || ss.getSheetByName("Sheet1") || ss.getSheets()[0];
+  var sheetName = mainSheet.getName();
   var data = (e && e.parameter) ? e.parameter : {};
   
   // Also parse JSON payload if sent via application/json
@@ -1199,15 +1267,15 @@ function doPost(e) {
 
       return ContentService.createTextOutput(JSON.stringify({
         status: 'success',
-        message: 'Order #' + orderIdToFind + ' reverted from ' + (data.currentStatus || 'status') + ' to ' + prevStatus + ', undo logged in history'
+        message: 'Order #' + orderIdToFind + ' reverted',
+        sheet: sheetName
       })).setMimeType(ContentService.MimeType.JSON);
     }
   }
 
-  // 2. UPDATE FOLLOWUP / ORDER STATUS / ORDER VALUE / SCHEDULE DATE & TIME
-  // AND LOG HISTORICAL AUDIT ROW TO "Followup" SHEET WITH EXACT 14 COLUMNS
+  // 2. UPDATE FOLLOWUP
   if (action === 'updateFollowup' || action === 'updateStatus' || action === 'updateOrder' || action === 'update') {
-    var orderIdToFind = String(data.orderId || data.order_id || '').trim();
+      var orderIdToFind = String(data.orderId || data.order_id || '').trim();
     var newFollowupStatus = data.followupStatus || data.followup_status || '';
     var newOrderStatus = data.orderStatus || data.order_status || (newFollowupStatus === 'Delivered' ? 'Delivered' : '');
     var updatedBy = data.updatedBy || data.updated_by || 'Manager';

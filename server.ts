@@ -3,6 +3,7 @@ import cors from 'cors';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import * as XLSX from 'xlsx';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -12,35 +13,108 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-  // API Proxy for fetching Google Sheet orders (avoids browser CORS)
+  // API Proxy for fetching Google Sheet orders & tabs (avoids browser CORS)
   app.get('/api/fetch-orders', async (req, res) => {
     try {
-      const scriptUrl = String(req.query.url || '');
-      if (!scriptUrl) {
-        return res.status(400).json({ error: 'Missing script URL' });
-      }
+      const defaultSheetId = '1CKnS6A3okk6igZRIQCcBCJPEo-J56xwXTYJL8Dg5AiA';
+      const inputUrl = String(req.query.url || '').trim();
+      const requestedTab = String(req.query.tab || req.query.sheet || '').trim();
 
-      const response = await fetch(scriptUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json, text/plain, */*'
-        },
-        redirect: 'follow'
-      });
+      const extractSheetId = (input: string): string | null => {
+        const clean = input.trim();
+        if (/^[a-zA-Z0-9-_]{25,}$/.test(clean)) {
+          return clean;
+        }
+        const match = clean.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (match && match[1]) {
+          return match[1];
+        }
+        return null;
+      };
 
-      if (!response.ok) {
-        throw new Error(`Google Apps Script HTTP error ${response.status}`);
-      }
+      // Always resolve to a valid Google Sheet ID, defaulting to user's sheet ID
+      const targetSheetId = (inputUrl ? extractSheetId(inputUrl) : null) || defaultSheetId;
 
-      const text = await response.text();
-      let data;
+      let sheetNames: string[] = ['orders', 'Sheet5', 'Followup'];
+      let rows: any[][] = [];
+      let targetSheetName = requestedTab || 'orders';
+
+      // 1. Try full XLSX export to obtain both tabs list and accurate formatted cells
       try {
-        data = JSON.parse(text);
-      } catch {
-        data = text;
+        const xlsxUrl = `https://docs.google.com/spreadsheets/d/${targetSheetId}/export?format=xlsx`;
+        const response = await fetch(xlsxUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, */*'
+          },
+          redirect: 'follow'
+        });
+
+        if (response.ok) {
+          const arrayBuf = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuf);
+          const textSample = buffer.toString('utf8', 0, Math.min(buffer.length, 500)).toLowerCase();
+          
+          if (!textSample.includes('<!doctype html') && !textSample.includes('sign in to google')) {
+            const workbook = XLSX.read(buffer, { type: 'buffer' });
+            if (workbook.SheetNames && workbook.SheetNames.length > 0) {
+              sheetNames = workbook.SheetNames;
+              
+              if (!requestedTab) {
+                const foundOrders = sheetNames.find(n => {
+                  const l = n.toLowerCase().trim();
+                  return l === 'orders' || l === 'order';
+                });
+                targetSheetName = foundOrders || sheetNames[0];
+              } else {
+                const matched = sheetNames.find(n => n.toLowerCase().trim() === requestedTab.toLowerCase().trim());
+                targetSheetName = matched || requestedTab;
+              }
+
+              const worksheet = workbook.Sheets[targetSheetName] || workbook.Sheets[sheetNames[0]];
+              if (worksheet) {
+                rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd hh:mm:ss' }) as any[][];
+              }
+            }
+          }
+        }
+      } catch (xlsxErr) {
+        console.warn('XLSX export fetch failed, falling back to CSV:', xlsxErr);
       }
 
-      return res.json({ success: true, data });
+      // 2. Fallback to direct GViz CSV export if XLSX failed or yielded empty data
+      if (!rows || rows.length <= 1) {
+        try {
+          const csvUrl = `https://docs.google.com/spreadsheets/d/${targetSheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(targetSheetName || 'orders')}`;
+          const csvRes = await fetch(csvUrl, { redirect: 'follow' });
+          if (csvRes.ok) {
+            const csvText = await csvRes.text();
+            if (!csvText.includes('<!doctype html')) {
+              const workbook = XLSX.read(csvText, { type: 'string' });
+              const sheet = workbook.Sheets[workbook.SheetNames[0]];
+              rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false }) as any[][];
+            }
+          }
+        } catch (csvErr) {
+          console.warn('GViz CSV export failed:', csvErr);
+        }
+      }
+
+      if (!rows || rows.length === 0) {
+        return res.status(500).json({
+          success: false,
+          error: 'Could not load data from Google Sheet. Please ensure sheet is set to "Anyone with the link can view".'
+        });
+      }
+
+      return res.json({
+        success: true,
+        tabs: sheetNames,
+        activeTab: targetSheetName,
+        total: Math.max(0, rows.length - 1),
+        data: rows,
+        sheetId: targetSheetId
+      });
     } catch (err: any) {
       console.error('Server fetch-orders error:', err);
       return res.status(500).json({ success: false, error: err.message || 'Failed to fetch orders from sheet' });
@@ -54,6 +128,8 @@ async function startServer() {
       if (!url) {
         return res.status(400).json({ error: 'Missing script URL' });
       }
+
+      console.log('Proxying request to:', url, 'with action:', formData.action);
 
       const params = new URLSearchParams();
       for (const [key, val] of Object.entries(formData)) {
@@ -70,6 +146,7 @@ async function startServer() {
       });
 
       const text = await response.text();
+      console.log('Google Sheets response:', text);
       return res.json({ success: true, response: text });
     } catch (err: any) {
       console.error('Server proxy-script error:', err);
