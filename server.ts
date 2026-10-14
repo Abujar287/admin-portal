@@ -129,6 +129,14 @@ async function startServer() {
         return res.status(400).json({ error: 'Missing script URL' });
       }
 
+      // Basic URL validation
+      try {
+        new URL(url);
+      } catch (e) {
+        console.error('Invalid URL passed to proxy:', url);
+        return res.status(400).json({ success: false, error: 'The provided URL is invalid. Please ensure it is a valid Google Apps Script Web App URL.' });
+      }
+
       console.log('Proxying request to:', url, 'with action:', formData.action);
 
       const params = new URLSearchParams();
@@ -146,6 +154,13 @@ async function startServer() {
       });
 
       const text = await response.text();
+      
+      // If it's HTML, it's likely a 404 or an error page, not a successful API response.
+      if (text.trim().toLowerCase().startsWith('<!doctype html') || text.toLowerCase().includes('<html')) {
+        console.error('Google Sheets returned HTML instead of data. Likely an invalid Script URL.');
+        return res.status(502).json({ success: false, error: 'Invalid Google Script URL or configuration. Please check your Web App URL.' });
+      }
+      
       console.log('Google Sheets response:', text);
       return res.json({ success: true, response: text });
     } catch (err: any) {

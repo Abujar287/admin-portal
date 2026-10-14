@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 
 export const DEFAULT_SCRIPT_URL =
   (import.meta.env?.VITE_GOOGLE_SCRIPT_URL as string) ||
-  'https://docs.google.com/spreadsheets/d/1CKnS6A3okk6igZRIQCcBCJPEo-J56xwXTYJL8Dg5AiA/edit';
+  'https://script.google.com/macros/s/AKfycbznJBoaggkUhg0ztkcmJpEyeaiuJRVRJX7oItiIgzWqhNPkYIbG3zjnEe2Hn1voDFFg/exec';
 
 const STORAGE_KEYS = {
   ORDERS: 'agent_portal_orders_v3',
@@ -973,55 +973,22 @@ export class OrderService {
         const bodyData: Record<string, string> = {
           url: scriptUrl,
           action: 'updateFollowup',
-          order_id: String(orderId),
-          orderId: String(orderId),
-          followup_id: String(nextFollowupId),
-          followupId: String(nextFollowupId),
-          action_name: actionStr,
-          actionName: actionStr,
-          status_change: statusChangeText,
-          statusChange: statusChangeText,
-          order_status: finalOrderStatus,
-          orderStatus: finalOrderStatus,
-          delivered_date: newDeliveredDate || '',
-          deliveredDate: newDeliveredDate || '',
-          cancelled_date: newCancelledDate || '',
-          cancelledDate: newCancelledDate || '',
-          followup_date: newFollowupDate || '',
-          followupDate: newFollowupDate || '',
-          updated_by: updatedBy,
-          updatedBy: updatedBy,
-          notes: notes,
-          remarks: notes,
-          timestamp: currentTimestamp
+          'Log Timestamp': currentTimestamp,
+          'followup_id': String(nextFollowupId),
+          'order_id': String(orderId),
+          'customer_name': existingOrder.customer_name || existingOrder.customerName || '',
+          'customer_mobile': existingOrder.customer_mobile || existingOrder.customerContact || '',
+          'previous_followup_status': prevFo,
+          'new_followup_status': finalFollowupStatus || prevFo,
+          'order_status': finalOrderStatus,
+          'order_value': orderValToSync !== undefined ? String(orderValToSync) : String(existingOrder.order_value || existingOrder.orderValue || 0),
+          'schedule_date': schedDate,
+          'schedule_time': schedTime,
+          'updated_by': updatedBy,
+          'status_change': statusChangeText,
+          'action': actionStr,
+          'notes': notes // Added to ensure notes aren't lost if needed
         };
-
-        if (finalFollowupStatus) {
-          bodyData.followup_status = finalFollowupStatus;
-          bodyData.followupStatus = finalFollowupStatus;
-        }
-        if (orderValToSync !== undefined) {
-          bodyData.order_value = String(orderValToSync);
-          bodyData.orderValue = String(orderValToSync);
-        }
-        if (finalProfitParam !== undefined) {
-          bodyData.profit = String(finalProfitParam);
-        }
-        if (scDtToSync !== undefined) {
-          bodyData.schedule_date = scDtToSync;
-          bodyData.scheduleDate = scDtToSync;
-        }
-        if (scTmToSync !== undefined) {
-          bodyData.schedule_time = scTmToSync;
-          bodyData.scheduledTime = scTmToSync;
-          bodyData.scheduleTime = scTmToSync;
-        }
-        if (existingOrder) {
-          bodyData.customer_name = existingOrder.customer_name || existingOrder.customerName || '';
-          bodyData.customerName = existingOrder.customer_name || existingOrder.customerName || '';
-          bodyData.customer_mobile = existingOrder.customer_mobile || existingOrder.customerContact || '';
-          bodyData.customerContact = existingOrder.customer_mobile || existingOrder.customerContact || '';
-        }
 
         await fetch('/api/proxy-script', {
           method: 'POST',
