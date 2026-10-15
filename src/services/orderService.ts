@@ -1471,23 +1471,32 @@ export class OrderService {
     const existingOrder = orders.find((ord) => String(ord.order_id || ord.id) === String(orderId));
 
     // Resolve manager / agent user ID and name cleanly
-    let uById = '1';
+    let uById = 'manager';
     let uByName = 'Manager';
 
     if (updatedBy) {
-      const lower = String(updatedBy).toLowerCase();
-      if (lower.includes('manager') || lower === 'admin' || lower.includes('@') || lower.includes('superadmin')) {
-        uById = '1';
-        uByName = 'Manager';
-      } else if (updatedBy.includes('(@')) {
-        const m = updatedBy.match(/\(@(.*)\)/);
-        if (m) {
-          uById = m[1].trim();
-          uByName = updatedBy.replace(/\s*\(@.*\)/, '').replace('@', '').trim();
+      const trimmed = String(updatedBy).trim();
+      if (trimmed.includes('(@')) {
+        const m = trimmed.match(/^(.*?)\s*\(@(.*)\)$/);
+        if (m && m[1] && m[2]) {
+          uByName = m[1].trim();
+          uById = m[2].trim();
+        } else {
+          uById = trimmed;
+          uByName = trimmed;
         }
+      } else if (trimmed.startsWith('@')) {
+        uById = trimmed.substring(1);
+        uByName = trimmed.substring(1);
       } else {
-        uById = updatedBy.replace(/[^0-9]/g, '') || '1';
-        uByName = updatedBy.replace(/\s*\(@.*\)/, '').replace('@', '').trim() || 'Manager';
+        const lower = trimmed.toLowerCase();
+        if ((lower.includes('manager') || lower === 'admin' || lower.includes('superadmin')) && !lower.includes('@')) {
+          uById = 'manager';
+          uByName = trimmed;
+        } else {
+          uById = trimmed;
+          uByName = trimmed;
+        }
       }
     }
 

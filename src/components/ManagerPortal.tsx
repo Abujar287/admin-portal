@@ -59,6 +59,9 @@ import {
 import { 
   ORDER_CHANNELS, 
   TIME_SLOTS, 
+  getTimeSlots,
+  addTimeSlot,
+  removeTimeSlot,
   getOrderChannels, 
   addOrderChannel,
   removeOrderChannel,
@@ -505,6 +508,30 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   // 5. Team Leader
   const [teamLeadersList, setTeamLeadersList] = useState<string[]>(() => getTeamLeadersList());
   const [newTeamLeaderInput, setNewTeamLeaderInput] = useState('');
+
+  // 6. Time Slot
+  const [timeSlotsList, setTimeSlotsList] = useState<string[]>(() => getTimeSlots());
+  const [newTimeSlotInput, setNewTimeSlotInput] = useState('');
+
+  const handleAddNewTimeSlot = (e: React.FormEvent) => {
+    e.preventDefault();
+    const ts = newTimeSlotInput.trim();
+    if (!ts) return;
+    if (timeSlotsList.some(item => item.toLowerCase() === ts.toLowerCase())) {
+      showToast(`Time slot "${ts}" already exists!`);
+      return;
+    }
+    const updated = addTimeSlot(ts);
+    setTimeSlotsList([...updated]);
+    setNewTimeSlotInput('');
+    showToast(`Time slot "${ts}" added!`);
+  };
+
+  const handleDeleteTimeSlot = (slotName: string) => {
+    const updated = removeTimeSlot(slotName);
+    setTimeSlotsList([...updated]);
+    showToast(`Time slot "${slotName}" removed.`);
+  };
 
   // Comprehensive deduplicated list of available Team Leaders for multi-select dropdowns
   const availableTeamLeaders = useMemo(() => {
@@ -1677,10 +1704,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             </div>
             {isSidebarOpen && (
               <div>
-                <h2 className="font-extrabold text-sm tracking-tight text-white">Manager Portal</h2>
-                <p className="text-[10px] text-indigo-300 uppercase tracking-widest font-semibold">
-                  Control Hub
-                </p>
+                <h2 className="font-extrabold text-sm tracking-tight text-white truncate max-w-[130px]">{currentManager.name || currentManager.user}</h2>
+                <span className="inline-block px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-bold bg-indigo-500/25 text-indigo-200 border border-indigo-400/30">
+                  ID: @{currentManager.user}
+                </span>
               </div>
             )}
           </div>
@@ -5212,13 +5239,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs bg-white/10 text-indigo-100 font-bold px-3 py-1.5 rounded-xl border border-white/10">
-                      5 Master Columns
+                      6 Master Columns
                     </span>
                   </div>
                 </div>
 
                 {/* Quick Column Metrics */}
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 pt-4">
                   <div className="bg-white/5 border border-white/10 rounded-xl p-3">
                     <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider block">Categories</span>
                     <span className="text-lg font-extrabold text-white mt-0.5 block">{categories.length}</span>
@@ -5235,15 +5262,19 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <span className="text-[10px] text-blue-300 font-bold uppercase tracking-wider block">Channels</span>
                     <span className="text-lg font-extrabold text-white mt-0.5 block">{channelsList.length}</span>
                   </div>
-                  <div className="bg-white/5 border border-white/10 rounded-xl p-3 col-span-2 sm:col-span-1">
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
                     <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider block">Team Leaders</span>
                     <span className="text-lg font-extrabold text-white mt-0.5 block">{teamLeadersList.length}</span>
+                  </div>
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                    <span className="text-[10px] text-sky-300 font-bold uppercase tracking-wider block">Time Slots</span>
+                    <span className="text-lg font-extrabold text-white mt-0.5 block">{timeSlotsList.length}</span>
                   </div>
                 </div>
               </div>
 
-              {/* 5 MASTER CONFIGURATION COLUMNS SIDE BY SIDE (Category | Order Status | Team | Channel | Team Leader) */}
-              <div className="grid grid-cols-5 gap-3">
+              {/* 6 MASTER CONFIGURATION COLUMNS SIDE BY SIDE */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
                 {/* Column 1: Category */}
                 <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col">
                   <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
@@ -5481,6 +5512,54 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           type="button"
                           onClick={() => handleDeleteTeamLeader(tl)}
                           title={`Remove ${tl}`}
+                          className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors cursor-pointer shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Column 6: Time Slot */}
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">⏰</span>
+                      <span className="font-extrabold text-xs text-slate-900 uppercase tracking-wider">Time Slot</span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+                      {timeSlotsList.length}
+                    </span>
+                  </div>
+                  {/* Add form */}
+                  <form onSubmit={handleAddNewTimeSlot} className="flex gap-1.5 mb-3">
+                    <input
+                      type="text"
+                      value={newTimeSlotInput}
+                      onChange={(e) => setNewTimeSlotInput(e.target.value)}
+                      placeholder="Add slot..."
+                      className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-indigo-600 font-medium"
+                    />
+                    <button
+                      type="submit"
+                      className="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold cursor-pointer shrink-0"
+                    >
+                      + Add
+                    </button>
+                  </form>
+                  {/* List */}
+                  <div className="flex-1 space-y-1.5 overflow-y-auto max-h-64 pr-1">
+                    {timeSlotsList.map((slot) => (
+                      <div
+                        key={slot}
+                        className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-200/60 text-xs transition-colors group"
+                      >
+                        <span className="font-semibold text-slate-800 truncate" title={slot}>{slot}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTimeSlot(slot)}
+                          title={`Remove ${slot}`}
                           className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors cursor-pointer shrink-0"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

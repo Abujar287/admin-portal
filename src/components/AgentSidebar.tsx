@@ -55,11 +55,11 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
           </div>
           {!collapsed && (
             <div className="overflow-hidden">
-              <h2 className="font-bold text-base tracking-tight text-white leading-tight truncate">
-                Agent Portal
+              <h2 className="font-bold text-sm tracking-tight text-white leading-tight truncate">
+                {currentAgent.name || currentAgent.user}
               </h2>
               <span className="inline-block px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-bold bg-sky-500/25 text-sky-200 border border-sky-400/30">
-                {currentAgent.user}
+                ID: @{currentAgent.user}
               </span>
             </div>
           )}

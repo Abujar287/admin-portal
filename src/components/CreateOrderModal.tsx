@@ -113,11 +113,10 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
     setCreateDate(OrderService.getBdtTimestamp());
 
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomY = tomorrow.getFullYear();
-    const tomM = String(tomorrow.getMonth() + 1).padStart(2, '0');
-    const tomD = String(tomorrow.getDate()).padStart(2, '0');
+    const today = new Date();
+    const tomY = today.getFullYear();
+    const tomM = String(today.getMonth() + 1).padStart(2, '0');
+    const tomD = String(today.getDate()).padStart(2, '0');
     setScheduleDate(`${tomY}-${tomM}-${tomD}`);
   };
 
@@ -167,7 +166,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
     const addressDetails = addressParts.length > 0 ? addressParts.join(', ') : 'Not specified';
     const numValue = parseFloat(orderValue) || 0;
-    const finalProfit = customProfit !== '' ? parseFloat(customProfit) || 0 : calculatedProfit;
+    const finalProfit = calculatedProfit;
 
     const newOrderPayload = {
       order_id: previewOrderId,
@@ -215,6 +214,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       setSubmitting(false);
     }
   };
+
+  const todayDateStr = new Date().toLocaleDateString('en-CA');
 
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-2xs overflow-y-auto">
@@ -487,6 +488,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 <input
                   type="date"
                   required
+                  min={todayDateStr}
                   value={scheduleDate}
                   onChange={(e) => setScheduleDate(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
@@ -503,7 +505,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
                 >
                   <option value="">Time Slot</option>
-                  {TIME_SLOTS.map((slot) => (
+                  {getTimeSlots().map((slot) => (
                     <option key={slot} value={slot}>{slot}</option>
                   ))}
                 </select>
@@ -522,29 +524,6 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   placeholder="0.00"
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white font-bold text-slate-900"
                 />
-              </div>
-            </div>
-
-            {/* Profit preview & edit */}
-            <div className="p-2.5 bg-blue-50/70 rounded-lg border border-blue-100 flex items-center justify-between text-xs">
-              <span className="flex items-center gap-1.5 text-blue-900 font-medium">
-                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                Profit (৳) {customProfit === '' ? '(20% auto-calculated)' : '(Custom)'}:
-              </span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  step="any"
-                  min="0"
-                  placeholder={String(calculatedProfit)}
-                  value={customProfit}
-                  onChange={(e) => setCustomProfit(e.target.value)}
-                  title="Override profit if needed, or leave blank to use 20% auto calculation"
-                  className="w-24 px-2 py-1 text-xs font-bold text-emerald-800 bg-white border border-emerald-300 rounded-md text-right focus:outline-hidden focus:border-emerald-600"
-                />
-                <strong className="text-emerald-700 font-bold whitespace-nowrap">
-                  ৳ {(customProfit !== '' ? parseFloat(customProfit) || 0 : calculatedProfit).toLocaleString()}
-                </strong>
               </div>
             </div>
           </div>

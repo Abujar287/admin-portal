@@ -134,7 +134,7 @@ export const AgentFollowupView: React.FC<AgentFollowupViewProps> = ({
         }
       }
 
-      const agentActor = currentAgent.name || currentAgent.user;
+      const agentActor = `${currentAgent.name || currentAgent.user} (@${currentAgent.user})`;
       await onUpdateOrderStatus(quickUpdateOrderId, updates, agentActor, quickUpdateNotes);
       setStatusMessage(`Order #${quickUpdateOrderId} updated successfully!`);
       setQuickUpdateNotes('');

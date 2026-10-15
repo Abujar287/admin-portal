@@ -97,6 +97,34 @@ export const TIME_SLOTS = [
   '8PM to 9PM'
 ];
 
+export const getTimeSlots = (): string[] => {
+  try {
+    const stored = localStorage.getItem('agent_portal_time_slots');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {
+    // fallback
+  }
+  return TIME_SLOTS;
+};
+
+export const addTimeSlot = (slot: string): string[] => {
+  const list = getTimeSlots();
+  if (!list.includes(slot)) {
+    list.push(slot);
+    localStorage.setItem('agent_portal_time_slots', JSON.stringify(list));
+  }
+  return list;
+};
+
+export const removeTimeSlot = (slot: string): string[] => {
+  const list = getTimeSlots().filter(s => s !== slot);
+  localStorage.setItem('agent_portal_time_slots', JSON.stringify(list));
+  return list;
+};
+
 export const ORDER_CHANNELS = [
   'Acquisition',
   'Retention',

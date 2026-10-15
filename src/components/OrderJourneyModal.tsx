@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 import { OrderItem, FollowupHistoryItem } from '../types';
 import { OrderService } from '../services/orderService';
-import { TIME_SLOTS } from '../data/mockOrders';
+import { TIME_SLOTS, getTimeSlots } from '../data/mockOrders';
 import {
   X,
   Edit3,
@@ -561,6 +561,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                       </label>
                       <input
                         type="date"
+                        min={new Date().toLocaleDateString('en-CA')}
                         value={singleScheduleDate}
                         onChange={(e) => setSingleScheduleDate(e.target.value)}
                         className="w-full px-2 py-1 text-xs font-bold rounded-lg border border-slate-300 bg-white"
@@ -593,7 +594,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                         className="w-full px-2 py-1 text-xs font-bold rounded-lg border border-slate-300 bg-white cursor-pointer"
                       >
                         <option value="">-- Slot --</option>
-                        {TIME_SLOTS.map((slot) => (
+                        {getTimeSlots().map((slot) => (
                           <option key={slot} value={slot}>{slot}</option>
                         ))}
                       </select>
@@ -666,12 +667,9 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
               <table className="w-full text-left text-[11px] border-collapse">
                 <thead>
                   <tr className="text-slate-500 border-b border-slate-100">
-                    <th className="py-2 px-2">Timestamp</th>
-                    <th className="py-2 px-2">Status</th>
-                    <th className="py-2 px-2">Value</th>
-                    <th className="py-2 px-2">Schedule</th>
-                    <th className="py-2 px-2">Updated By</th>
-                    <th className="py-2 px-2">Action</th>
+                    <th className="py-2 px-3">Timestamp</th>
+                    <th className="py-2 px-3">Updated By</th>
+                    <th className="py-2 px-3">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -679,18 +677,13 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                     .filter(h => String(h.orderId) === orderId)
                     .map((h, i) => (
                       <tr key={i} className="text-slate-700 hover:bg-slate-50">
-                        <td className="py-2 px-2 font-mono whitespace-nowrap">{h.timestamp}</td>
-                        <td className="py-2 px-2">
-                           <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">{h.previousStatus} ➔ {h.newStatus}</span>
-                        </td>
-                        <td className="py-2 px-2 whitespace-nowrap">৳ {(h.orderValue || 0).toLocaleString()}</td>
-                        <td className="py-2 px-2 whitespace-nowrap">{h.scheduleDate} {h.scheduledTime}</td>
-                        <td className="py-2 px-2 whitespace-nowrap">
+                        <td className="py-2 px-3 font-mono whitespace-nowrap">{h.timestamp}</td>
+                        <td className="py-2 px-3 whitespace-nowrap font-medium">
                           {h.updatedByName || h.updatedBy?.replace(/\s*\(@.*\)/, '').replace('@', '_')}
                         </td>
-                        <td className="py-2 px-2">
+                        <td className="py-2 px-3">
                            <div className="font-bold">{h.action}</div>
-                           <div className="text-slate-500">{h.notes?.replace(/\(Status: (.*) -> (.*)\).*/, 'Status: $1 -> $2')}</div>
+                           {h.notes && <div className="text-slate-500 text-[10px]">{h.notes}</div>}
                         </td>
                       </tr>
                     ))}
