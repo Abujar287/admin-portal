@@ -34,6 +34,12 @@ export interface ManagerUser {
   pass: string;
   name: string;
   role: string;
+  contact?: string;
+  email?: string;
+  address?: string;
+  bloodGroup?: string;
+  gender?: string;
+  birthday?: string;
 }
 
 export interface OrderItem {

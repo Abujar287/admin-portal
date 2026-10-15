@@ -1387,7 +1387,8 @@ export class OrderService {
         orderValue: orderVal,
         scheduleDate: schedDate,
         scheduledTime: schedTime,
-        updatedBy: updatedBy || 'Manager',
+        updatedBy: updatedBy.match(/\(@(.*)\)/)?.[1] || updatedBy,
+        updatedByName: updatedBy.replace(/\s*\(@.*\)/, '').replace('@', '_'),
         timestamp: currentTimestamp,
         action: actionStr,
         notes: notes || ''

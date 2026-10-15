@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import { X } from 'lucide-react';
 
 interface SelectionModalProps {
@@ -13,8 +14,8 @@ interface SelectionModalProps {
 export const SelectionModal: React.FC<SelectionModalProps> = ({ title, options, selected, onSelect, onAdd, onClose }) => {
   const [newValue, setNewValue] = useState('');
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-3 sm:p-5 backdrop-blur-xs overflow-y-auto animate-fadeIn" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-3 sm:p-5 backdrop-blur-xs overflow-y-auto animate-fadeIn" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="bg-white rounded-3xl w-full max-w-sm flex flex-col shadow-2xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-extrabold text-lg text-slate-900">{title}</h3>
@@ -39,6 +40,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({ title, options, 
           <button onClick={() => { onAdd(newValue); setNewValue(''); onClose(); }} className="px-4 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold">Add</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

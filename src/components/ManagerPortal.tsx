@@ -79,9 +79,60 @@ import {
   CategoryTeamMapping,
   ORDER_STATUS_LIST,
 } from '../data/mockOrders';
-import { OrderJourneyModal } from './OrderJourneyModal';
-import { SelectionModal } from './SelectionModal';
-import { CreateOrderModal } from './CreateOrderModal';
+import { AgentProfileView } from './AgentProfileView';
+// ... (imports)
+import { auth } from '../firebase';
+// ...
+export const ManagerPortal: React.FC<ManagerPortalProps> = ({
+  currentManager,
+  agents,
+  onUpdateAgents,
+  // ...
+  onLogout,
+  onUpdateOrderStatus
+}) => {
+  // ... (existing state)
+  const [managerProfile, setManagerProfile] = useState<ManagerUser>(currentManager);
+  // ...
+  const handleUpdateManagerProfile = (updatedProfile: ManagerUser) => {
+    setManagerProfile(updatedProfile);
+    // You might need to add a prop to update the manager in App.tsx if needed
+  };
+
+// ... inside rendering logic for 'profiles' tab:
+              {activeTab === 'profiles' && (
+                <div className="bg-white p-6 rounded-2xl border border-slate-200">
+                  <h2 className="text-lg font-bold mb-4">Manager Profile</h2>
+                  <AgentProfileView
+                    currentAgent={{
+                      user: managerProfile.user,
+                      pass: managerProfile.pass,
+                      name: managerProfile.name,
+                      team: 'Manager',
+                      contact: managerProfile.contact,
+                      email: managerProfile.email,
+                      address: managerProfile.address,
+                      bloodGroup: managerProfile.bloodGroup,
+                      gender: managerProfile.gender,
+                      birthday: managerProfile.birthday
+                    }}
+                    onUpdateAgentProfile={(updated) => {
+                        handleUpdateManagerProfile({
+                            user: updated.user,
+                            pass: updated.pass,
+                            name: updated.name,
+                            role: 'Manager',
+                            contact: updated.contact,
+                            email: updated.email,
+                            address: updated.address,
+                            bloodGroup: updated.bloodGroup,
+                            gender: updated.gender,
+                            birthday: updated.birthday
+                        });
+                    }}
+                  />
+                </div>
+              )}
 
 export const AGENT_MANAGEABLE_TABS: { id: AgentNavTab; label: string; description: string }[] = [
   { id: 'summary', label: 'Summary', description: 'Analytics, KPI metrics & sales summary' },
@@ -841,12 +892,20 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   };
 
   // Add or update agent
-  const handleSaveAgent = (e: React.FormEvent) => {
+  const handleSaveAgent = async (e: React.FormEvent) => {
     e.preventDefault();
     const u = newAgentUser.trim();
     const p = newAgentPass.trim();
     const email = newAgentEmail.trim();
     if (!u || !p || !email) return;
+
+    if (p.length < 6) {
+      showToast('Password must be at least 6 characters.');
+      return;
+    }
+
+// Firebase auth creation removed to allow manager-side local credential management
+
 
     const permissions: AgentPermissions = {
       canCreate: newCanCreate,
@@ -936,6 +995,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setNewCanAddProfit(true);
     setNewAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
     setNewAllowedTabs(['summary', 'orders', 'agent-performance', 'profiles']);
+    showToast('Agent created/updated successfully!');
   };
 
   const handleEditAgent = (agentOrIndex: AgentUser | number) => {
@@ -4873,48 +4933,39 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
           {/* TAB: PROFILES */}
           {activeTab === 'profiles' && (
-            <div className="max-w-6xl space-y-6">
-              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs">
-                <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
-                  <h3 className="font-extrabold text-slate-900 text-lg">Agent User Access Management</h3>
-                  <button className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700">Add New Agent</button>
-                </div>
-                
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left">
-                    <thead>
-                      <tr className="text-slate-500 uppercase border-b border-slate-100">
-                        <th className="py-3 px-2 whitespace-nowrap">Agent ID</th>
-                        <th className="py-3 px-2 whitespace-nowrap">Agent Name</th>
-                        <th className="py-3 px-2 whitespace-nowrap">Password</th>
-                        <th className="py-3 px-2 whitespace-nowrap">Role</th>
-                        <th className="py-3 px-2 whitespace-nowrap">Team Assigned</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {agents.map((agent, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50">
-                          <td className="py-3 px-2 font-mono text-slate-700 whitespace-nowrap">{agent.user}</td>
-                          <td className="py-3 px-2 font-bold text-slate-900 whitespace-nowrap">{agent.name}</td>
-                          <td className="py-3 px-2 font-mono text-slate-400 whitespace-nowrap">••••••••</td>
-                          <td className="py-3 px-2 whitespace-nowrap">
-                             <button onClick={() => { setEditingAgent(agent); setEditingField('role'); }} className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md font-bold hover:bg-indigo-100">
-                              {agent.role || 'Set Role'}
-                             </button>
-                          </td>
-                          <td className="py-3 px-2 whitespace-nowrap">
-                             <button onClick={() => { setEditingAgent(agent); setEditingField('team'); }} className="px-2 py-1 bg-purple-50 text-purple-700 rounded-md font-bold hover:bg-purple-100">
-                              {agent.team || 'Assign Team'}
-                             </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-200">
+              <h2 className="text-lg font-bold mb-4">Manager Profile</h2>
+              <AgentProfileView
+                currentAgent={{
+                  user: managerProfile.user,
+                  pass: managerProfile.pass,
+                  name: managerProfile.name,
+                  team: 'Manager',
+                  contact: managerProfile.contact,
+                  email: managerProfile.email,
+                  address: managerProfile.address,
+                  bloodGroup: managerProfile.bloodGroup,
+                  gender: managerProfile.gender,
+                  birthday: managerProfile.birthday
+                }}
+                onUpdateAgentProfile={(updated) => {
+                    handleUpdateManagerProfile({
+                        user: updated.user,
+                        pass: updated.pass,
+                        name: updated.name,
+                        role: 'Manager',
+                        contact: updated.contact,
+                        email: updated.email,
+                        address: updated.address,
+                        bloodGroup: updated.bloodGroup,
+                        gender: updated.gender,
+                        birthday: updated.birthday
+                    });
+                }}
+              />
             </div>
           )}
+
 
           {/* TAB: SETTINGS & EXPORT HUB */}
           {activeTab === 'settings' && (
