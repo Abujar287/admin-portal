@@ -205,7 +205,7 @@ export default function App() {
       }
 
       // Check status update permission and allowed statuses
-      const requestedStatus = updates.order_status || updates.orderStatus || updates.followup_status || updates.followupStatus;
+      const requestedStatus = updates.followup_status || updates.followupStatus || updates.order_status || updates.orderStatus;
       if (requestedStatus) {
         if (perms.canUpdateStatus === false) {
           showToast('Access Denied: You do not have permission to update status after order placement.');

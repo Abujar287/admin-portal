@@ -576,6 +576,9 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                   const updates: Partial<OrderItem> = {};
                   if (perms.canUpdateStatus) {
                     updates.followup_status = editFollowupStatus;
+                    updates.followupStatus = editFollowupStatus;
+                    updates.order_status = 'Pending';
+                    updates.orderStatus = 'Pending';
                   }
                   if (perms.canChangeSchedule) {
                     if (editScheduleDate) updates.schedule_date = editScheduleDate;

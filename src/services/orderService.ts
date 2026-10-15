@@ -797,8 +797,9 @@ export class OrderService {
     const orders = (await this.getLocalOrders()) || [];
     const existingOrder = orders.find((ord) => String(ord.order_id || ord.id) === String(orderId));
 
-    let finalOrderStatus = updates.order_status || updates.orderStatus || existingOrder?.order_status || existingOrder?.orderStatus || 'Pending';
-    const finalFollowupStatus = updates.followup_status || updates.followupStatus;
+    // The order_status MUST always remain 'Pending'. All status changes apply to followup_status.
+    const finalOrderStatus = 'Pending';
+    const finalFollowupStatus = updates.followup_status || updates.followupStatus || existingOrder?.followup_status || existingOrder?.followupStatus || 'Pending';
     const currentTimestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
     const isCancelled = (finalFollowupStatus || '').toLowerCase() === 'cancelled';
@@ -846,8 +847,6 @@ export class OrderService {
             ? String(updates.scheduledTime)
             : (ord.schedule_time || ord.scheduledTime || ''));
 
-        const fStatus = finalFollowupStatus || ord.followup_status || ord.followupStatus || 'Pending';
-
         return {
           order_id: ord.order_id || ord.id,
           id: ord.order_id || ord.id,
@@ -875,23 +874,25 @@ export class OrderService {
           deliveryArea: ord.delivery_area || ord.deliveryArea,
           address_details: ord.address_details || ord.addressDetails,
           addressDetails: ord.address_details || ord.addressDetails,
-          schedule_date: updates.schedule_date || updates.scheduleDate || ord.schedule_date || ord.scheduleDate || '',
-          scheduleDate: updates.schedule_date || updates.scheduleDate || ord.schedule_date || ord.scheduleDate || '',
-          schedule_time: updates.schedule_time || updates.scheduledTime || ord.schedule_time || ord.scheduledTime || '',
-          scheduledTime: updates.schedule_time || updates.scheduledTime || ord.schedule_time || ord.scheduledTime || '',
-          order_value: updates.order_value ?? updates.orderValue ?? ord.order_value ?? ord.orderValue ?? 0,
-          orderValue: updates.order_value ?? updates.orderValue ?? ord.order_value ?? ord.orderValue ?? 0,
-          profit: updates.profit ?? ord.profit ?? 0,
-          order_status: ord.order_status || ord.orderStatus || 'Pending',
-          orderStatus: ord.order_status || ord.orderStatus || 'Pending',
-          followup_status: updates.followup_status || updates.followupStatus || ord.followup_status || ord.followupStatus || 'Pending',
-          followupStatus: updates.followup_status || updates.followupStatus || ord.followup_status || ord.followupStatus || 'Pending',
-          delivered_date: newDeliveredDate || ord.delivered_date || ord.deliveredDate || '',
-          deliveredDate: newDeliveredDate || ord.delivered_date || ord.deliveredDate || '',
-          cancelled_date: newCancelledDate || ord.cancelled_date || ord.cancelledDate || '',
-          cancelledDate: newCancelledDate || ord.cancelled_date || ord.cancelledDate || '',
-          followup_date: newFollowupDate || ord.followup_date || ord.followupDate || '',
-          followupDate: newFollowupDate || ord.followup_date || ord.followupDate || ''
+          schedule_date: schedDate,
+          scheduleDate: schedDate,
+          schedule_time: schedTime,
+          scheduledTime: schedTime,
+          order_value: orderVal,
+          orderValue: orderVal,
+          profit: profit,
+          // CRITICAL: order_status ALWAYS remains 'Pending'
+          order_status: 'Pending',
+          orderStatus: 'Pending',
+          // CRITICAL: followup_status updates with the new status
+          followup_status: finalFollowupStatus,
+          followupStatus: finalFollowupStatus,
+          delivered_date: newDeliveredDate,
+          deliveredDate: newDeliveredDate,
+          cancelled_date: newCancelledDate,
+          cancelledDate: newCancelledDate,
+          followup_date: newFollowupDate,
+          followupDate: newFollowupDate
         };
       }
       return ord;
@@ -954,7 +955,7 @@ export class OrderService {
       if (schedTimeChanged) changeDescriptions.push(`Schedule Time updated to ${schedTime}`);
       if (priceChanged) changeDescriptions.push(`Price updated to ${orderVal}`);
       
-      let statusChangeText = changeDescriptions.length > 0 ? changeDescriptions.map(d => `(${d})`).join(' ') : 'No Status Change';
+      const statusChangeText = changeDescriptions.length > 0 ? changeDescriptions.map(d => `(${d})`).join(' ') : 'No Status Change';
 
       historyItem = {
         id: nextId,
@@ -964,7 +965,7 @@ export class OrderService {
         customerContact: existingOrder.customer_mobile || existingOrder.customerContact,
         previousStatus: prevFo,
         newStatus: finalFollowupStatus || prevFo,
-        orderStatus: finalOrderStatus,
+        orderStatus: 'Pending',
         orderValue: orderVal,
         scheduleDate: schedDate,
         scheduledTime: schedTime,
@@ -1005,41 +1006,69 @@ export class OrderService {
         
         const statusChangeText = changeDescriptions.length > 0 ? changeDescriptions.map(d => `(${d})`).join(' ') : 'No Status Change';
 
-        const finalProfitParam = isCancelled ? 0 : (updates.profit !== undefined ? updates.profit : (orderValToSync !== undefined ? Number(orderValToSync) * 0.20 : undefined));
+        const finalProfitParam = isCancelled ? 0 : (updates.profit !== undefined ? updates.profit : (orderValToSync !== undefined ? Math.round(Number(orderValToSync) * 0.20) : undefined));
 
         const bodyData: Record<string, string> = {
           url: scriptUrl,
           action: 'updateFollowup',
           'Log Timestamp': currentTimestamp,
           'followup_id': String(nextFollowupId),
+          followupId: String(nextFollowupId),
           'order_id': String(orderId),
-          'customer_name': existingOrder.customer_name || existingOrder.customerName || '',
-          'customer_mobile': existingOrder.customer_mobile || existingOrder.customerContact || '',
+          orderId: String(orderId),
+          'customer_name': existingOrder?.customer_name || existingOrder?.customerName || '',
+          customerName: existingOrder?.customer_name || existingOrder?.customerName || '',
+          'customer_mobile': existingOrder?.customer_mobile || existingOrder?.customerContact || '',
+          customerMobile: existingOrder?.customer_mobile || existingOrder?.customerContact || '',
+          customerContact: existingOrder?.customer_mobile || existingOrder?.customerContact || '',
           'previous_followup_status': prevFo,
-          'order_value': orderValToSync !== undefined ? String(orderValToSync) : String(existingOrder.order_value || existingOrder.orderValue || 0),
+          previousFollowupStatus: prevFo,
+          'order_value': orderValToSync !== undefined ? String(orderValToSync) : String(existingOrder?.order_value || existingOrder?.orderValue || 0),
+          orderValue: orderValToSync !== undefined ? String(orderValToSync) : String(existingOrder?.order_value || existingOrder?.orderValue || 0),
           'schedule_date': schedDate,
+          scheduleDate: schedDate,
           'schedule_time': schedTime,
+          scheduleTime: schedTime,
+          scheduledTime: schedTime,
           'updated_by': updatedBy,
+          updatedBy: updatedBy,
           'status_change': statusChangeText,
+          statusChange: statusChangeText,
           'change_description': actionStr,
-          'notes': notes
+          actionName: actionStr,
+          'notes': notes,
+          remarks: notes,
+          // CRITICAL: order_status ALWAYS remains 'Pending'
+          'order_status': 'Pending',
+          orderStatus: 'Pending',
+          // CRITICAL: Send followup_status in all common parameter names so Google Apps Script captures it
+          'followup_status': finalFollowupStatus,
+          followupStatus: finalFollowupStatus,
+          'new_followup_status': finalFollowupStatus,
+          newFollowupStatus: finalFollowupStatus,
+          status: finalFollowupStatus,
+          // Profit: 20% on Delivered, empty / 0 on others
+          profit: String(isDelivered ? (finalProfitParam || Math.round(Number(orderValToSync || existingOrder?.order_value || 0) * 0.20)) : ''),
+          // Mutually exclusive dates
+          'delivered_date': newDeliveredDate,
+          deliveredDate: newDeliveredDate,
+          'cancelled_date': newCancelledDate,
+          cancelledDate: newCancelledDate,
+          'followup_date': newFollowupDate,
+          followupDate: newFollowupDate
         };
-        if (updates.order_status || updates.orderStatus) {
-          bodyData['order_status'] = updates.order_status || updates.orderStatus || '';
-        }
-        if (updates.followup_status || updates.followupStatus) {
-          bodyData['new_followup_status'] = updates.followup_status || updates.followupStatus || '';
-        }
 
         console.log('DEBUG: Final Payload sent to Google Sheet:', bodyData);
-        await fetch('/api/proxy-script', {
+        const proxyRes = await fetch('/api/proxy-script', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify(bodyData)
         });
-        remoteSynced = true;
+        const proxyJson = await proxyRes.json();
+        console.log('DEBUG: Proxy script response:', proxyJson);
+        remoteSynced = proxyJson.success ?? false;
       } catch (err) {
         console.warn('Google Apps Script status update proxy error:', err);
       }
@@ -1285,8 +1314,9 @@ function doPost(e) {
   // 2. UPDATE FOLLOWUP
   if (action === 'updateFollowup' || action === 'updateStatus' || action === 'updateOrder' || action === 'update') {
       var orderIdToFind = String(data.orderId || data.order_id || '').trim();
-    var newFollowupStatus = data.followupStatus || data.followup_status || '';
-    var newOrderStatus = data.orderStatus || data.order_status || (newFollowupStatus === 'Delivered' ? 'Delivered' : '');
+    var newFollowupStatus = data.followupStatus || data.followup_status || data.new_followup_status || data.newFollowupStatus || data.status || '';
+    // order_status must always stay 'Pending' as required
+    var newOrderStatus = 'Pending';
     var updatedBy = data.updatedBy || data.updated_by || 'Manager';
     var note = data.notes || data.remarks || '';
     var timestamp = new Date();
@@ -1320,10 +1350,8 @@ function doPost(e) {
       if (newFollowupStatus) {
         mainSheet.getRange(foundRowIndex, 19).setValue(newFollowupStatus);
       }
-      // (b) Update Order Status (Col 18)
-      if (newOrderStatus) {
-        mainSheet.getRange(foundRowIndex, 18).setValue(newOrderStatus);
-      }
+      // (b) Update Order Status (Col 18) - ALWAYS keep 'Pending'
+      mainSheet.getRange(foundRowIndex, 18).setValue('Pending');
       // (c) Update Order Value (Col 17)
       var valInput = data.orderValue !== undefined && data.orderValue !== '' ? data.orderValue : data.order_value;
       if (valInput !== undefined && valInput !== '') {

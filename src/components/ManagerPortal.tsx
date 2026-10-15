@@ -5422,8 +5422,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         {
                           followup_status: modalFollowupStatus,
                           followupStatus: modalFollowupStatus,
-                          order_status: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : 'Pending'),
-                          orderStatus: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : 'Pending'),
+                          order_status: 'Pending',
+                          orderStatus: 'Pending',
                           order_value: modalOrderValue !== '' ? parseFloat(modalOrderValue) : undefined,
                           orderValue: modalOrderValue !== '' ? parseFloat(modalOrderValue) : undefined,
                           profit: isDeliv 

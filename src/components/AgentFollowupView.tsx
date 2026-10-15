@@ -104,8 +104,8 @@ export const AgentFollowupView: React.FC<AgentFollowupViewProps> = ({
       const updates: Partial<OrderItem> = {
         followup_status: quickUpdateStatus,
         followupStatus: quickUpdateStatus,
-        order_status: quickUpdateStatus,
-        orderStatus: quickUpdateStatus
+        order_status: 'Pending',
+        orderStatus: 'Pending'
       };
 
       if (perms.canChangeSchedule !== false) {

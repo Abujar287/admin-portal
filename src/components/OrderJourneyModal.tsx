@@ -96,8 +96,8 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
         {
           followup_status: singleStatus,
           followupStatus: singleStatus,
-          order_status: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : 'Pending'),
-          orderStatus: isDeliv ? 'Delivered' : (isCanc ? 'Cancelled' : 'Pending'),
+          order_status: 'Pending',
+          orderStatus: 'Pending',
           profit: isDeliv ? Math.round(currentVal * 0.20) : 0,
           delivered_date: isDeliv ? nowTs : '',
           deliveredDate: isDeliv ? nowTs : '',
