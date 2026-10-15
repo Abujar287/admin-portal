@@ -255,7 +255,6 @@ export default function App() {
     if (res.historyItem) {
       setFollowupHistory((prev) => [res.historyItem!, ...prev]);
     }
-    await loadOrdersData(true);
     showToast(
       updates.followup_status || updates.followupStatus
         ? `Order #${orderId} followup status updated to "${updates.followup_status || updates.followupStatus}" & synced!`

@@ -793,10 +793,11 @@ export class OrderService {
     updatedBy: string = 'manager',
     notes: string = ''
   ): Promise<{ updatedOrders: OrderItem[]; historyItem?: FollowupHistoryItem; remoteSynced: boolean }> {
+    console.log('Update Order Payload:', JSON.stringify(updates));
     const orders = (await this.getLocalOrders()) || [];
     const existingOrder = orders.find((ord) => String(ord.order_id || ord.id) === String(orderId));
 
-    const finalOrderStatus = updates.order_status || updates.orderStatus || existingOrder?.order_status || existingOrder?.orderStatus || 'Pending';
+    let finalOrderStatus = updates.order_status || updates.orderStatus || existingOrder?.order_status || existingOrder?.orderStatus || 'Pending';
     const finalFollowupStatus = updates.followup_status || updates.followupStatus;
     const currentTimestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
@@ -849,26 +850,25 @@ export class OrderService {
 
         return {
           ...ord,
-          ...updates,
           order_id: ord.order_id || ord.id,
           id: ord.order_id || ord.id,
           order_value: orderVal,
           orderValue: orderVal,
           profit: profit,
-          order_status: finalOrderStatus,
-          orderStatus: finalOrderStatus,
-          followup_status: fStatus,
-          followupStatus: fStatus,
+          order_status: isDelivered ? 'Delivered' : (isCancelled ? 'Cancelled' : 'Pending'),
+          orderStatus: isDelivered ? 'Delivered' : (isCancelled ? 'Cancelled' : 'Pending'),
+          followup_status: updates.followup_status || updates.followupStatus || ord.followup_status || ord.followupStatus || 'Pending',
+          followupStatus: updates.followup_status || updates.followupStatus || ord.followup_status || ord.followupStatus || 'Pending',
           schedule_date: schedDate,
           scheduleDate: schedDate,
           schedule_time: schedTime,
           scheduledTime: schedTime,
-          delivered_date: newDeliveredDate,
-          deliveredDate: newDeliveredDate,
-          cancelled_date: newCancelledDate,
-          cancelledDate: newCancelledDate,
-          followup_date: newFollowupDate,
-          followupDate: newFollowupDate
+          delivered_date: newDeliveredDate || (isDelivered ? '' : (ord.delivered_date || ord.deliveredDate || '')),
+          deliveredDate: newDeliveredDate || (isDelivered ? '' : (ord.delivered_date || ord.deliveredDate || '')),
+          cancelled_date: newCancelledDate || (isCancelled ? '' : (ord.cancelled_date || ord.cancelledDate || '')),
+          cancelledDate: newCancelledDate || (isCancelled ? '' : (ord.cancelled_date || ord.cancelledDate || '')),
+          followup_date: newFollowupDate || (isDelivered || isCancelled ? '' : (ord.followup_date || ord.followupDate || '')),
+          followupDate: newFollowupDate || (isDelivered || isCancelled ? '' : (ord.followup_date || ord.followupDate || ''))
         };
       }
       return ord;
@@ -924,11 +924,14 @@ export class OrderService {
         actionStr = `(${changedParts.join(', ')}) change`;
       }
 
-      // Generate status change string only if status changed, otherwise include update notes
-      let statusChangeText = statusChanged ? `${prevFo} -> ${finalFollowupStatus || prevFo}` : '';
-      if (!statusChanged && schedDateChanged) statusChangeText = `(Schedule Date updated to ${schedDate})`;
-      else if (!statusChanged && schedTimeChanged) statusChangeText = `(Schedule Time updated to ${schedTime})`;
-      else if (!statusChanged) statusChangeText = 'No Status Change';
+      // Generate status change string capturing ALL changes
+      const changeDescriptions: string[] = [];
+      if (statusChanged) changeDescriptions.push(`${prevFo} -> ${finalFollowupStatus || prevFo}`);
+      if (schedDateChanged) changeDescriptions.push(`Schedule Date updated to ${schedDate}`);
+      if (schedTimeChanged) changeDescriptions.push(`Schedule Time updated to ${schedTime}`);
+      if (priceChanged) changeDescriptions.push(`Price updated to ${orderVal}`);
+      
+      let statusChangeText = changeDescriptions.length > 0 ? changeDescriptions.map(d => `(${d})`).join(' ') : 'No Status Change';
 
       historyItem = {
         id: nextId,
@@ -964,10 +967,21 @@ export class OrderService {
         const schedTimeChanged = scTmToSync !== undefined && scTmToSync !== (existingOrder?.schedule_time || existingOrder?.scheduledTime || '');
         const schedDate = scDtToSync || (existingOrder?.schedule_date || existingOrder?.scheduleDate || '');
         const schedTime = scTmToSync || (existingOrder?.schedule_time || existingOrder?.scheduledTime || '');
-
-        const statusChangeText = statusChanged ? `${prevFo} -> ${finalFollowupStatus || prevFo}` : (schedDateChanged ? `(Schedule Date updated to ${schedDate})` : (schedTimeChanged ? `(Schedule Time updated to ${schedTime})` : 'No Status Change'));
-
         const orderValToSync = updates.order_value !== undefined ? updates.order_value : updates.orderValue;
+        const priceChanged = orderValToSync !== undefined && Number(orderValToSync) !== Number(existingOrder?.order_value || existingOrder?.orderValue || 0);
+
+        const prevSchedDate = existingOrder?.schedule_date || existingOrder?.scheduleDate || '';
+        const prevSchedTime = existingOrder?.schedule_time || existingOrder?.scheduledTime || '';
+        const prevOrderVal = Number(existingOrder?.order_value || existingOrder?.orderValue || 0);
+
+        const changeDescriptions: string[] = [];
+        if (statusChanged) changeDescriptions.push(`Status: ${prevFo} -> ${finalFollowupStatus || prevFo}`);
+        if (schedDateChanged) changeDescriptions.push(`Schedule Date: ${prevSchedDate} -> ${schedDate}`);
+        if (schedTimeChanged) changeDescriptions.push(`Schedule Time: ${prevSchedTime} -> ${schedTime}`);
+        if (priceChanged) changeDescriptions.push(`Price: ${prevOrderVal} -> ${orderValToSync}`);
+        
+        const statusChangeText = changeDescriptions.length > 0 ? changeDescriptions.map(d => `(${d})`).join(' ') : 'No Status Change';
+
         const finalProfitParam = isCancelled ? 0 : (updates.profit !== undefined ? updates.profit : (orderValToSync !== undefined ? Number(orderValToSync) * 0.20 : undefined));
 
         const bodyData: Record<string, string> = {
@@ -979,16 +993,20 @@ export class OrderService {
           'customer_name': existingOrder.customer_name || existingOrder.customerName || '',
           'customer_mobile': existingOrder.customer_mobile || existingOrder.customerContact || '',
           'previous_followup_status': prevFo,
-          'new_followup_status': finalFollowupStatus || prevFo,
-          'order_status': finalOrderStatus,
           'order_value': orderValToSync !== undefined ? String(orderValToSync) : String(existingOrder.order_value || existingOrder.orderValue || 0),
           'schedule_date': schedDate,
           'schedule_time': schedTime,
           'updated_by': updatedBy,
           'status_change': statusChangeText,
-          'action': actionStr,
-          'notes': notes // Added to ensure notes aren't lost if needed
+          'change_description': actionStr,
+          'notes': notes
         };
+        if (updates.order_status || updates.orderStatus) {
+          bodyData['order_status'] = updates.order_status || updates.orderStatus || '';
+        }
+        if (updates.followup_status || updates.followupStatus) {
+          bodyData['new_followup_status'] = updates.followup_status || updates.followupStatus || '';
+        }
 
         await fetch('/api/proxy-script', {
           method: 'POST',

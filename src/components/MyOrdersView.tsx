@@ -353,13 +353,14 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">profit</th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">delivered_date</th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">cancelled_date</th>
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">followup_date</th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-800">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={23} className="text-center py-12 text-slate-400">
+                  <td colSpan={24} className="text-center py-12 text-slate-400">
                     <p className="font-semibold text-sm text-slate-600">No orders found</p>
                     <p className="text-xs mt-1">Use the Create Order button above to book your first order.</p>
                   </td>
@@ -371,104 +372,35 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                   return (
                     <tr key={`agent-ord-${ord.order_id || ord.id || idx}-${idx}`} className="hover:bg-blue-50/40 transition-colors">
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-blue-700">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenOrder(ord)}
-                          className="hover:underline text-blue-700 hover:text-blue-900 font-bold cursor-pointer flex items-center gap-1"
-                          title="Click to open order details"
-                        >
-                          <span>#{ord.order_id || ord.id}</span>
+                        <button type="button" onClick={() => handleOpenOrder(ord)} className="hover:underline text-blue-700 font-bold cursor-pointer">
+                          #{ord.order_id || ord.id}
                         </button>
                       </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">
-                        {ord.customer_id || ord.customerId}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600">
-                        {ord.customer_mobile || ord.customerContact}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">
-                        {ord.customer_name || ord.customerName}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">
-                        {ord.gender}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-600 font-mono text-[11px]">
-                        {OrderService.formatDateTime(ord.create_date || ord.createDate)}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap">
-                        <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700">
-                          {ord.order_channel || ord.orderChannel}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600">
-                        {ord.agent_id || ord.agentId}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">
-                        {ord.agent_name || ord.agentName}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">
-                        {ord.product_category || ord.productCategory}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-800 max-w-[200px] truncate" title={ord.product_name || ord.productName}>
-                        {ord.product_name || ord.productName}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">
-                        {ord.city}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">
-                        {ord.delivery_area || ord.deliveryArea}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-500 max-w-[220px] truncate" title={ord.address_details || ord.addressDetails}>
-                        {ord.address_details || ord.addressDetails}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-slate-700">
-                        {OrderService.formatDateTime(ord.schedule_date || ord.scheduleDate)}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">
-                        {ord.schedule_time || ord.scheduledTime}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-bold text-slate-900">
-                        ৳ {((ord.order_value ?? ord.orderValue) || 0).toLocaleString()}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            isDelivered ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                          }`}
-                        >
-                          {ord.order_status || ord.orderStatus}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            isDelivered ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                          }`}
-                        >
-                          {ord.followup_status || ord.followupStatus}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-bold text-emerald-600">
-                        ৳ {((ord.profit ?? 0) || 0).toLocaleString()}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-emerald-700 font-medium">
-                        {ord.delivered_date || ord.deliveredDate ? OrderService.formatDateTime(ord.delivered_date || ord.deliveredDate) : '-'}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-red-700 font-medium">
-                        {ord.cancelled_date || ord.cancelledDate ? OrderService.formatDateTime(ord.cancelled_date || ord.cancelledDate) : '-'}
-                      </td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">{ord.customer_id || ord.customerId}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600">{ord.customer_mobile || ord.customerContact}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">{ord.customer_name || ord.customerName}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">{ord.gender}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-600 font-mono text-[11px]">{OrderService.formatDateTime(ord.create_date || ord.createDate)}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap"><span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700">{ord.order_channel || ord.orderChannel}</span></td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600">{ord.agent_id || ord.agentId}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">{ord.agent_name || ord.agentName}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">{ord.product_category || ord.productCategory}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-800 truncate" title={ord.product_name || ord.productName}>{ord.product_name || ord.productName}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">{ord.city}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">{ord.delivery_area || ord.deliveryArea}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-500 truncate" title={ord.address_details || ord.addressDetails}>{ord.address_details || ord.addressDetails}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-slate-700">{OrderService.formatDateTime(ord.schedule_date || ord.scheduleDate)}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">{ord.schedule_time || ord.scheduledTime}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-bold text-slate-900">৳ {((ord.order_value ?? ord.orderValue) || 0).toLocaleString()}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">{ord.order_status || ord.orderStatus}</span></td>
+                      <td className="py-3 px-3.5 whitespace-nowrap"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isDelivered ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{ord.followup_status || ord.followupStatus}</span></td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-bold text-emerald-600">৳ {((ord.profit ?? 0) || 0).toLocaleString()}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-emerald-700 font-medium">{ord.delivered_date || ord.deliveredDate ? OrderService.formatDateTime(ord.delivered_date || ord.deliveredDate) : '-'}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-red-700 font-medium">{ord.cancelled_date || ord.cancelledDate ? OrderService.formatDateTime(ord.cancelled_date || ord.cancelledDate) : '-'}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-blue-700 font-medium">{ord.followup_date || ord.followupDate ? OrderService.formatDateTime(ord.followup_date || ord.followupDate) : '-'}</td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-center">
-                        <button
-                          onClick={() => handleOpenOrder(ord)}
-                          title={canEditAnyField ? "View / Update Details" : "View Details"}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer ${
-                            canEditAnyField 
-                              ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700' 
-                              : 'bg-blue-50 hover:bg-blue-100 text-blue-700'
-                          }`}
-                        >
-                          {canEditAnyField ? <Edit3 className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                          <span>{canEditAnyField ? 'Update' : 'View'}</span>
+                        <button onClick={() => handleOpenOrder(ord)} className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 cursor-pointer">
+                          Update
                         </button>
                       </td>
                     </tr>
@@ -643,7 +575,6 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                 try {
                   const updates: Partial<OrderItem> = {};
                   if (perms.canUpdateStatus) {
-                    updates.order_status = editOrderStatus;
                     updates.followup_status = editFollowupStatus;
                   }
                   if (perms.canChangeSchedule) {
@@ -657,6 +588,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                     updates.profit = parseFloat(editProfit) || 0;
                   }
 
+                  console.log('Sending updates:', updates);
                   await onUpdateOrderStatus(
                     String(selectedOrder.order_id || selectedOrder.id),
                     updates,
