@@ -819,7 +819,7 @@ export class OrderService {
     if (!isDelivered && !isCancelled && finalFollowupStatus) {
       newFollowupDate = updates.followup_date || updates.followupDate || currentTimestamp;
     }
-
+    // Mutually exclusive dates for delivered, cancelled, and followup
     const updated = (orders || []).map((ord) => {
       if (String(ord.order_id || ord.id) === String(orderId)) {
         const orderVal = updates.order_value !== undefined 
@@ -849,26 +849,49 @@ export class OrderService {
         const fStatus = finalFollowupStatus || ord.followup_status || ord.followupStatus || 'Pending';
 
         return {
-          ...ord,
           order_id: ord.order_id || ord.id,
           id: ord.order_id || ord.id,
-          order_value: orderVal,
-          orderValue: orderVal,
-          profit: profit,
-          order_status: isDelivered ? 'Delivered' : (isCancelled ? 'Cancelled' : 'Pending'),
-          orderStatus: isDelivered ? 'Delivered' : (isCancelled ? 'Cancelled' : 'Pending'),
+          customer_id: ord.customer_id || ord.customerId,
+          customerId: ord.customer_id || ord.customerId,
+          customer_mobile: ord.customer_mobile || ord.customerContact,
+          customerContact: ord.customer_mobile || ord.customerContact,
+          customer_name: ord.customer_name || ord.customerName,
+          customerName: ord.customer_name || ord.customerName,
+          gender: ord.gender,
+          create_date: ord.create_date || ord.createDate,
+          createDate: ord.create_date || ord.createDate,
+          order_channel: ord.order_channel || ord.orderChannel,
+          orderChannel: ord.order_channel || ord.orderChannel,
+          agent_id: ord.agent_id || ord.agentId,
+          agentId: ord.agent_id || ord.agentId,
+          agent_name: ord.agent_name || ord.agentName,
+          agentName: ord.agent_name || ord.agentName,
+          product_category: ord.product_category || ord.productCategory,
+          productCategory: ord.product_category || ord.productCategory,
+          product_name: ord.product_name || ord.productName,
+          productName: ord.product_name || ord.productName,
+          city: ord.city,
+          delivery_area: ord.delivery_area || ord.deliveryArea,
+          deliveryArea: ord.delivery_area || ord.deliveryArea,
+          address_details: ord.address_details || ord.addressDetails,
+          addressDetails: ord.address_details || ord.addressDetails,
+          schedule_date: updates.schedule_date || updates.scheduleDate || ord.schedule_date || ord.scheduleDate || '',
+          scheduleDate: updates.schedule_date || updates.scheduleDate || ord.schedule_date || ord.scheduleDate || '',
+          schedule_time: updates.schedule_time || updates.scheduledTime || ord.schedule_time || ord.scheduledTime || '',
+          scheduledTime: updates.schedule_time || updates.scheduledTime || ord.schedule_time || ord.scheduledTime || '',
+          order_value: updates.order_value ?? updates.orderValue ?? ord.order_value ?? ord.orderValue ?? 0,
+          orderValue: updates.order_value ?? updates.orderValue ?? ord.order_value ?? ord.orderValue ?? 0,
+          profit: updates.profit ?? ord.profit ?? 0,
+          order_status: ord.order_status || ord.orderStatus || 'Pending',
+          orderStatus: ord.order_status || ord.orderStatus || 'Pending',
           followup_status: updates.followup_status || updates.followupStatus || ord.followup_status || ord.followupStatus || 'Pending',
           followupStatus: updates.followup_status || updates.followupStatus || ord.followup_status || ord.followupStatus || 'Pending',
-          schedule_date: schedDate,
-          scheduleDate: schedDate,
-          schedule_time: schedTime,
-          scheduledTime: schedTime,
-          delivered_date: newDeliveredDate || (isDelivered ? '' : (ord.delivered_date || ord.deliveredDate || '')),
-          deliveredDate: newDeliveredDate || (isDelivered ? '' : (ord.delivered_date || ord.deliveredDate || '')),
-          cancelled_date: newCancelledDate || (isCancelled ? '' : (ord.cancelled_date || ord.cancelledDate || '')),
-          cancelledDate: newCancelledDate || (isCancelled ? '' : (ord.cancelled_date || ord.cancelledDate || '')),
-          followup_date: newFollowupDate || (isDelivered || isCancelled ? '' : (ord.followup_date || ord.followupDate || '')),
-          followupDate: newFollowupDate || (isDelivered || isCancelled ? '' : (ord.followup_date || ord.followupDate || ''))
+          delivered_date: newDeliveredDate || ord.delivered_date || ord.deliveredDate || '',
+          deliveredDate: newDeliveredDate || ord.delivered_date || ord.deliveredDate || '',
+          cancelled_date: newCancelledDate || ord.cancelled_date || ord.cancelledDate || '',
+          cancelledDate: newCancelledDate || ord.cancelled_date || ord.cancelledDate || '',
+          followup_date: newFollowupDate || ord.followup_date || ord.followupDate || '',
+          followupDate: newFollowupDate || ord.followup_date || ord.followupDate || ''
         };
       }
       return ord;
@@ -1008,6 +1031,7 @@ export class OrderService {
           bodyData['new_followup_status'] = updates.followup_status || updates.followupStatus || '';
         }
 
+        console.log('DEBUG: Final Payload sent to Google Sheet:', bodyData);
         await fetch('/api/proxy-script', {
           method: 'POST',
           headers: {

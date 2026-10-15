@@ -588,7 +588,6 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                     updates.profit = parseFloat(editProfit) || 0;
                   }
 
-                  console.log('Sending updates:', updates);
                   await onUpdateOrderStatus(
                     String(selectedOrder.order_id || selectedOrder.id),
                     updates,
