@@ -700,7 +700,40 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   const handleExportXlsx = (data: any[], filename: string) => {
     if (data.length === 0) return;
-    const ws = XLSX.utils.json_to_sheet(data);
+    
+    // Check if data likely contains OrderItems (which have duplicate camelCase aliases)
+    const isOrderItem = data.some(item => item.order_id || item.id);
+    
+    let exportData = data;
+    if (isOrderItem) {
+      exportData = data.map(item => ({
+        order_id: item.order_id || item.id || '',
+        customer_id: item.customer_id || item.customerId || '',
+        customer_mobile: item.customer_mobile || item.customerContact || '',
+        customer_name: item.customer_name || item.customerName || '',
+        gender: item.gender || '',
+        create_date: item.create_date || item.createDate || item.createdAt || '',
+        order_channel: item.order_channel || item.orderChannel || '',
+        agent_id: item.agent_id || item.agentId || '',
+        agent_name: item.agent_name || item.agentName || '',
+        product_category: item.product_category || item.productCategory || '',
+        product_name: item.product_name || item.productName || '',
+        city: item.city || '',
+        delivery_area: item.delivery_area || item.deliveryArea || '',
+        address_details: item.address_details || item.addressDetails || '',
+        schedule_date: item.schedule_date || item.scheduleDate || '',
+        schedule_time: item.schedule_time || item.scheduledTime || '',
+        order_value: item.order_value || item.orderValue || 0,
+        order_status: item.order_status || item.orderStatus || '',
+        followup_status: item.followup_status || item.followupStatus || '',
+        profit: item.profit || 0,
+        delivered_date: item.delivered_date || item.deliveredDate || '',
+        cancelled_date: item.cancelled_date || item.cancelledDate || '',
+        followup_date: item.followup_date || item.followupDate || ''
+      }));
+    }
+
+    const ws = XLSX.utils.json_to_sheet(exportData, { header: Object.keys(exportData[0]) });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
     XLSX.writeFile(wb, filename.replace('.csv', '.xlsx'));
