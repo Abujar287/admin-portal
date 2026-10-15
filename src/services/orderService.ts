@@ -227,9 +227,6 @@ export class OrderService {
           const parsed = this.parseGoogleSheetRows(rawOrders);
           if (parsed.length > 0) {
             this.saveLocalOrders(parsed);
-            try {
-              this.syncAgentsFromOrders(parsed);
-            } catch {}
             return { tabs, orders: parsed, source: 'google_sheets' };
           }
         }
@@ -245,9 +242,6 @@ export class OrderService {
         const parsed = this.parseGoogleSheetRows(gvizRows);
         if (parsed.length > 0) {
           this.saveLocalOrders(parsed);
-          try {
-            this.syncAgentsFromOrders(parsed);
-          } catch {}
           return { tabs: ['orders', 'Sheet5', 'Followup'], orders: parsed, source: 'google_sheets' };
         }
       }
@@ -257,6 +251,263 @@ export class OrderService {
 
     const local = await this.getLocalOrders();
     return { tabs: ['orders', 'Sheet5', 'Followup'], orders: local, source: 'local_storage' };
+  }
+
+  static async fetchAgentsFromSheet(scriptUrl?: string): Promise<AgentUser[]> {
+    const url = scriptUrl || this.getScriptUrl();
+    const targetSheetId = extractSheetId(url || '') || DEFAULT_SHEET_ID;
+
+    // Check candidate tabs ('users' requested by user, or 'users details')
+    const candidateTabs = ['users', 'users details', 'Users', 'Users Details'];
+
+    // 1. Try server proxy route
+    for (const tabName of candidateTabs) {
+      try {
+        const res = await fetch(`/api/fetch-orders?url=${encodeURIComponent(url || DEFAULT_SCRIPT_URL)}&tab=${encodeURIComponent(tabName)}`);
+        if (res.ok) {
+          const jsonRes = await res.json();
+          if (jsonRes.success && Array.isArray(jsonRes.data) && jsonRes.data.length > 0) {
+            const rawData = jsonRes.data;
+            const parsed = this.parseAgentSheetRows(rawData);
+            // Tab exists in sheet! Store exactly what is in the sheet (even if 0 accounts)
+            this.saveAgents(parsed);
+            return parsed;
+          }
+        }
+      } catch (err) {
+        console.warn(`Failed to fetch agents via proxy from ${tabName}:`, err);
+      }
+    }
+
+    // 2. Direct GViz fallback
+    for (const tabName of candidateTabs) {
+      try {
+        const gvizRows = await this.fetchSheetViaGvizJsonp(targetSheetId, tabName);
+        if (Array.isArray(gvizRows) && gvizRows.length > 0) {
+          const parsed = this.parseAgentSheetRows(gvizRows);
+          this.saveAgents(parsed);
+          return parsed;
+        }
+      } catch (directErr) {
+        console.warn(`Direct GViz fetch for ${tabName} failed:`, directErr);
+      }
+    }
+
+    return this.getAgents();
+  }
+
+  static async saveAgentToSheet(agent: AgentUser): Promise<{ success: boolean; error?: string; rawResponse?: any }> {
+    const scriptUrl = this.getScriptUrl();
+    if (!scriptUrl) {
+      return { success: false, error: 'No Google Script URL configured' };
+    }
+
+    try {
+      const payload = {
+        url: scriptUrl,
+        action: 'saveUser',
+        user_id: agent.user,
+        user_name: agent.name || agent.user,
+        email: agent.email || '',
+        password: agent.pass || '',
+        team: agent.team || 'Acquisition',
+        role: agent.role || 'Agent',
+        team_leader: Array.isArray(agent.teamLeaders) && agent.teamLeaders.length > 0 
+          ? agent.teamLeaders.join(', ') 
+          : (agent.teamLeaderId || ''),
+        permission: JSON.stringify(agent.permissions || {}),
+        birthday: agent.birthday || '',
+        blood_group: agent.bloodGroup || '',
+        status: agent.status || 'active'
+      };
+
+      const res = await fetch('/api/proxy-script', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Failed to sync with Google Sheet' };
+      }
+
+      // Check whether Google Apps Script actually executed saveUser or fell back to order creation
+      let parsedResp: any = null;
+      try {
+        parsedResp = typeof data.response === 'string' ? JSON.parse(data.response) : data.response;
+      } catch {}
+
+      if (parsedResp && (parsedResp.orderId !== undefined || parsedResp.order_id !== undefined)) {
+        return {
+          success: false,
+          error: 'Apps Script Outdated: Google Sheet Apps Script does not have the updated Code.gs! It treated this user as a new order. Please update Code.gs in your Google Sheet (Extensions > Apps Script) and deploy a "New version".'
+        };
+      }
+
+      if (parsedResp && parsedResp.status === 'error') {
+        return {
+          success: false,
+          error: parsedResp.message || 'Google Sheet returned error while saving user'
+        };
+      }
+
+      return { success: true, rawResponse: parsedResp };
+    } catch (e: any) {
+      console.error('saveAgentToSheet error:', e);
+      return { success: false, error: e.message || 'Network error' };
+    }
+  }
+
+  static async deleteAgentFromSheet(userId: string): Promise<{ success: boolean; error?: string }> {
+    const scriptUrl = this.getScriptUrl();
+    if (!scriptUrl) return { success: false, error: 'No script URL' };
+    try {
+      const payload = {
+        url: scriptUrl,
+        action: 'deleteUser',
+        user_id: userId
+      };
+      const res = await fetch('/api/proxy-script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      
+      let parsedResp: any = null;
+      try {
+        parsedResp = typeof data.response === 'string' ? JSON.parse(data.response) : data.response;
+      } catch {}
+
+      if (parsedResp && (parsedResp.orderId !== undefined || parsedResp.order_id !== undefined)) {
+        return {
+          success: false,
+          error: 'Apps Script Outdated: Please update Code.gs in Extensions > Apps Script with New Version.'
+        };
+      }
+
+      return { success: !!data.success };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  private static parseAgentSheetRows(data: any): AgentUser[] {
+    if (!Array.isArray(data) || data.length === 0) return [];
+
+    // Filter out completely empty rows
+    const nonNullRows = data.filter((r: any) => {
+      if (!r) return false;
+      if (Array.isArray(r)) {
+        return r.some(c => c !== undefined && c !== null && String(c).trim() !== '');
+      }
+      if (typeof r === 'object') {
+        return Object.values(r).some(c => c !== undefined && c !== null && String(c).trim() !== '');
+      }
+      return true;
+    });
+
+    if (nonNullRows.length === 0) return [];
+
+    // Case 1: Array of JSON objects
+    if (typeof nonNullRows[0] === 'object' && !Array.isArray(nonNullRows[0])) {
+      return nonNullRows.map((item: any): AgentUser | null => {
+        const u = String(item.user_id || item.user || item.id || item.username || '').trim();
+        if (!u) return null;
+        let perms = undefined;
+        try {
+          if (item.permission || item.permissions) {
+            perms = typeof item.permission === 'object' ? item.permission : JSON.parse(item.permission || item.permissions);
+          }
+        } catch {}
+
+        const tlRaw = String(item.team_leader || item.teamleader || item.teamLeader || item.teamLeaders || '');
+        const tlArr = tlRaw ? tlRaw.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
+
+        return {
+          user: u,
+          pass: String(item.password || item.pass || '123456'),
+          name: String(item.user_name || item.name || u),
+          role: String(item.role || 'Agent'),
+          team: String(item.team || 'Acquisition'),
+          email: String(item.email || ''),
+          status: (String(item.status || 'active').toLowerCase() === 'deactivated' ? 'deactivated' : 'active') as 'active' | 'deactivated',
+          teamLeaderId: tlRaw,
+          teamLeaders: tlArr,
+          permissions: perms,
+          birthday: String(item.birthday || ''),
+          bloodGroup: String(item['blood group'] || item.blood_group || item.bloodGroup || '')
+        };
+      }).filter((a): a is AgentUser => a !== null && !!a.user);
+    }
+
+    // Case 2: 2D array of rows
+    const firstRow = nonNullRows[0].map((h: any) => String(h || '').trim().toLowerCase());
+    const findCol = (...candidates: string[]) => {
+      for (const cand of candidates) {
+        const norm = cand.toLowerCase().replace(/[\s_-]+/g, '');
+        const idx = firstRow.findIndex((h: string) => {
+          const normH = h.replace(/[\s_-]+/g, '');
+          return normH === norm || h === cand.toLowerCase() || h.includes(cand.toLowerCase());
+        });
+        if (idx !== -1) return idx;
+      }
+      return -1;
+    };
+
+    const idxId = findCol('user_id', 'userid', 'user', 'id');
+    const idxName = findCol('user_name', 'username', 'name', 'agent_name');
+    const idxEmail = findCol('email', 'mail');
+    const idxPass = findCol('password', 'pass');
+    const idxTeam = findCol('team', 'channel', 'department');
+    const idxRole = findCol('role');
+    const idxLeader = findCol('team_leader', 'teamleader', 'leader');
+    const idxPerm = findCol('permission', 'permissions');
+    const idxBday = findCol('birthday', 'birth_date', 'dob');
+    const idxBlood = findCol('blood group', 'bloodgroup', 'blood');
+    const idxStatus = findCol('status');
+
+    const dataRows = nonNullRows.slice(1);
+    return dataRows.map((row: any[]): AgentUser | null => {
+      const u = String(row[idxId !== -1 ? idxId : 0] || '').trim();
+      // Ignore if user cell is header or empty
+      if (!u || u.toLowerCase() === 'user_id' || u.toLowerCase() === 'user') return null;
+
+      const p = String(row[idxPass !== -1 ? idxPass : 3] || '123456');
+      const nm = String(row[idxName !== -1 ? idxName : 1] || u);
+      const em = String(row[idxEmail !== -1 ? idxEmail : 2] || '');
+      const tm = String(row[idxTeam !== -1 ? idxTeam : 4] || 'Acquisition');
+      const rl = String(row[idxRole !== -1 ? idxRole : 5] || 'Agent');
+      const tl = String(row[idxLeader !== -1 ? idxLeader : 6] || '');
+      const tlArr = tl ? tl.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
+      const permRaw = idxPerm !== -1 ? String(row[idxPerm] || '') : '';
+      let perms = undefined;
+      try {
+        if (permRaw) perms = JSON.parse(permRaw);
+      } catch {}
+
+      const bday = idxBday !== -1 ? String(row[idxBday] || '') : '';
+      const bld = idxBlood !== -1 ? String(row[idxBlood] || '') : '';
+      const st = (String(row[idxStatus !== -1 ? idxStatus : 10] || 'active').toLowerCase() === 'deactivated' ? 'deactivated' : 'active') as 'active' | 'deactivated';
+
+      return {
+        user: u,
+        pass: p,
+        name: nm,
+        role: rl,
+        team: tm,
+        email: em,
+        status: st,
+        teamLeaderId: tl,
+        teamLeaders: tlArr,
+        permissions: perms,
+        birthday: bday,
+        bloodGroup: bld
+      };
+    }).filter((a): a is AgentUser => a !== null && !!a.user);
   }
 
   private static resolveAgentName(aId: string, sheetNm?: string): string {
@@ -269,17 +520,16 @@ export class OrderService {
   static getAgents(): AgentUser[] {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.AGENTS);
-      if (stored) {
+      if (stored !== null) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           return parsed;
         }
       }
     } catch {
       // fallback
     }
-    localStorage.setItem(STORAGE_KEYS.AGENTS, JSON.stringify(INITIAL_AGENTS));
-    return INITIAL_AGENTS;
+    return [];
   }
 
   static saveAgents(agents: AgentUser[]): void {
@@ -481,7 +731,11 @@ export class OrderService {
       const headers = rows[0].map((h: any) => String(h || '').trim().toLowerCase());
       const findCol = (...names: string[]) => {
         for (const n of names) {
-          const idx = headers.findIndex((h: string) => h === n || h.includes(n));
+          const idx = headers.findIndex((h: string) => h === n);
+          if (idx !== -1) return idx;
+        }
+        for (const n of names) {
+          const idx = headers.findIndex((h: string) => h.includes(n));
           if (idx !== -1) return idx;
         }
         return -1;
@@ -518,6 +772,18 @@ export class OrderService {
         }
 
         const rawTs = String(r[idxTs !== -1 ? idxTs : 0] || '');
+        let uBy = String(r[idxUpBy !== -1 ? idxUpBy : 11] || '100');
+        let uByName = String(r[idxUpByNm !== -1 ? idxUpByNm : 12] || '');
+        if (!uByName && uBy.includes('(@')) {
+          const m = uBy.match(/\(@(.*)\)/);
+          if (m) {
+            uByName = uBy.replace(/\s*\(@.*\)/, '').replace('@', '').trim();
+            uBy = m[1].trim();
+          }
+        } else if (!uByName && uBy.startsWith('@')) {
+          uBy = uBy.substring(1);
+        }
+
         parsedItems.push({
           id: String(fidRaw || i),
           followupId: !isNaN(fidNum) ? fidNum : (fidRaw || i),
@@ -530,9 +796,9 @@ export class OrderService {
           orderValue: Number(r[idxVal !== -1 ? idxVal : 8]) || 0,
           scheduleDate: String(r[idxScDt !== -1 ? idxScDt : 9] || ''),
           scheduledTime: String(r[idxScTm !== -1 ? idxScTm : 10] || ''),
-          updatedBy: String(r[idxUpBy !== -1 ? idxUpBy : 11] || 'Manager'),
-          updatedByName: String(r[idxUpByNm !== -1 ? idxUpByNm : 12] || ''),
-          action: String(r[idxAct !== -1 ? idxAct : 14] || r[idxStCh !== -1 ? idxStCh : 13] || 'Follow-up Update'),
+          updatedBy: uBy,
+          updatedByName: uByName,
+          action: String(r[idxAct !== -1 ? idxAct : 14] || 'Follow-up Update'),
           notes: String(r[idxStCh !== -1 ? idxStCh : 13] || ''),
           timestamp: rawTs
         });
@@ -623,12 +889,6 @@ export class OrderService {
         if (Array.isArray(rawData) && rawData.length > 0) {
           const parsed = this.parseGoogleSheetRows(rawData);
           if (parsed.length > 0) {
-            try {
-              this.syncAgentsFromOrders(parsed);
-            } catch (e) {
-              console.warn('Agent sync skipped:', e);
-            }
-
             this.saveLocalOrders(parsed);
             try {
               localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString());
@@ -648,12 +908,6 @@ export class OrderService {
       if (Array.isArray(gvizRows) && gvizRows.length > 1) {
         const parsed = this.parseGoogleSheetRows(gvizRows);
         if (parsed.length > 0) {
-          try {
-            this.syncAgentsFromOrders(parsed);
-          } catch (e) {
-            console.warn('Agent sync skipped:', e);
-          }
-
           this.saveLocalOrders(parsed);
           try {
             localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString());
@@ -1216,6 +1470,27 @@ export class OrderService {
     const orders = (await this.getLocalOrders()) || [];
     const existingOrder = orders.find((ord) => String(ord.order_id || ord.id) === String(orderId));
 
+    // Resolve manager / agent user ID and name cleanly
+    let uById = '1';
+    let uByName = 'Manager';
+
+    if (updatedBy) {
+      const lower = String(updatedBy).toLowerCase();
+      if (lower.includes('manager') || lower === 'admin' || lower.includes('@') || lower.includes('superadmin')) {
+        uById = '1';
+        uByName = 'Manager';
+      } else if (updatedBy.includes('(@')) {
+        const m = updatedBy.match(/\(@(.*)\)/);
+        if (m) {
+          uById = m[1].trim();
+          uByName = updatedBy.replace(/\s*\(@.*\)/, '').replace('@', '').trim();
+        }
+      } else {
+        uById = updatedBy.replace(/[^0-9]/g, '') || '1';
+        uByName = updatedBy.replace(/\s*\(@.*\)/, '').replace('@', '').trim() || 'Manager';
+      }
+    }
+
     const finalOrderStatus = 'Pending';
     const finalFollowupStatus = updates.followup_status || updates.followupStatus || existingOrder?.followup_status || existingOrder?.followupStatus || 'Pending';
     const currentTimestamp = this.getBdtTimestamp();
@@ -1369,11 +1644,11 @@ export class OrderService {
       // Generate status change string capturing ALL changes
       const changeDescriptions: string[] = [];
       if (statusChanged) changeDescriptions.push(`${prevFo} -> ${finalFollowupStatus || prevFo}`);
-      if (schedDateChanged) changeDescriptions.push(`Schedule Date updated to ${schedDate}`);
-      if (schedTimeChanged) changeDescriptions.push(`Schedule Time updated to ${schedTime}`);
-      if (priceChanged) changeDescriptions.push(`Price updated to ${orderVal}`);
+      if (schedDateChanged) changeDescriptions.push(`Schedule Date: ${prevScDate} -> ${schedDate}`);
+      if (schedTimeChanged) changeDescriptions.push(`Schedule Time: ${prevScTime} -> ${schedTime}`);
+      if (priceChanged) changeDescriptions.push(`Price: ${prevVal} -> ${orderVal}`);
       
-      const statusChangeText = changeDescriptions.length > 0 ? changeDescriptions.map(d => `(${d})`).join(' ') : 'No Status Change';
+      const statusChangeText = changeDescriptions.length > 0 ? changeDescriptions.join(', ') : 'No Status Change';
 
       historyItem = {
         id: nextId,
@@ -1387,8 +1662,8 @@ export class OrderService {
         orderValue: orderVal,
         scheduleDate: schedDate,
         scheduledTime: schedTime,
-        updatedBy: updatedBy.match(/\(@(.*)\)/)?.[1] || updatedBy,
-        updatedByName: updatedBy.replace(/\s*\(@.*\)/, '').replace('@', '_'),
+        updatedBy: uById,
+        updatedByName: uByName,
         timestamp: currentTimestamp,
         action: actionStr,
         notes: notes || ''
@@ -1451,8 +1726,10 @@ export class OrderService {
           'schedule_time': schedTime,
           scheduleTime: schedTime,
           scheduledTime: schedTime,
-          'updated_by': updatedBy,
-          updatedBy: updatedBy,
+          'updated_by': uById,
+          updatedBy: uById,
+          'updated_by_name': uByName,
+          updatedByName: uByName,
           'status_change': statusChangeText,
           statusChange: statusChangeText,
           'change_description': actionStr,
@@ -1680,6 +1957,118 @@ function doPost(e) {
 
   var action = data.action;
 
+  // 0. SAVE / UPDATE USER IN 'users' / 'users details' TAB
+  if (action === 'saveUser' || action === 'saveAgent' || action === 'updateAgent' || action === 'addUser') {
+    var usersSheet = ss.getSheetByName("users") || ss.getSheetByName("Users") || ss.getSheetByName("users details") || ss.getSheetByName("Users Details");
+    if (!usersSheet) {
+      usersSheet = ss.insertSheet("users");
+      usersSheet.appendRow([
+        "user_id",
+        "user_name",
+        "email",
+        "password",
+        "team",
+        "role",
+        "team_leader",
+        "permission",
+        "birthday",
+        "blood group",
+        "status"
+      ]);
+      usersSheet.getRange(1, 1, 1, 11).setFontWeight("bold").setBackground("#e2e8f0");
+    }
+
+    var uId = String(data.user_id || data.user || data.userId || '').trim();
+    if (!uId) {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'error',
+        message: 'Missing user_id'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var uName = String(data.user_name || data.name || uId);
+    var uEmail = String(data.email || '');
+    var uPass = String(data.password || data.pass || '');
+    var uTeam = String(data.team || 'Acquisition');
+    var uRole = String(data.role || 'Agent');
+    var uLeader = String(data.team_leader || data.teamLeader || data.teamLeaders || '');
+    var uPerm = String(data.permission || data.permissions || '');
+    var uBday = String(data.birthday || '');
+    var uBlood = String(data['blood group'] || data.blood_group || data.bloodGroup || '');
+    var uStatus = String(data.status || 'active');
+
+    var uRows = usersSheet.getDataRange().getValues();
+    var foundIndex = -1;
+    var firstEmptyRow = -1;
+    for (var u = 1; u < uRows.length; u++) {
+      var cellVal = String(uRows[u][0] || '').trim();
+      if (!cellVal && firstEmptyRow === -1) {
+        firstEmptyRow = u + 1;
+      }
+      if (cellVal && cellVal.toLowerCase() === uId.toLowerCase()) {
+        foundIndex = u + 1; // 1-indexed row in sheet
+        break;
+      }
+    }
+
+    var targetRow = foundIndex > 0 ? foundIndex : (firstEmptyRow > 0 ? firstEmptyRow : -1);
+
+    if (targetRow > 0) {
+      usersSheet.getRange(targetRow, 1).setValue(uId);
+      usersSheet.getRange(targetRow, 2).setValue(uName);
+      usersSheet.getRange(targetRow, 3).setValue(uEmail);
+      if (uPass) usersSheet.getRange(targetRow, 4).setValue(uPass);
+      usersSheet.getRange(targetRow, 5).setValue(uTeam);
+      usersSheet.getRange(targetRow, 6).setValue(uRole);
+      usersSheet.getRange(targetRow, 7).setValue(uLeader);
+      usersSheet.getRange(targetRow, 8).setValue(uPerm);
+      usersSheet.getRange(targetRow, 9).setValue(uBday);
+      usersSheet.getRange(targetRow, 10).setValue(uBlood);
+      usersSheet.getRange(targetRow, 11).setValue(uStatus);
+    } else {
+      usersSheet.appendRow([
+        uId,
+        uName,
+        uEmail,
+        uPass,
+        uTeam,
+        uRole,
+        uLeader,
+        uPerm,
+        uBday,
+        uBlood,
+        uStatus
+      ]);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'success',
+      action: 'saveUser',
+      message: 'User ' + uId + ' saved successfully into users tab',
+      user_id: uId,
+      tab: usersSheet.getName()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // 0.1 DELETE USER FROM 'users' / 'users details' TAB
+  if (action === 'deleteUser' || action === 'removeUser') {
+    var usersSheet = ss.getSheetByName("users") || ss.getSheetByName("Users") || ss.getSheetByName("users details") || ss.getSheetByName("Users Details");
+    var uIdToDelete = String(data.user_id || data.user || '').trim().toLowerCase();
+    if (usersSheet && uIdToDelete) {
+      var uRows = usersSheet.getDataRange().getValues();
+      for (var u = 1; u < uRows.length; u++) {
+        if (String(uRows[u][0]).trim().toLowerCase() === uIdToDelete) {
+          usersSheet.deleteRow(u + 1);
+          break;
+        }
+      }
+    }
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'success',
+      message: 'User deleted'
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
   // 1. REVERT FOLLOWUP: Revert status in Sheet1, clear profit and dates
   if (action === 'revertFollowup') {
     var orderIdToFind = String(data.orderId || data.order_id || '').trim();
@@ -1727,7 +2116,15 @@ function doPost(e) {
         var scDate = data.scheduleDate || data.schedule_date || rows[foundRowIndex - 1][14] || '';
         var scTime = data.scheduledTime || data.scheduled_time || rows[foundRowIndex - 1][15] || '';
         var currStat = data.currentStatus || data.current_status || 'Delivered';
-        var uBy = data.updatedBy || data.updated_by || 'Manager';
+        var uByVal = data.updatedBy || data.updated_by || '100';
+        var uByNameVal = data.updatedByName || data.updated_by_name || '';
+        if (!uByNameVal && uByVal.includes('(@')) {
+          var m = uByVal.match(/\(@(.*)\)/);
+          if (m) {
+            uByNameVal = uByVal.replace(/\s*\(@.*\)/, '').replace('@', '').trim();
+            uByVal = m[1].trim();
+          }
+        }
         var actName = data.actionName || data.action_name || ("Undo (" + currStat + " -> " + prevStatus + ")");
 
         followupSheet.appendRow([
@@ -1742,7 +2139,8 @@ function doPost(e) {
           ordVal,
           scDate,
           scTime,
-          uBy,
+          uByVal,
+          uByNameVal,
           currStat + " -> " + prevStatus + " (Undone)",
           actName
         ]);
@@ -1849,8 +2247,8 @@ function doPost(e) {
         mainSheet.getRange(foundRowIndex, 16).setValue(schedTmInput);
       }
 
-      // (f) Record Historical Log into 'Followup' sheet with exact 14 columns requested:
-      // Log Timestamp | followup_id | order_id | customer_name | customer_mobile | previous_followup_status | new_followup_status | order_status | order_value | schedule_date | schedule_time | updated_by | status_change | action
+      // (f) Record Historical Log into 'Followup' sheet with exact 15 columns requested:
+      // Log Timestamp | followup_id | order_id | customer_name | customer_mobile | previous_followup_status | new_followup_status | order_status | order_value | schedule_date | schedule_time | updated_by | updated_by_name | status_change | action
       var followupSheet = ss.getSheetByName("Followup");
       if (!followupSheet) {
         followupSheet = ss.insertSheet("Followup");
@@ -1867,10 +2265,11 @@ function doPost(e) {
           "schedule_date",
           "schedule_time",
           "updated_by",
+          "updated_by_name",
           "status_change",
           "action"
         ]);
-        followupSheet.getRange(1, 1, 1, 14).setFontWeight("bold").setBackground("#e2e8f0");
+        followupSheet.getRange(1, 1, 1, 15).setFontWeight("bold").setBackground("#e2e8f0");
       }
 
       var finalOrderVal = (valInput !== undefined && valInput !== '') ? valInput : prevOrderVal;
@@ -1887,9 +2286,6 @@ function doPost(e) {
       var prevFo = prevFollowupStatus || 'Pending';
       var newFo = newFollowupStatus || prevFo;
       var statusChangeVal = data.statusChange || data.status_change || (prevFo + " -> " + newFo);
-      if (note) {
-        statusChangeVal = statusChangeVal + " (" + note + ")";
-      }
 
       // Determine Action Name
       var actionName = data.actionName || data.action_name || data.action || '';
@@ -1922,6 +2318,9 @@ function doPost(e) {
         }
       }
 
+      var uByVal = data.updatedBy || data.updated_by || '100';
+      var uByNameVal = data.updatedByName || data.updated_by_name || '';
+
       followupSheet.appendRow([
         timestamp,
         nextFollowupId,
@@ -1934,7 +2333,8 @@ function doPost(e) {
         finalOrderVal,
         finalSchedDate,
         finalSchedTime,
-        updatedBy,
+        uByVal,
+        uByNameVal,
         statusChangeVal,
         actionName
       ]);

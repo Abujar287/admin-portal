@@ -23,6 +23,7 @@ export interface AgentUser {
   address?: string;
   bloodGroup?: string;
   birthday?: string;
+  gender?: string;
   status?: 'active' | 'deactivated';
   failedAttempts?: number;
   role?: string; // 'Agent' | 'Team Leader' | 'Sr Agent'

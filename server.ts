@@ -67,13 +67,20 @@ async function startServer() {
                 });
                 targetSheetName = foundOrders || sheetNames[0];
               } else {
-                const matched = sheetNames.find(n => n.toLowerCase().trim() === requestedTab.toLowerCase().trim());
+                const reqLower = requestedTab.toLowerCase().trim();
+                const matched = sheetNames.find(n => n.toLowerCase().trim() === reqLower)
+                  || sheetNames.find(n => n.toLowerCase().replace(/[\s_-]+/g, '') === reqLower.replace(/[\s_-]+/g, ''))
+                  || sheetNames.find(n => {
+                    const l = n.toLowerCase().trim();
+                    return (reqLower.includes('user') && l.includes('user'));
+                  });
                 targetSheetName = matched || requestedTab;
               }
 
               const worksheet = workbook.Sheets[targetSheetName] || workbook.Sheets[sheetNames[0]];
               if (worksheet) {
-                rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd hh:mm:ss' }) as any[][];
+                const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd hh:mm:ss' }) as any[][];
+                rows = rawRows.filter(r => Array.isArray(r) && r.some(c => c !== undefined && c !== null && String(c).trim() !== ''));
               }
             }
           }
@@ -92,7 +99,8 @@ async function startServer() {
             if (!csvText.includes('<!doctype html')) {
               const workbook = XLSX.read(csvText, { type: 'string' });
               const sheet = workbook.Sheets[workbook.SheetNames[0]];
-              rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false }) as any[][];
+              const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false }) as any[][];
+              rows = rawRows.filter(r => Array.isArray(r) && r.some(c => c !== undefined && c !== null && String(c).trim() !== ''));
             }
           }
         } catch (csvErr) {
@@ -100,7 +108,7 @@ async function startServer() {
         }
       }
 
-      if (!rows || rows.length === 0) {
+      if (!rows || (rows.length === 0 && !sheetNames.some(s => s.toLowerCase().trim() === targetSheetName.toLowerCase().trim()))) {
         return res.status(500).json({
           success: false,
           error: 'Could not load data from Google Sheet. Please ensure sheet is set to "Anyone with the link can view".'

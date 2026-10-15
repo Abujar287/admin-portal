@@ -3,6 +3,7 @@ import { AgentUser, OrderItem } from '../types';
 import { CITY_AREA_MAP, ORDER_CHANNELS, PRODUCT_CATEGORIES, TIME_SLOTS } from '../data/mockOrders';
 import { OrderService } from '../services/orderService';
 import { X, CheckCircle2, AlertCircle, Loader2, Sparkles, Send } from 'lucide-react';
+import ReactDOM from 'react-dom';
 
 interface CreateOrderModalProps {
   isOpen: boolean;

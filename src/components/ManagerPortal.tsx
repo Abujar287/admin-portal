@@ -10,6 +10,7 @@ import {
   LogOut, 
   RotateCw, 
   RotateCcw,
+  RefreshCw,
   Search, 
   Plus, 
   Edit2, 
@@ -80,9 +81,13 @@ import {
   ORDER_STATUS_LIST,
 } from '../data/mockOrders';
 import { AgentProfileView } from './AgentProfileView';
+import { CreateOrderModal } from './CreateOrderModal';
+import { OrderJourneyModal } from './OrderJourneyModal';
+import { SelectionModal } from './SelectionModal';
 // ... (imports)
 import { auth } from '../firebase';
 // ...
+/*
 export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   currentManager,
   agents,
@@ -133,6 +138,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   />
                 </div>
               )}
+*/
 
 export const AGENT_MANAGEABLE_TABS: { id: AgentNavTab; label: string; description: string }[] = [
   { id: 'summary', label: 'Summary', description: 'Analytics, KPI metrics & sales summary' },
@@ -170,6 +176,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   onLogout,
   onUpdateOrderStatus
 }) => {
+  const [managerProfile, setManagerProfile] = useState<ManagerUser>(currentManager);
+  const handleUpdateManagerProfile = (updatedProfile: ManagerUser) => {
+    setManagerProfile(updatedProfile);
+  };
   const isManager = currentManager.role === 'Manager';
   const isTeamLeader = !isManager;
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -212,6 +222,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [showAppsScriptModal, setShowAppsScriptModal] = useState<boolean>(false);
   const [copiedScript, setCopiedScript] = useState<boolean>(false);
   const [isManagerCreateOrderOpen, setIsManagerCreateOrderOpen] = useState(false);
+  const [isSyncingAgents, setIsSyncingAgents] = useState(false);
 
   // User Edit Modal Popup State
   const [editingAgentModal, setEditingAgentModal] = useState<AgentUser | null>(null);
@@ -995,7 +1006,19 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setNewCanAddProfit(true);
     setNewAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
     setNewAllowedTabs(['summary', 'orders', 'agent-performance', 'profiles']);
-    showToast('Agent created/updated successfully!');
+    showToast('Agent created locally! Syncing to Google Sheet...');
+
+    const savedAgent = updated.find(a => a.user.toLowerCase() === u.toLowerCase());
+    if (savedAgent) {
+      OrderService.saveAgentToSheet(savedAgent).then((sheetRes) => {
+        if (sheetRes.success) {
+          showToast(`✓ Agent @${u} synced to Google Sheet ('users' tab)!`);
+        } else {
+          showToast(`⚠️ Saved locally, but Sheet sync failed: ${sheetRes.error}`);
+          setShowAppsScriptModal(true);
+        }
+      }).catch(() => {});
+    }
   };
 
   const handleEditAgent = (agentOrIndex: AgentUser | number) => {
@@ -1082,12 +1105,33 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setEditTeamLeaders([]);
     setEditCustomTLInput('');
     setEditAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
+    showToast('Agent updated locally! Syncing to Google Sheet...');
+
+    const updatedAgent = updated.find(a => a.user.toLowerCase() === u.toLowerCase());
+    if (updatedAgent) {
+      OrderService.saveAgentToSheet(updatedAgent).then((sheetRes) => {
+        if (sheetRes.success) {
+          showToast(`✓ Agent @${u} updated in Google Sheet ('users' tab)!`);
+        } else {
+          showToast(`⚠️ Updated locally, but Sheet sync failed: ${sheetRes.error}`);
+          setShowAppsScriptModal(true);
+        }
+      }).catch(() => {});
+    }
   };
 
   const handleDeleteAgent = (index: number) => {
-    if (agents.length <= 1) return;
+    const agentToDelete = agents[index];
     const updated = agents.filter((_, idx) => idx !== index);
     onUpdateAgents(updated, true);
+    showToast('Agent removed locally.');
+    if (agentToDelete) {
+      OrderService.deleteAgentFromSheet(agentToDelete.user).then((res) => {
+        if (res.success) {
+          showToast(`Agent @${agentToDelete.user} removed from Google Sheet.`);
+        }
+      }).catch(() => {});
+    }
   };
 
   // Reactivate / Deactivate Agent
@@ -1106,6 +1150,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         : a
     );
     onUpdateAgents(updated, true);
+    const updatedAgent = updated[index];
+    if (updatedAgent) {
+      OrderService.saveAgentToSheet(updatedAgent).catch(() => {});
+    }
   };
 
   // Filtered Orders for Orders Tab
@@ -1621,7 +1669,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         </div>
       )}
       {/* Manager Sidebar */}
-      <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col p-5 border-r border-white/10 shrink-0 transition-all duration-300`}>
+      <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col p-5 border-r border-white/10 shrink-0 transition-all duration-300 z-10`}>
         <div className="flex items-center justify-between pb-6 mb-6 border-b border-white/10">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white shadow-lg">
@@ -1645,41 +1693,41 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {isManager && (
             <button
               onClick={() => setActiveTab('sheet-connection')}
-              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer hover:translate-x-1 whitespace-nowrap ${
                 activeTab === 'sheet-connection'
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                  ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
                   : 'text-slate-300 hover:text-white hover:bg-white/5'
               }`}
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-              {isSidebarOpen && <span>Google Sheet &amp; Tabs</span>}
+              <FileSpreadsheet className="w-4 h-4 shrink-0 text-emerald-400" />
+              {isSidebarOpen && <span className="whitespace-nowrap">Google Sheet &amp; Tabs</span>}
             </button>
           )}
 
           <button
             onClick={() => setActiveTab('summary')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer hover:translate-x-1 whitespace-nowrap ${
               activeTab === 'summary'
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
                 : 'text-slate-300 hover:text-white hover:bg-white/5'
             }`}
           >
-            <BarChart2 className="w-4 h-4" />
-            {isSidebarOpen && <span>Summary</span>}
+            <BarChart2 className="w-4 h-4 shrink-0" />
+            {isSidebarOpen && <span className="whitespace-nowrap">Summary</span>}
           </button>
 
           <button
             onClick={() => setActiveTab('orders')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer hover:translate-x-1 whitespace-nowrap ${
               activeTab === 'orders'
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
                 : 'text-slate-300 hover:text-white hover:bg-white/5'
             }`}
           >
-            <FileText className="w-4 h-4" />
-            {isSidebarOpen && <span>Orders</span>}
+            <FileText className="w-4 h-4 shrink-0" />
+            {isSidebarOpen && <span className="whitespace-nowrap">Orders</span>}
             {isSidebarOpen && (
-              <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
+              <span className="ml-auto text-[10px] bg-white/10 px-1.5 py-0.5 rounded-full font-bold">
                 {orders.length}
               </span>
             )}
@@ -1817,7 +1865,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         </header>
 
         {/* Scrollable Workspace */}
-        <main className="flex-1 overflow-y-auto p-6 space-y-6">
+        <main className="flex-1 overflow-y-auto p-6 space-y-6 relative z-50">
           {/* TAB: GOOGLE SHEET & DYNAMIC TABS */}
           {isManager && activeTab === 'sheet-connection' && (
             <div className="space-y-6 max-w-5xl mx-auto">
@@ -1998,7 +2046,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {activeTab === 'users' && (
             <div className="space-y-6">
               {/* 1-ROW ADD / EDIT AGENT CARD */}
-              <div id="add-edit-agent-card" className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs relative z-40">
+              <div id="add-edit-agent-card" className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs z-[60]">
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-100">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
@@ -2012,6 +2060,49 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         All in 1 Row — Click Team, Team Leader, and Access Control to open configuration popups.
                       </p>
                     </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAppsScriptModal(true)}
+                      className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
+                      title="View Code.gs script needed to enable user saves in Google Sheet"
+                    >
+                      <Code className="w-3.5 h-3.5" />
+                      <span>Apps Script Code</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onUpdateAgents([], true);
+                        OrderService.saveAgents([]);
+                        showToast('Local agent cache cleared.');
+                      }}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                      title="Clear local cached users"
+                    >
+                      Clear Local Users
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSyncingAgents}
+                      onClick={async () => {
+                        setIsSyncingAgents(true);
+                        try {
+                          const updatedAgents = await OrderService.fetchAgentsFromSheet();
+                          onUpdateAgents(updatedAgents, true);
+                          showToast(`Synced from Sheet: ${updatedAgents.length} user(s) loaded from 'users' tab!`);
+                        } catch {
+                          showToast('Failed to sync users from Google Sheet.');
+                        } finally {
+                          setIsSyncingAgents(false);
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncingAgents ? 'animate-spin' : ''}`} />
+                      <span>{isSyncingAgents ? 'Syncing...' : 'Sync From Sheet'}</span>
+                    </button>
                   </div>
                   {editingIndex !== null && (
                     <div className="flex items-center gap-2">
@@ -2577,7 +2668,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     {/* 7. access control (1 col) - INLINE DROPDOWN */}
                     <div className="lg:col-span-1 relative">
                       <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                        access control
+                        <span className="whitespace-nowrap">access control</span>
                       </label>
                       <button
                         type="button"
@@ -2600,7 +2691,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       {/* Dropdown: Access Control */}
                       {openAddAgentPopup === 'accessControl' && (
                         <div
-                          className="absolute top-full right-0 mt-1.5 w-72 sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3"
+                          className="absolute top-full left-0 mt-1.5 w-72 sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[100] p-4 space-y-3"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -2807,7 +2898,20 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-800">
-                      {agents.map((agent, index) => {
+                      {agents.length === 0 ? (
+                        <tr>
+                          <td colSpan={10} className="py-12 text-center text-slate-500">
+                            <div className="flex flex-col items-center justify-center space-y-2">
+                              <Users className="w-8 h-8 text-slate-300" />
+                              <p className="font-semibold text-sm text-slate-700">No users found in Google Sheet</p>
+                              <p className="text-xs text-slate-500 max-w-sm">
+                                The 'users' tab in your Google Sheet is currently empty. Use the 1-row form above to add an agent account.
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        agents.map((agent, index) => {
                         const isDeactivated = agent.status === 'deactivated';
                         const isTL = agent.role === 'Team Leader';
                         const isPassVisible = showTablePasswords[agent.user];
@@ -2974,7 +3078,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             </td>
                           </tr>
                         );
-                      })}
+                      }))}
                     </tbody>
                   </table>
                 </div>
@@ -5393,7 +5497,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
       {/* CSV Preview Modal */}
       {csvPreviewModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 animate-fadeIn">
             <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
               <div>
@@ -5494,7 +5598,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
       {/* Modal: Google Apps Script Dual-Sheet Code */}
       {showAppsScriptModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2">
@@ -5575,7 +5679,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
       {/* Modal: Full Agent Details Card */}
       {selectedAgentDetails && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -5787,7 +5891,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
       {/* Modal: Edit Agent Profile & Permissions Popup */}
       {editingAgentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs overflow-y-auto">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-100 overflow-hidden animate-fadeIn my-6">
             <div className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-3">
