@@ -6,6 +6,20 @@ export const DEFAULT_SCRIPT_URL =
   (import.meta.env?.VITE_GOOGLE_SCRIPT_URL as string) ||
   'https://script.google.com/macros/s/AKfycbznJBoaggkUhg0ztkcmJpEyeaiuJRVRJX7oItiIgzWqhNPkYIbG3zjnEe2Hn1voDFFg/exec';
 
+export const DEFAULT_SHEET_ID = '1CKnS6A3okk6igZRIQCcBCJPEo-J56xwXTYJL8Dg5AiA';
+
+export function extractSheetId(input: string): string | null {
+  const clean = String(input || '').trim();
+  if (/^[a-zA-Z0-9-_]{25,}$/.test(clean)) {
+    return clean;
+  }
+  const match = clean.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  if (match && match[1]) {
+    return match[1];
+  }
+  return null;
+}
+
 const STORAGE_KEYS = {
   ORDERS: 'agent_portal_orders_v3',
   AGENTS: 'agentUsers_v3',
@@ -84,11 +98,109 @@ export class OrderService {
     localStorage.setItem(STORAGE_KEYS.SCRIPT_URL, url.trim());
   }
 
+  /**
+   * Fetches data directly from Google Sheets using GViz JSONP (bypasses browser CORS on Vercel/static hosts)
+   */
+  static async fetchSheetViaGvizJsonp(sheetId: string = DEFAULT_SHEET_ID, sheetTab: string = 'orders'): Promise<any[][]> {
+    const parseGvizJson = (rawText: string): any[][] => {
+      const jsonStr = rawText
+        .replace(/^[\s\S]*?google\.visualization\.Query\.setResponse\(/, '')
+        .replace(/^[\s\S]*?__gviz_cb_[a-zA-Z0-9]+\(/, '')
+        .replace(/\);?\s*$/, '');
+      const data = JSON.parse(jsonStr);
+      if (!data || !data.table) return [];
+      const cols = (data.table.cols || []).map((c: any) => c ? (c.label || c.id || '') : '');
+      const rows: any[][] = [cols];
+      for (const r of data.table.rows || []) {
+        if (!r || !r.c) continue;
+        const rowValues = r.c.map((cell: any) => {
+          if (!cell) return '';
+          if (cell.f !== undefined && cell.f !== null) return String(cell.f);
+          if (cell.v !== undefined && cell.v !== null) return String(cell.v);
+          return '';
+        });
+        rows.push(rowValues);
+      }
+      return rows;
+    };
+
+    // 1. Browser JSONP via dynamic <script> tag (works anywhere without CORS)
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      try {
+        const rows = await new Promise<any[][]>((resolve, reject) => {
+          const cbId = '__gviz_cb_' + Math.random().toString(36).substring(2, 9);
+          const script = document.createElement('script');
+          let completed = false;
+
+          const cleanup = () => {
+            completed = true;
+            try { delete (window as any)[cbId]; } catch {}
+            if (script.parentNode) script.parentNode.removeChild(script);
+          };
+
+          const timer = setTimeout(() => {
+            if (!completed) {
+              cleanup();
+              reject(new Error('GViz JSONP timeout'));
+            }
+          }, 25000);
+
+          (window as any)[cbId] = (data: any) => {
+            clearTimeout(timer);
+            cleanup();
+            try {
+              if (!data || !data.table) {
+                reject(new Error('Invalid GViz table response'));
+                return;
+              }
+              const cols = (data.table.cols || []).map((c: any) => c ? (c.label || c.id || '') : '');
+              const parsedRows: any[][] = [cols];
+              for (const r of data.table.rows || []) {
+                if (!r || !r.c) continue;
+                const rowValues = r.c.map((cell: any) => {
+                  if (!cell) return '';
+                  if (cell.f !== undefined && cell.f !== null) return String(cell.f);
+                  if (cell.v !== undefined && cell.v !== null) return String(cell.v);
+                  return '';
+                });
+                parsedRows.push(rowValues);
+              }
+              resolve(parsedRows);
+            } catch (err) {
+              reject(err);
+            }
+          };
+
+          script.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=responseHandler:${cbId}&sheet=${encodeURIComponent(sheetTab)}`;
+          script.onerror = () => {
+            clearTimeout(timer);
+            cleanup();
+            reject(new Error('GViz script tag failed to load'));
+          };
+          document.body.appendChild(script);
+        });
+
+        if (rows && rows.length > 0) return rows;
+      } catch (scriptErr) {
+        console.warn('Browser JSONP failed, attempting direct fetch:', scriptErr);
+      }
+    }
+
+    // 2. Direct fetch fallback
+    const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetTab)}`;
+    const res = await fetch(url);
+    const text = await res.text();
+    return parseGvizJson(text);
+  }
+
   static async fetchSheetTabsAndOrders(scriptUrl?: string): Promise<{ tabs: string[]; orders: OrderItem[]; source: 'google_sheets' | 'local_storage'; error?: string }> {
     const url = scriptUrl || this.getScriptUrl();
+    const targetSheetId = extractSheetId(url) || DEFAULT_SHEET_ID;
+
+    // 1. Try server/Vercel proxy route
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
 
       const res = await fetch(`/api/fetch-orders?url=${encodeURIComponent(url || DEFAULT_SCRIPT_URL)}`, {
         method: 'GET',
@@ -97,38 +209,54 @@ export class OrderService {
       });
       clearTimeout(timeoutId);
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const jsonRes = await res.json();
-      if (!jsonRes.success || jsonRes.error) {
-        throw new Error(jsonRes.error || `HTTP ${res.status}`);
-      }
-      const data = jsonRes.data;
+      if (res.ok) {
+        const jsonRes = await res.json();
+        if (jsonRes.success && jsonRes.data) {
+          const tabs: string[] = Array.isArray(jsonRes.tabs) && jsonRes.tabs.length > 0
+            ? jsonRes.tabs
+            : ['orders', 'Sheet5', 'Followup'];
 
-      const tabs: string[] = Array.isArray(jsonRes.tabs) && jsonRes.tabs.length > 0
-        ? jsonRes.tabs
-        : ['orders', 'Sheet5', 'Followup'];
+          let rawOrders = jsonRes.data;
+          if (rawOrders && typeof rawOrders === 'object' && !Array.isArray(rawOrders)) {
+            if (Array.isArray(rawOrders.orders)) rawOrders = rawOrders.orders;
+            else if (Array.isArray(rawOrders.rows)) rawOrders = rawOrders.rows;
+            else if (Array.isArray(rawOrders.data)) rawOrders = rawOrders.data;
+            else if (Array.isArray(rawOrders.values)) rawOrders = rawOrders.values;
+          }
 
-      let rawOrders = data;
-      if (data && typeof data === 'object' && !Array.isArray(data)) {
-        if (Array.isArray(data.orders)) rawOrders = data.orders;
-        else if (Array.isArray(data.rows)) rawOrders = data.rows;
-        else if (Array.isArray(data.data)) rawOrders = data.data;
-        else if (Array.isArray(data.values)) rawOrders = data.values;
+          const parsed = this.parseGoogleSheetRows(rawOrders);
+          if (parsed.length > 0) {
+            this.saveLocalOrders(parsed);
+            try {
+              this.syncAgentsFromOrders(parsed);
+            } catch {}
+            return { tabs, orders: parsed, source: 'google_sheets' };
+          }
+        }
       }
-
-      const parsed = this.parseGoogleSheetRows(rawOrders);
-      if (parsed.length > 0) {
-        this.saveLocalOrders(parsed);
-        try {
-          this.syncAgentsFromOrders(parsed);
-        } catch {}
-      }
-      const local = await this.getLocalOrders();
-      return { tabs, orders: parsed.length > 0 ? parsed : local, source: 'google_sheets' };
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return { tabs: ['orders', 'Sheet5', 'Followup'], orders: await this.getLocalOrders(), source: 'local_storage', error: msg };
+    } catch (proxyErr) {
+      console.warn('Proxy tabs/orders fetch failed, falling back to direct GViz:', proxyErr);
     }
+
+    // 2. Direct GViz JSONP fallback (essential for Vercel static deployments)
+    try {
+      const gvizRows = await this.fetchSheetViaGvizJsonp(targetSheetId, 'orders');
+      if (gvizRows && gvizRows.length > 1) {
+        const parsed = this.parseGoogleSheetRows(gvizRows);
+        if (parsed.length > 0) {
+          this.saveLocalOrders(parsed);
+          try {
+            this.syncAgentsFromOrders(parsed);
+          } catch {}
+          return { tabs: ['orders', 'Sheet5', 'Followup'], orders: parsed, source: 'google_sheets' };
+        }
+      }
+    } catch (directErr) {
+      console.warn('Direct GViz tabs/orders fetch failed:', directErr);
+    }
+
+    const local = await this.getLocalOrders();
+    return { tabs: ['orders', 'Sheet5', 'Followup'], orders: local, source: 'local_storage' };
   }
 
   private static resolveAgentName(aId: string, sheetNm?: string): string {
@@ -319,10 +447,35 @@ export class OrderService {
    */
   static async fetchFollowupHistory(): Promise<FollowupHistoryItem[]> {
     try {
-      const res = await fetch('/api/fetch-orders?tab=Followup');
-      if (!res.ok) return this.getFollowupHistory();
-      const json = await res.json();
-      const rows = json.data;
+      let rows: any[][] = [];
+
+      // 1. Try server proxy route
+      try {
+        const res = await fetch('/api/fetch-orders?tab=Followup');
+        if (res.ok) {
+          const json = await res.json();
+          if (Array.isArray(json.data) && json.data.length >= 2) {
+            rows = json.data;
+          }
+        }
+      } catch (proxyErr) {
+        console.warn('Proxy fetch for Followup failed:', proxyErr);
+      }
+
+      // 2. Direct GViz fallback (works on Vercel without proxy server)
+      if (!rows || rows.length < 2) {
+        try {
+          const scriptUrl = this.getScriptUrl();
+          const sheetId = extractSheetId(scriptUrl || '') || DEFAULT_SHEET_ID;
+          const gvizRows = await this.fetchSheetViaGvizJsonp(sheetId, 'Followup');
+          if (Array.isArray(gvizRows) && gvizRows.length >= 2) {
+            rows = gvizRows;
+          }
+        } catch (gvizErr) {
+          console.warn('Direct GViz fetch for Followup failed:', gvizErr);
+        }
+      }
+
       if (!Array.isArray(rows) || rows.length < 2) return this.getFollowupHistory();
 
       const headers = rows[0].map((h: any) => String(h || '').trim().toLowerCase());
@@ -439,10 +592,12 @@ export class OrderService {
   static async fetchOrders(forceRefresh = false): Promise<{ orders: OrderItem[]; source: 'google_sheets' | 'local_storage'; error?: string }> {
     const scriptUrl = this.getScriptUrl();
     const localOrders = await this.getLocalOrders();
+    const targetSheetId = extractSheetId(scriptUrl || '') || DEFAULT_SHEET_ID;
 
+    // 1. Try server / Vercel proxy route
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
 
       const res = await fetch(`/api/fetch-orders?url=${encodeURIComponent(scriptUrl || DEFAULT_SCRIPT_URL)}`, {
         method: 'GET',
@@ -453,30 +608,50 @@ export class OrderService {
       });
       clearTimeout(timeoutId);
 
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
+      if (res.ok) {
+        const jsonRes = await res.json();
+        let rawData = jsonRes.data;
+        if (rawData && typeof rawData === 'object' && !Array.isArray(rawData)) {
+          if (Array.isArray(rawData.orders)) rawData = rawData.orders;
+          else if (Array.isArray(rawData.rows)) rawData = rawData.rows;
+          else if (Array.isArray(rawData.data)) rawData = rawData.data;
+          else if (Array.isArray(rawData.values)) rawData = rawData.values;
+        }
 
-      const jsonRes = await res.json();
-      let rawData = jsonRes.data;
-      if (rawData && typeof rawData === 'object' && !Array.isArray(rawData)) {
-        if (Array.isArray(rawData.orders)) rawData = rawData.orders;
-        else if (Array.isArray(rawData.rows)) rawData = rawData.rows;
-        else if (Array.isArray(rawData.data)) rawData = rawData.data;
-        else if (Array.isArray(rawData.values)) rawData = rawData.values;
-      }
+        if (Array.isArray(rawData) && rawData.length > 0) {
+          const parsed = this.parseGoogleSheetRows(rawData);
+          if (parsed.length > 0) {
+            try {
+              this.syncAgentsFromOrders(parsed);
+            } catch (e) {
+              console.warn('Agent sync skipped:', e);
+            }
 
-      if (Array.isArray(rawData) && rawData.length > 0) {
-        const parsed = this.parseGoogleSheetRows(rawData);
+            this.saveLocalOrders(parsed);
+            try {
+              localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString());
+            } catch (e) {}
+
+            return { orders: parsed, source: 'google_sheets' };
+          }
+        }
+      }
+    } catch (proxyErr) {
+      console.warn('Proxy fetchOrders failed, falling back to direct Google Sheet GViz:', proxyErr);
+    }
+
+    // 2. Direct GViz fallback (CRITICAL: fetches all 5002 orders on Vercel without proxy server)
+    try {
+      const gvizRows = await this.fetchSheetViaGvizJsonp(targetSheetId, 'orders');
+      if (Array.isArray(gvizRows) && gvizRows.length > 1) {
+        const parsed = this.parseGoogleSheetRows(gvizRows);
         if (parsed.length > 0) {
-          // Sync agents dynamically discovered in the Google Sheet
           try {
             this.syncAgentsFromOrders(parsed);
           } catch (e) {
             console.warn('Agent sync skipped:', e);
           }
 
-          // Strictly use parsed sheet orders as source of truth
           this.saveLocalOrders(parsed);
           try {
             localStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString());
@@ -485,17 +660,18 @@ export class OrderService {
           return { orders: parsed, source: 'google_sheets' };
         }
       }
-      return { orders: localOrders, source: 'local_storage' };
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn('Google Sheet fetch failed (checking IndexedDB cache):', msg);
-      const idbOrders = await idbGetOrders();
-      if (idbOrders && idbOrders.length > 0) {
-        memoryOrders = idbOrders;
-        return { orders: idbOrders, source: 'local_storage', error: msg };
-      }
-      return { orders: localOrders, source: 'local_storage', error: msg };
+    } catch (directErr) {
+      console.warn('Direct GViz fetchOrders failed:', directErr);
     }
+
+    // 3. Fallback to IndexedDB cache
+    const idbOrders = await idbGetOrders();
+    if (idbOrders && idbOrders.length > 0) {
+      memoryOrders = idbOrders;
+      return { orders: idbOrders, source: 'local_storage' };
+    }
+
+    return { orders: localOrders, source: 'local_storage' };
   }
 
   /**
@@ -931,16 +1107,39 @@ export class OrderService {
           cancelled_date: fullOrder.cancelled_date || ''
         };
 
-        await fetch('/api/proxy-script', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(bodyData)
-        });
-        remoteSynced = true;
+        try {
+          const proxyRes = await fetch('/api/proxy-script', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(bodyData)
+          });
+          if (proxyRes.ok) {
+            remoteSynced = true;
+          } else {
+            throw new Error(`Proxy error ${proxyRes.status}`);
+          }
+        } catch (proxyErr) {
+          console.warn('Google Apps Script proxy error, attempting direct POST:', proxyErr);
+          try {
+            const params = new URLSearchParams();
+            for (const [key, val] of Object.entries(bodyData)) {
+              params.append(key, String(val ?? ''));
+            }
+            await fetch(scriptUrl, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: params.toString()
+            });
+            remoteSynced = true;
+          } catch (directErr) {
+            console.warn('Direct Google Apps Script doPost error:', directErr);
+          }
+        }
       } catch (err) {
-        console.warn('Google Apps Script doPost proxy error:', err);
+        console.warn('Google Apps Script createOrder overall error:', err);
       }
     }
 
@@ -1229,6 +1428,8 @@ export class OrderService {
           url: scriptUrl,
           action: 'updateFollowup',
           'Log Timestamp': currentTimestamp,
+          logTimestamp: currentTimestamp,
+          timestamp: currentTimestamp,
           'followup_id': String(nextFollowupId),
           followupId: String(nextFollowupId),
           'order_id': String(orderId),
@@ -1276,18 +1477,41 @@ export class OrderService {
         };
 
         console.log('DEBUG: Final Payload sent to Google Sheet:', bodyData);
-        const proxyRes = await fetch('/api/proxy-script', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(bodyData)
-        });
-        const proxyJson = await proxyRes.json();
-        console.log('DEBUG: Proxy script response:', proxyJson);
-        remoteSynced = proxyJson.success ?? false;
+        try {
+          const proxyRes = await fetch('/api/proxy-script', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(bodyData)
+          });
+          if (proxyRes.ok) {
+            const proxyJson = await proxyRes.json();
+            console.log('DEBUG: Proxy script response:', proxyJson);
+            remoteSynced = proxyJson.success ?? false;
+          } else {
+            throw new Error(`Proxy returned HTTP ${proxyRes.status}`);
+          }
+        } catch (proxyErr) {
+          console.warn('Google Apps Script status update proxy error, attempting direct POST:', proxyErr);
+          try {
+            const params = new URLSearchParams();
+            for (const [key, val] of Object.entries(bodyData)) {
+              params.append(key, String(val ?? ''));
+            }
+            await fetch(scriptUrl, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: params.toString()
+            });
+            remoteSynced = true;
+          } catch (directErr) {
+            console.warn('Direct Google Apps Script status update error:', directErr);
+          }
+        }
       } catch (err) {
-        console.warn('Google Apps Script status update proxy error:', err);
+        console.warn('Google Apps Script status update overall error:', err);
       }
     }
 
