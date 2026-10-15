@@ -772,7 +772,7 @@ export class OrderService {
         }
 
         const rawTs = String(r[idxTs !== -1 ? idxTs : 0] || '');
-        let uBy = String(r[idxUpBy !== -1 ? idxUpBy : 11] || '100');
+        let uBy = String(r[idxUpBy !== -1 ? idxUpBy : 11] || '1');
         let uByName = String(r[idxUpByNm !== -1 ? idxUpByNm : 12] || '');
         if (!uByName && uBy.includes('(@')) {
           const m = uBy.match(/\(@(.*)\)/);
@@ -782,6 +782,24 @@ export class OrderService {
           }
         } else if (!uByName && uBy.startsWith('@')) {
           uBy = uBy.substring(1);
+        }
+
+        // Manager access should strictly have update_by as '1', not email
+        const lowerUBy = uBy.toLowerCase();
+        const lowerUName = uByName.toLowerCase();
+        if (
+          lowerUBy === 'manager' ||
+          lowerUBy === 'admin' ||
+          lowerUBy === '1' ||
+          lowerUBy.includes('abujar') ||
+          lowerUBy.includes('@') ||
+          lowerUName === 'manager' ||
+          lowerUName === 'manager (admin)' ||
+          lowerUName.includes('manager') ||
+          lowerUName.includes('admin')
+        ) {
+          uBy = '1';
+          if (!uByName || uByName.includes('@')) uByName = 'Manager';
         }
 
         parsedItems.push({
@@ -1471,7 +1489,7 @@ export class OrderService {
     const existingOrder = orders.find((ord) => String(ord.order_id || ord.id) === String(orderId));
 
     // Resolve manager / agent user ID and name cleanly
-    let uById = 'manager';
+    let uById = '1';
     let uByName = 'Manager';
 
     if (updatedBy) {
@@ -1491,13 +1509,34 @@ export class OrderService {
       } else {
         const lower = trimmed.toLowerCase();
         if ((lower.includes('manager') || lower === 'admin' || lower.includes('superadmin')) && !lower.includes('@')) {
-          uById = 'manager';
+          uById = '1';
           uByName = trimmed;
         } else {
           uById = trimmed;
           uByName = trimmed;
         }
       }
+    }
+
+    // Manager access: if updated by manager or contains manager/email or session is manager, uById must strictly be '1', NOT email
+    const sessionRole = typeof window !== 'undefined' ? sessionStorage.getItem('portal_session_role') : null;
+    const lowerId = uById.toLowerCase();
+    const lowerName = uByName.toLowerCase();
+    if (
+      sessionRole === 'manager' ||
+      lowerId === 'manager' ||
+      lowerId === 'admin' ||
+      lowerId === 'superadmin' ||
+      lowerId === '1' ||
+      lowerId.includes('abujar') ||
+      lowerId.includes('@') ||
+      lowerName === 'manager' ||
+      lowerName === 'manager (admin)' ||
+      lowerName.includes('manager') ||
+      lowerName.includes('admin')
+    ) {
+      uById = '1';
+      uByName = 'Manager';
     }
 
     const finalOrderStatus = 'Pending';
@@ -1737,8 +1776,12 @@ export class OrderService {
           scheduledTime: schedTime,
           'updated_by': uById,
           updatedBy: uById,
+          'update_by': uById,
+          updateBy: uById,
           'updated_by_name': uByName,
           updatedByName: uByName,
+          'update_by_name': uByName,
+          updateByName: uByName,
           'status_change': statusChangeText,
           statusChange: statusChangeText,
           'change_description': actionStr,
@@ -1857,6 +1900,17 @@ export class OrderService {
     const nextFollowupId = this.getMaxFollowupId(history) + 1;
     localStorage.setItem('agent_portal_max_followup_id', String(nextFollowupId));
 
+    const sessionRoleUndo = typeof window !== 'undefined' ? sessionStorage.getItem('portal_session_role') : null;
+    const normalizedUndoneBy = (
+      sessionRoleUndo === 'manager' ||
+      !undoneBy ||
+      undoneBy.toLowerCase() === 'manager' ||
+      undoneBy.toLowerCase() === 'admin' ||
+      undoneBy.includes('abujar') ||
+      undoneBy.includes('@') ||
+      undoneBy === '1'
+    ) ? '1' : undoneBy;
+
     // Create the new UNDO history audit record (recording from which status to which status)
     const undoHistoryItem: FollowupHistoryItem = {
       id: String(Date.now()),
@@ -1870,7 +1924,7 @@ export class OrderService {
       orderValue: targetItem?.orderValue ?? Number(existingOrder?.order_value || existingOrder?.orderValue || 0),
       scheduleDate: targetItem?.scheduleDate || existingOrder?.schedule_date || existingOrder?.scheduleDate || '',
       scheduledTime: targetItem?.scheduledTime || existingOrder?.schedule_time || existingOrder?.scheduledTime || '',
-      updatedBy: undoneBy || 'Manager',
+      updatedBy: normalizedUndoneBy,
       timestamp: nowTimestamp,
       action: `Undo (${currentStatusBeforeUndo} → ${restoredStatus})`,
       notes: `Order status reverted via Undo from "${currentStatusBeforeUndo}" back to "${restoredStatus}"`,
@@ -1903,8 +1957,10 @@ export class OrderService {
         params.append('orderId', String(orderId));
         params.append('previousStatus', restoredStatus);
         params.append('currentStatus', currentStatusBeforeUndo);
-        params.append('updated_by', undoneBy || 'Manager');
-        params.append('updatedBy', undoneBy || 'Manager');
+        params.append('updated_by', normalizedUndoneBy);
+        params.append('updatedBy', normalizedUndoneBy);
+        params.append('update_by', normalizedUndoneBy);
+        params.append('updateBy', normalizedUndoneBy);
         params.append('actionName', `Undo (${currentStatusBeforeUndo} → ${restoredStatus})`);
         params.append('customerName', undoHistoryItem.customerName || '');
         params.append('customerMobile', undoHistoryItem.customerContact || '');
@@ -2124,15 +2180,31 @@ function doPost(e) {
         var custMob = data.customerMobile || data.customer_mobile || rows[foundRowIndex - 1][2] || '';
         var scDate = data.scheduleDate || data.schedule_date || rows[foundRowIndex - 1][14] || '';
         var scTime = data.scheduledTime || data.scheduled_time || rows[foundRowIndex - 1][15] || '';
-        var currStat = data.currentStatus || data.current_status || 'Delivered';
-        var uByVal = data.updatedBy || data.updated_by || '100';
-        var uByNameVal = data.updatedByName || data.updated_by_name || '';
-        if (!uByNameVal && uByVal.includes('(@')) {
+        var uByVal = String(data.updatedBy || data.updated_by || data.updateBy || data.update_by || '1').trim();
+        var uByNameVal = String(data.updatedByName || data.updated_by_name || data.updateByName || data.update_by_name || '').trim();
+        if (!uByNameVal && uByVal.indexOf('(@') !== -1) {
           var m = uByVal.match(/\(@(.*)\)/);
           if (m) {
             uByNameVal = uByVal.replace(/\s*\(@.*\)/, '').replace('@', '').trim();
             uByVal = m[1].trim();
           }
+        }
+        var lowerUBy = uByVal.toLowerCase();
+        var lowerUName = uByNameVal.toLowerCase();
+        if (
+          lowerUBy === 'manager' ||
+          lowerUBy === 'admin' ||
+          lowerUBy === '1' ||
+          lowerUBy.indexOf('abujar') !== -1 ||
+          lowerUBy.indexOf('manager') !== -1 ||
+          lowerUBy.indexOf('admin') !== -1 ||
+          lowerUBy.indexOf('@') !== -1 ||
+          lowerUName === 'manager' ||
+          lowerUName.indexOf('manager') !== -1 ||
+          lowerUName.indexOf('admin') !== -1
+        ) {
+          uByVal = '1';
+          if (!uByNameVal || uByNameVal.indexOf('@') !== -1) uByNameVal = 'Manager';
         }
         var actName = data.actionName || data.action_name || ("Undo (" + currStat + " -> " + prevStatus + ")");
 
@@ -2327,8 +2399,32 @@ function doPost(e) {
         }
       }
 
-      var uByVal = data.updatedBy || data.updated_by || '100';
-      var uByNameVal = data.updatedByName || data.updated_by_name || '';
+      var uByVal = String(data.updatedBy || data.updated_by || data.updateBy || data.update_by || '1').trim();
+      var uByNameVal = String(data.updatedByName || data.updated_by_name || data.updateByName || data.update_by_name || '').trim();
+      if (!uByNameVal && uByVal.indexOf('(@') !== -1) {
+        var m = uByVal.match(/\(@(.*)\)/);
+        if (m) {
+          uByNameVal = uByVal.replace(/\s*\(@.*\)/, '').replace('@', '').trim();
+          uByVal = m[1].trim();
+        }
+      }
+      var lowerUBy = uByVal.toLowerCase();
+      var lowerUName = uByNameVal.toLowerCase();
+      if (
+        lowerUBy === 'manager' ||
+        lowerUBy === 'admin' ||
+        lowerUBy === '1' ||
+        lowerUBy.indexOf('abujar') !== -1 ||
+        lowerUBy.indexOf('manager') !== -1 ||
+        lowerUBy.indexOf('admin') !== -1 ||
+        lowerUBy.indexOf('@') !== -1 ||
+        lowerUName === 'manager' ||
+        lowerUName.indexOf('manager') !== -1 ||
+        lowerUName.indexOf('admin') !== -1
+      ) {
+        uByVal = '1';
+        if (!uByNameVal || uByNameVal.indexOf('@') !== -1) uByNameVal = 'Manager';
+      }
 
       followupSheet.appendRow([
         timestamp,

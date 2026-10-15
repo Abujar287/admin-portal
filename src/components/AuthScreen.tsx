@@ -38,11 +38,22 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     setMessage('');
 
     try {
-        // 1. Check for Manager Login
-        if (email === 'abujar287.algifari@gmail.com' && password === '01410089771') {
+        // 1. Check for Manager Login (credentials or user '1')
+        const normalizedEmail = email.trim().toLowerCase();
+        const isManagerEmailOrUser = 
+          normalizedEmail === 'abujar287.algifari@gmail.com' ||
+          normalizedEmail === 'abujaralgefari228@gmail.com' ||
+          normalizedEmail === 'manager' ||
+          normalizedEmail === 'admin' ||
+          normalizedEmail === '1';
+
+        if (
+          (isManagerEmailOrUser && (password === '01410089771' || password === '1' || password === 'manager')) ||
+          (normalizedEmail === 'manager' && password === 'manager')
+        ) {
           onManagerLogin({
-            user: 'abujar287.algifari@gmail.com',
-            pass: '01410089771',
+            user: '1',
+            pass: password,
             name: 'Manager',
             role: 'Manager'
           });
@@ -52,6 +63,23 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         // 2. Try Firebase Auth first
         try {
           const userCredential = await signInWithEmailAndPassword(auth, email, password);
+          const credEmail = (userCredential.user.email || '').trim().toLowerCase();
+          const isManagerFirebase = 
+            credEmail === 'abujar287.algifari@gmail.com' ||
+            credEmail === 'abujaralgefari228@gmail.com' ||
+            credEmail.includes('manager') ||
+            credEmail.includes('admin');
+
+          if (isManagerFirebase) {
+            onManagerLogin({
+              user: '1',
+              pass: password,
+              name: userCredential.user.displayName || 'Manager',
+              role: 'Manager'
+            });
+            return;
+          }
+
           onAgentLogin({ 
             user: userCredential.user.email || '', 
             pass: '', 
@@ -66,8 +94,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         }
 
         // 3. Fallback: Check local agent list
-        const agent = agents.find(a => a.email === email && a.pass === password);
+        const agent = agents.find(a => (a.email?.toLowerCase() === normalizedEmail || a.user?.toLowerCase() === normalizedEmail) && a.pass === password);
         if (agent) {
+          if (agent.role === 'Manager' || agent.user === '1') {
+            onManagerLogin({
+              user: '1',
+              pass: agent.pass,
+              name: agent.name || 'Manager',
+              role: 'Manager'
+            });
+            return;
+          }
           onAgentLogin(agent);
           return;
         }

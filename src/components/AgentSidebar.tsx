@@ -76,7 +76,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
       </div>
 
       {/* Navigation (Only 3 tabs, No Create Order) */}
-      <nav className="flex-1 space-y-1.5 overflow-y-auto">
+      <nav className="flex-1 space-y-2 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive =
@@ -88,18 +88,20 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
               key={item.id}
               onClick={() => setActiveTab(item.id)}
               title={collapsed ? item.label : undefined}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-xs transition-all cursor-pointer ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
                 isActive
-                  ? 'bg-white/20 text-white shadow-xs font-semibold backdrop-blur-xs'
-                  : 'text-white/75 hover:text-white hover:bg-white/10'
-              } ${collapsed ? 'justify-center px-0' : ''}`}
+                  ? 'translate-x-3 bg-gradient-to-r from-white/30 via-white/20 to-white/10 text-white shadow-xl shadow-blue-950/50 font-extrabold border-l-4 border-l-sky-400 backdrop-blur-md justify-center scale-[1.03]'
+                  : 'text-white/75 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-medium'
+              } ${collapsed ? 'justify-center px-0 !translate-x-0 !scale-100' : ''}`}
             >
-              <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-sky-300' : 'text-white/70'}`} />
+              <Icon className={`w-4 h-4 shrink-0 transition-transform duration-300 ${isActive ? 'text-sky-300 scale-110' : 'text-white/70'}`} />
               {!collapsed && (
-                <span className="truncate flex-1 text-left">{item.label}</span>
+                <span className={`transition-all duration-300 ease-in-out truncate ${isActive ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left flex-1'}`}>
+                  {item.label}
+                </span>
               )}
               {!collapsed && item.badge !== undefined && item.badge > 0 && (
-                <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-sky-400/30 text-sky-200 font-bold border border-sky-300/30">
+                <span className={`px-1.5 py-0.5 text-[10px] rounded-full font-bold border transition-all duration-300 ${isActive ? 'bg-sky-400 text-slate-900 border-white' : 'bg-sky-400/30 text-sky-200 border-sky-300/30'}`}>
                   {item.badge}
                 </span>
               )}

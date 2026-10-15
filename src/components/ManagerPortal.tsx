@@ -12,6 +12,7 @@ import {
   RotateCcw,
   RefreshCw,
   Search, 
+  Download,
   Plus, 
   Edit2, 
   Trash2, 
@@ -187,17 +188,17 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const isTeamLeader = !isManager;
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTabState] = useState<
-    'profiles' | 'users' | 'orders' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping' | 'sheet-connection'
+    'profiles' | 'users' | 'orders' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping' | 'sheet-connection' | 'followup'
   >(() => {
     const saved = sessionStorage.getItem('manager_active_tab') as any;
     if (!isManager && (saved === 'sheet-connection' || saved === 'users' || saved === 'category-mapping' || saved === 'profiles' || saved === 'settings')) {
       return 'summary';
     }
-    if (saved && saved !== 'followup') return saved;
+    if (saved) return saved;
     return isManager ? 'users' : 'summary';
   });
 
-  const setActiveTab = (tab: 'profiles' | 'users' | 'orders' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping' | 'sheet-connection') => {
+  const setActiveTab = (tab: 'profiles' | 'users' | 'orders' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping' | 'sheet-connection' | 'followup') => {
     if (!isManager && (tab === 'sheet-connection' || tab === 'users' || tab === 'category-mapping' || tab === 'profiles' || tab === 'settings')) {
       return;
     }
@@ -209,6 +210,26 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setManagerToast(msg);
     setTimeout(() => setManagerToast(null), 3000);
   };
+
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    return (localStorage.getItem('portal_theme') as 'light' | 'dark') || 'light';
+  });
+
+  const isDark = theme === 'dark';
+  const cardBg = isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900';
+  const cardHeaderBg = isDark ? 'bg-slate-800/80 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-100 text-slate-800';
+  const tableHeaderBg = isDark ? 'bg-slate-800 text-slate-200 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-200';
+  const tableRowBg = isDark ? 'divide-slate-800 text-slate-200 hover:bg-slate-800/60' : 'divide-slate-100 text-slate-800 hover:bg-amber-100/50';
+  const inputBg = isDark ? 'bg-slate-800 border-slate-700 text-slate-100 placeholder-slate-400 focus:border-indigo-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-indigo-600';
+
+  const handleToggleTheme = (newTheme: 'light' | 'dark') => {
+    setTheme(newTheme);
+    localStorage.setItem('portal_theme', newTheme);
+    showToast(`Switched to ${newTheme === 'dark' ? 'Dark' : 'Light'} Theme!`);
+  };
+
+  const [followupFilterName, setFollowupFilterName] = useState<string>('All');
+  const [followupFilterDate, setFollowupFilterDate] = useState<string>('');
 
   // Status & Details Modal State
   const [statusModalOrder, setStatusModalOrder] = useState<OrderItem | null>(null);
@@ -1688,7 +1709,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   }, [filteredAgentPerformance]);
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 font-sans antialiased overflow-hidden select-none">
+    <div className={`flex h-screen font-sans antialiased overflow-hidden select-none ${theme === 'dark' ? 'bg-slate-950 text-slate-100 dark' : 'bg-slate-50 text-slate-900'}`}>
       {managerToast && (
         <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xl flex items-center gap-2 border border-slate-700 animate-fadeIn">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -1716,65 +1737,100 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1.5">
+        <nav className="flex-1 space-y-2">
           {isManager && (
             <button
               onClick={() => setActiveTab('sheet-connection')}
-              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer hover:translate-x-1 whitespace-nowrap ${
+              className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
                 activeTab === 'sheet-connection'
-                  ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
-                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+                  ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
               }`}
             >
-              <FileSpreadsheet className="w-4 h-4 shrink-0 text-emerald-400" />
-              {isSidebarOpen && <span className="whitespace-nowrap">Google Sheet &amp; Tabs</span>}
+              <FileSpreadsheet className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'sheet-connection' ? 'text-emerald-300 scale-110' : 'text-emerald-400'}`} />
+              {isSidebarOpen && (
+                <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'sheet-connection' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                  Google Sheet &amp; Tabs
+                </span>
+              )}
             </button>
           )}
 
           <button
             onClick={() => setActiveTab('summary')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer hover:translate-x-1 whitespace-nowrap ${
+            className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
               activeTab === 'summary'
-                ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
-                : 'text-slate-300 hover:text-white hover:bg-white/5'
+                ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
             }`}
           >
-            <BarChart2 className="w-4 h-4 shrink-0" />
-            {isSidebarOpen && <span className="whitespace-nowrap">Summary</span>}
+            <BarChart2 className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'summary' ? 'text-sky-300 scale-110' : 'text-slate-400'}`} />
+            {isSidebarOpen && (
+              <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'summary' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                Summary
+              </span>
+            )}
           </button>
 
           <button
             onClick={() => setActiveTab('orders')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer hover:translate-x-1 whitespace-nowrap ${
+            className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
               activeTab === 'orders'
-                ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
-                : 'text-slate-300 hover:text-white hover:bg-white/5'
+                ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
             }`}
           >
-            <FileText className="w-4 h-4 shrink-0" />
-            {isSidebarOpen && <span className="whitespace-nowrap">Orders</span>}
+            <FileText className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'orders' ? 'text-amber-300 scale-110' : 'text-slate-400'}`} />
             {isSidebarOpen && (
-              <span className="ml-auto text-[10px] bg-white/10 px-1.5 py-0.5 rounded-full font-bold">
+              <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'orders' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                Orders
+              </span>
+            )}
+            {isSidebarOpen && (
+              <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'orders' ? 'bg-white text-indigo-900' : 'bg-white/10 text-white'}`}>
                 {orders.length}
               </span>
             )}
           </button>
 
-          {/* Followup tab removed */}
+          <button
+            onClick={() => setActiveTab('followup')}
+            className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
+              activeTab === 'followup'
+                ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+            }`}
+          >
+            <History className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'followup' ? 'text-indigo-300 scale-110' : 'text-slate-400'}`} />
+            {isSidebarOpen && (
+              <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'followup' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                Followup History
+              </span>
+            )}
+            {isSidebarOpen && (
+              <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'followup' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
+                {followupHistory.length}
+              </span>
+            )}
+          </button>
 
           {!isTeamLeader && (
             <button
               onClick={() => setActiveTab('users')}
-              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+              className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
                 activeTab === 'users'
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+                  ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
               }`}
             >
-              <Users className="w-4 h-4" />
-              {isSidebarOpen && <span>User Details</span>}
+              <Users className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'users' ? 'text-purple-300 scale-110' : 'text-slate-400'}`} />
               {isSidebarOpen && (
-                <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
+                <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'users' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                  User Details
+                </span>
+              )}
+              {isSidebarOpen && (
+                <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'users' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
                   {agents.length}
                 </span>
               )}
@@ -1783,16 +1839,20 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
           <button
             onClick={() => setActiveTab('agent-performance')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
               activeTab === 'agent-performance'
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                : 'text-slate-300 hover:text-white hover:bg-white/5'
+                ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
             }`}
           >
-            <TrendingUp className="w-4 h-4 text-amber-400" />
-            {isSidebarOpen && <span>Agent Performance</span>}
+            <TrendingUp className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'agent-performance' ? 'text-amber-300 scale-110' : 'text-amber-400'}`} />
             {isSidebarOpen && (
-              <span className="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
+              <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'agent-performance' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                Agent Performance
+              </span>
+            )}
+            {isSidebarOpen && (
+              <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'agent-performance' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
                 {summaryStats.agentSummary.length}
               </span>
             )}
@@ -1802,38 +1862,50 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             <>
               <button
                 onClick={() => setActiveTab('category-mapping')}
-                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
                   activeTab === 'category-mapping'
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-white/5'
+                    ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                    : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
                 }`}
               >
-                <Layers className="w-4 h-4 text-purple-300" />
-                {isSidebarOpen && <span>Category Mapping</span>}
+                <Layers className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'category-mapping' ? 'text-purple-300 scale-110' : 'text-purple-400'}`} />
+                {isSidebarOpen && (
+                  <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'category-mapping' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                    Category Mapping
+                  </span>
+                )}
               </button>
 
               <button
                 onClick={() => setActiveTab('profiles')}
-                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
                   activeTab === 'profiles'
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-white/5'
+                    ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                    : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
                 }`}
               >
-                <User className="w-4 h-4" />
-                {isSidebarOpen && <span>Profiles</span>}
+                <User className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'profiles' ? 'text-sky-300 scale-110' : 'text-slate-400'}`} />
+                {isSidebarOpen && (
+                  <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'profiles' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                    Profiles
+                  </span>
+                )}
               </button>
 
               <button
                 onClick={() => setActiveTab('settings')}
-                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
                   activeTab === 'settings'
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-white/5'
+                    ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                    : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
                 }`}
               >
-                <Settings className="w-4 h-4 text-indigo-300" />
-                {isSidebarOpen && <span>Settings &amp; Export</span>}
+                <Settings className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'settings' ? 'text-indigo-300 scale-110' : 'text-indigo-400'}`} />
+                {isSidebarOpen && (
+                  <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'settings' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                    Settings &amp; Export
+                  </span>
+                )}
               </button>
             </>
           )}
@@ -1862,6 +1934,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             <h1 className="text-lg font-extrabold text-slate-900 capitalize">
               {isManager && activeTab === 'sheet-connection' && 'Google Sheet & Dynamic Tabs Hub'}
               {activeTab === 'users' && 'User Details (Agent Directory)'}
+              {activeTab === 'followup' && 'All Followup History & Audit Logs'}
               {activeTab === 'orders' && 'All Orders Database'}
               {activeTab === 'summary' && 'Analytics & Summary'}
               {activeTab === 'agent-performance' && 'Agent Performance Report'}
@@ -2247,9 +2320,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       </button>
 
                       {/* Dropdown: Role Dropdown Menu */}
+                      {/* Dropdown: Role Dropdown Menu - No scrolling needed, all visible */}
                       {openAddAgentPopup === 'role' && (
                         <div
-                          className="absolute top-full left-0 mt-1.5 w-64 sm:w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3"
+                          className="absolute top-full left-0 mt-1.5 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[70] p-4 space-y-3"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -2269,8 +2343,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             </button>
                           </div>
 
-                          {/* Existing Roles List */}
-                          <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                          {/* Existing Roles List (Clean multi-button display without scrolling) */}
+                          <div className="space-y-1.5">
                             {availableRoles.map((role) => {
                               const isSelected = newAgentRole === role;
                               const isTL = role === 'Team Leader';
@@ -2285,7 +2359,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                   }}
                                   className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer border ${
                                     isSelected
-                                      ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-bold'
+                                      ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-bold ring-1 ring-indigo-300'
                                       : 'border-slate-200 hover:bg-slate-50 text-slate-700'
                                   }`}
                                 >
@@ -2303,7 +2377,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           </div>
 
                           {/* Add Role Option at Bottom */}
-                          <div className="pt-3 border-t border-slate-100 space-y-2">
+                          <div className="pt-2 border-t border-slate-100 space-y-2">
                             <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
                               + Add New Role
                             </label>
@@ -2328,7 +2402,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                     }
                                   }
                                 }}
-                                className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:border-indigo-600 bg-white"
+                                className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:border-indigo-600 bg-white"
                               />
                               <button
                                 type="button"
@@ -2344,9 +2418,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                     setOpenAddAgentPopup(null);
                                   }
                                 }}
-                                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors shadow-xs"
+                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors shadow-xs"
                               >
-                                Add Role
+                                Add
                               </button>
                             </div>
                           </div>
@@ -2376,10 +2450,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 ml-1 transition-transform duration-150 ${openAddAgentPopup === 'team' ? 'rotate-180 text-indigo-600' : ''}`} />
                       </button>
 
-                      {/* Dropdown 1: Team Dropdown Menu */}
+                      {/* Dropdown 1: Team Dropdown Menu - Clean 2-column grid, no scroll needed */}
                       {openAddAgentPopup === 'team' && (
                         <div
-                          className="absolute top-full left-0 mt-1.5 w-72 sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3"
+                          className="absolute top-full left-0 mt-1.5 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[70] p-4 space-y-3"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -2412,8 +2486,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             </div>
                           </div>
 
-                          {/* Existing Teams List */}
-                          <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
+                          {/* 2-column layout: ALL teams visible on the display without scrolling */}
+                          <div className="grid grid-cols-2 gap-1.5">
                             {/* All Select Option */}
                             <button
                               key="pop-team-all-select"
@@ -2423,7 +2497,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                 setNewAgentTeam('All');
                                 setOpenAddAgentPopup(null);
                               }}
-                              className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer border ${
+                              className={`col-span-2 text-left px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer border ${
                                 newAgentTeam === 'All'
                                   ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-bold ring-1 ring-indigo-300'
                                   : 'border-slate-200 hover:bg-slate-50 text-slate-700'
@@ -2447,21 +2521,21 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                     setNewAgentTeam(team);
                                     setOpenAddAgentPopup(null);
                                   }}
-                                  className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer border ${
+                                  className={`text-left px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer border ${
                                     isSelected
                                       ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-bold'
                                       : 'border-slate-200 hover:bg-slate-50 text-slate-700'
                                   }`}
                                 >
-                                  <span>{team}</span>
-                                  {isSelected && <Check className="w-4 h-4 text-indigo-600" />}
+                                  <span className="truncate">{team}</span>
+                                  {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0 ml-1" />}
                                 </button>
                               );
                             })}
                           </div>
 
                           {/* Add Team Option at Bottom */}
-                          <div className="pt-3 border-t border-slate-100 space-y-2">
+                          <div className="pt-2 border-t border-slate-100 space-y-1.5">
                             <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
                               + Add New Team
                             </label>
@@ -2483,7 +2557,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                     }
                                   }
                                 }}
-                                className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:border-indigo-600 bg-white"
+                                className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:border-indigo-600 bg-white"
                               />
                               <button
                                 type="button"
@@ -2496,9 +2570,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                     setOpenAddAgentPopup(null);
                                   }
                                 }}
-                                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors shadow-xs"
+                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors shadow-xs"
                               >
-                                Add Team
+                                Add
                               </button>
                             </div>
                           </div>
@@ -2533,10 +2607,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 ml-1 transition-transform duration-150 ${openAddAgentPopup === 'teamLeader' ? 'rotate-180 text-purple-600' : ''}`} />
                       </button>
 
-                      {/* Dropdown 2: Team Leader Dropdown Menu */}
+                      {/* Dropdown 2: Team Leader Dropdown Menu - Clean 2-column grid, all visible on display */}
                       {openAddAgentPopup === 'teamLeader' && (
                         <div
-                          className="absolute top-full left-0 sm:-left-24 lg:-left-32 mt-1.5 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 space-y-3"
+                          className="absolute top-full left-0 sm:-left-24 lg:-left-36 mt-1.5 w-80 sm:w-[420px] bg-white rounded-2xl shadow-2xl border border-slate-200 z-[70] p-4 space-y-3"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -2544,7 +2618,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               <User className="w-4 h-4 text-purple-600" />
                               <div>
                                 <h4 className="font-extrabold text-sm text-slate-900">Assign Team Leader(s)</h4>
-                                <p className="text-[11px] text-slate-500">Tik mark / select one or multiple Team Leaders</p>
+                                <p className="text-[11px] text-slate-500">Click to select one or multiple Team Leaders</p>
                               </div>
                             </div>
                             <button
@@ -2559,7 +2633,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             </button>
                           </div>
 
-                          {/* Selected badges */}
+                          {/* Selected badges (compact inline) */}
                           {newAgentTeamLeaders.length > 0 && (
                             <div className="flex flex-wrap items-center gap-1.5 p-2 bg-purple-50/60 rounded-xl border border-purple-100">
                               <span className="text-[11px] font-bold text-purple-900 mr-1">Selected ({newAgentTeamLeaders.length}):</span>
@@ -2594,14 +2668,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             </div>
                           )}
 
-                          {/* Checkbox list */}
-                          <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                          {/* Checkbox grid: 2 columns, all visible without scrolling */}
+                          <div className="grid grid-cols-2 gap-1.5">
                             {availableTeamLeaders.map((tl) => {
                               const isSelected = newAgentTeamLeaders.includes(tl);
                               return (
                                 <label
                                   key={`pop-tl-${tl}`}
-                                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs cursor-pointer border transition-colors ${
+                                  className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs cursor-pointer border transition-colors ${
                                     isSelected
                                       ? 'bg-purple-50 border-purple-200 text-purple-950 font-bold'
                                       : 'border-slate-200 hover:bg-slate-50 text-slate-700'
@@ -2628,7 +2702,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           </div>
 
                           {/* Add Team Leader Option at Bottom */}
-                          <div className="pt-3 border-t border-slate-100 space-y-2">
+                          <div className="pt-2 border-t border-slate-100 space-y-1.5">
                             <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
                               + Add New Team Leader
                             </label>
@@ -2653,7 +2727,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                     }
                                   }
                                 }}
-                                className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:border-indigo-600 bg-white"
+                                className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:border-indigo-600 bg-white"
                               />
                               <button
                                 type="button"
@@ -2669,9 +2743,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                     setNewCustomTLInput('');
                                   }
                                 }}
-                                className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors shadow-xs"
+                                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors shadow-xs"
                               >
-                                Add TL
+                                Add
                               </button>
                             </div>
                           </div>
@@ -2683,7 +2757,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                 e.stopPropagation();
                                 setOpenAddAgentPopup(null);
                               }}
-                              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+                              className="px-5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer"
                             >
                               Done
                             </button>
@@ -2715,10 +2789,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 ml-1 transition-transform duration-150 ${openAddAgentPopup === 'accessControl' ? 'rotate-180 text-indigo-600' : ''}`} />
                       </button>
 
-                      {/* Dropdown: Access Control */}
+                      {/* Dropdown: Access Control - 2-column layout, all visible on display without scrolling */}
                       {openAddAgentPopup === 'accessControl' && (
                         <div
-                          className="absolute top-full left-0 mt-1.5 w-72 sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[100] p-4 space-y-3"
+                          className="absolute top-full left-0 sm:-left-40 lg:-left-64 mt-1.5 w-80 sm:w-[480px] bg-white rounded-2xl shadow-2xl border border-slate-200 z-[70] p-4 space-y-3"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -2738,122 +2812,170 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             </button>
                           </div>
 
-                          {/* 1. Order Creation Access */}
-                          <div className="space-y-1">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                              Order Creation
-                            </span>
-                            <label className="flex items-center justify-between px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-800 transition-colors">
-                              <span>Create Order</span>
-                              <input
-                                type="checkbox"
-                                checked={newCanCreate}
-                                onChange={(e) => setNewCanCreate(e.target.checked)}
-                                className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
-                              />
-                            </label>
-                          </div>
+                          {/* 2 Side-by-Side Columns for All Controls without Scrolling */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {/* Left Column: Order Creation & Placed Order Permissions */}
+                            <div className="space-y-2">
+                              <div>
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                  Order Creation
+                                </span>
+                                <label className="flex items-center justify-between px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-800 transition-colors">
+                                  <span>Create Order</span>
+                                  <input
+                                    type="checkbox"
+                                    checked={newCanCreate}
+                                    onChange={(e) => setNewCanCreate(e.target.checked)}
+                                    className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                                  />
+                                </label>
+                              </div>
 
-                          {/* 2. Placed Order Permissions */}
-                          <div className="space-y-1.5 pt-1">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                              Placed Order Permissions
-                            </span>
-                            <label className="flex items-center justify-between px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-800 transition-colors">
-                              <span>Schedule Change</span>
-                              <input
-                                type="checkbox"
-                                checked={newCanChangeSchedule}
-                                onChange={(e) => setNewCanChangeSchedule(e.target.checked)}
-                                className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
-                              />
-                            </label>
+                              <div>
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                  Order Permissions
+                                </span>
+                                <div className="space-y-1.5">
+                                  <label className="flex items-center justify-between px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-800 transition-colors">
+                                    <span>Schedule Change</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={newCanChangeSchedule}
+                                      onChange={(e) => setNewCanChangeSchedule(e.target.checked)}
+                                      className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                                    />
+                                  </label>
 
-                            <label className="flex items-center justify-between px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-800 transition-colors">
-                              <span>Price Change</span>
-                              <input
-                                type="checkbox"
-                                checked={newCanChangeValue}
-                                onChange={(e) => setNewCanChangeValue(e.target.checked)}
-                                className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
-                              />
-                            </label>
+                                  <label className="flex items-center justify-between px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-800 transition-colors">
+                                    <span>Price Change</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={newCanChangeValue}
+                                      onChange={(e) => setNewCanChangeValue(e.target.checked)}
+                                      className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                                    />
+                                  </label>
 
-                            <label className="flex items-center justify-between px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-800 transition-colors">
-                              <span>Profit</span>
-                              <input
-                                type="checkbox"
-                                checked={newCanAddProfit}
-                                onChange={(e) => setNewCanAddProfit(e.target.checked)}
-                                className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
-                              />
-                            </label>
-                          </div>
+                                  <label className="flex items-center justify-between px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-800 transition-colors">
+                                    <span>Profit</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={newCanAddProfit}
+                                      onChange={(e) => setNewCanAddProfit(e.target.checked)}
+                                      className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                                    />
+                                  </label>
+                                </div>
+                              </div>
+                            </div>
 
-                          {/* 3. Status Section */}
-                          <div className="pt-2 border-t border-slate-100 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <label className="flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={newCanUpdateStatus}
-                                  onChange={(e) => setNewCanUpdateStatus(e.target.checked)}
-                                  className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
-                                />
-                                <span>Status Update</span>
-                              </label>
+                            {/* Right Column: Status Update & All Statuses in Clean Grid */}
+                            <div className="space-y-2 border-t sm:border-t-0 sm:border-l border-slate-100 sm:pl-3">
+                              <div className="flex items-center justify-between">
+                                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-800 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={newCanUpdateStatus}
+                                    onChange={(e) => setNewCanUpdateStatus(e.target.checked)}
+                                    className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                                  />
+                                  <span>Status Update</span>
+                                </label>
+                                {newCanUpdateStatus && (
+                                  <div className="flex items-center gap-1.5 text-[10px]">
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewAllowedOrderStatuses([...ORDER_STATUS_LIST])}
+                                      className="text-indigo-600 font-semibold hover:underline cursor-pointer"
+                                    >
+                                      All
+                                    </button>
+                                    <span className="text-slate-300">|</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewAllowedOrderStatuses([])}
+                                      className="text-slate-500 font-semibold hover:underline cursor-pointer"
+                                    >
+                                      Clear
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+
                               {newCanUpdateStatus && (
-                                <div className="flex items-center gap-1.5 text-[10px]">
-                                  <button
-                                    type="button"
-                                    onClick={() => setNewAllowedOrderStatuses([...ORDER_STATUS_LIST])}
-                                    className="text-indigo-600 font-semibold hover:underline cursor-pointer"
-                                  >
-                                    All
-                                  </button>
-                                  <span className="text-slate-300">|</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setNewAllowedOrderStatuses([])}
-                                    className="text-slate-500 font-semibold hover:underline cursor-pointer"
-                                  >
-                                    Clear
-                                  </button>
+                                <div className="grid grid-cols-2 gap-1 pt-1">
+                                  {ORDER_STATUS_LIST.map((st) => {
+                                    const isChecked = newAllowedOrderStatuses.includes(st);
+                                    return (
+                                      <label
+                                        key={`status-chk-${st}`}
+                                        className={`flex items-center justify-between px-2 py-1 rounded-lg border text-[11px] cursor-pointer transition-colors ${
+                                          isChecked
+                                            ? 'bg-indigo-50 border-indigo-200 text-indigo-950 font-bold'
+                                            : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                                        }`}
+                                      >
+                                        <span className="truncate">{st}</span>
+                                        <input
+                                          type="checkbox"
+                                          checked={isChecked}
+                                          onChange={(e) => {
+                                            if (e.target.checked) {
+                                              setNewAllowedOrderStatuses(prev => [...prev, st]);
+                                            } else {
+                                              setNewAllowedOrderStatuses(prev => prev.filter(x => x !== st));
+                                            }
+                                          }}
+                                          className="rounded text-indigo-600 w-3 h-3 cursor-pointer ml-1"
+                                        />
+                                      </label>
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
+                          </div>
 
-                            {newCanUpdateStatus && (
-                              <div className="grid grid-cols-2 gap-1.5 pt-1 max-h-36 overflow-y-auto pr-1">
-                                {ORDER_STATUS_LIST.map((st) => {
-                                  const isChecked = newAllowedOrderStatuses.includes(st);
-                                  return (
-                                    <label
-                                      key={`status-chk-${st}`}
-                                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer transition-colors ${
-                                        isChecked
-                                          ? 'bg-indigo-50 border-indigo-200 text-indigo-950 font-bold'
-                                          : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
-                                      }`}
-                                    >
-                                      <span className="truncate">{st}</span>
-                                      <input
-                                        type="checkbox"
-                                        checked={isChecked}
-                                        onChange={(e) => {
-                                          if (e.target.checked) {
-                                            setNewAllowedOrderStatuses(prev => [...prev, st]);
-                                          } else {
-                                            setNewAllowedOrderStatuses(prev => prev.filter(x => x !== st));
-                                          }
-                                        }}
-                                        className="rounded text-indigo-600 w-3.5 h-3.5 cursor-pointer ml-1"
-                                      />
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            )}
+                          {/* Permitted Navigation Tabs Access Control */}
+                          <div className="space-y-2 pt-3 border-t border-slate-100">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                              Permitted Navigation Tabs
+                            </span>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                              {[
+                                { id: 'summary', label: 'Summary' },
+                                { id: 'orders', label: 'Orders' },
+                                { id: 'followup', label: 'Followup History' },
+                                { id: 'agent-performance', label: 'Performance' },
+                                { id: 'profiles', label: 'Profiles' }
+                              ].map((tab) => {
+                                const isChecked = newAllowedTabs.includes(tab.id as AgentNavTab);
+                                return (
+                                  <label
+                                    key={`tab-chk-${tab.id}`}
+                                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-[11px] cursor-pointer transition-colors ${
+                                      isChecked
+                                        ? 'bg-indigo-50 border-indigo-200 text-indigo-950 font-bold'
+                                        : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                                    }`}
+                                  >
+                                    <span className="truncate">{tab.label}</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setNewAllowedTabs(prev => [...prev, tab.id as AgentNavTab]);
+                                        } else {
+                                          setNewAllowedTabs(prev => prev.filter(x => x !== tab.id));
+                                        }
+                                      }}
+                                      className="rounded text-indigo-600 w-3.5 h-3.5 cursor-pointer ml-1"
+                                    />
+                                  </label>
+                                );
+                              })}
+                            </div>
                           </div>
 
                           <div className="pt-2 border-t border-slate-100">
@@ -2863,7 +2985,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                 e.stopPropagation();
                                 setOpenAddAgentPopup(null);
                               }}
-                              className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer shadow-xs transition-colors"
+                              className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer shadow-xs transition-colors"
                             >
                               Done
                             </button>
@@ -3106,6 +3228,362 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           </tr>
                         );
                       }))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: FOLLOWUP HISTORY & AUDIT LOGS */}
+          {activeTab === 'followup' && (
+            <div className="space-y-4">
+              <div className={`${cardBg} rounded-2xl p-5 border shadow-xs space-y-4`}>
+                <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+                  <div className="flex items-center gap-2">
+                    <History className={`w-5 h-5 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
+                    <div>
+                      <h3 className={`font-extrabold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Followup History &amp; Audit Logs</h3>
+                      <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Filter all customer followups by operator (Update By Name) and date, or export to CSV/XLSX.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const availableUpdatedByNames = Array.from(new Set(followupHistory.map(h => h.updatedByName || h.updatedBy).filter(Boolean)));
+                        const filtered = followupHistory.filter((h) => {
+                          const isAuthorized = currentManager.role === 'Manager' || 
+                                               h.updatedBy === currentManager.user ||
+                                               agents.some(a => a.user === h.updatedBy && (
+                                                 a.teamLeaderId === currentManager.user ||
+                                                 a.teamLeaderId?.includes(currentManager.user) ||
+                                                 a.teamLeaderId?.includes(currentManager.name) ||
+                                                 (Array.isArray(a.teamLeaders) && (
+                                                   a.teamLeaders.includes(currentManager.user) ||
+                                                   a.teamLeaders.includes(currentManager.name)
+                                                 ))
+                                               ));
+                          if (!isAuthorized) return false;
+                          if (followupFilterName !== 'All') {
+                            const nameMatch = h.updatedByName === followupFilterName || h.updatedBy === followupFilterName;
+                            if (!nameMatch) return false;
+                          }
+                          if (followupFilterDate.trim()) {
+                            const histDateStr = String(h.timestamp || '');
+                            if (!histDateStr.includes(followupFilterDate.trim())) return false;
+                          }
+                          if (followupSearch.trim()) {
+                            const q = followupSearch.toLowerCase();
+                            const matches = (
+                              String(h.followupId || '').toLowerCase().includes(q) ||
+                              String(h.orderId || (h as any).order_id || '').toLowerCase().includes(q) ||
+                              String(h.customerName || (h as any).customer_name || '').toLowerCase().includes(q) ||
+                              String(h.previousStatus || '').toLowerCase().includes(q) ||
+                              String(h.newStatus || (h as any).new_status || '').toLowerCase().includes(q) ||
+                              String(h.action || '').toLowerCase().includes(q) ||
+                              String(h.notes || '').toLowerCase().includes(q) ||
+                              String(h.updatedByName || '').toLowerCase().includes(q)
+                            );
+                            if (!matches) return false;
+                          }
+                          return true;
+                        });
+                        handleExportCsv(filtered, 'followup_audit_logs.csv');
+                      }}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Export CSV / XLSX</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filters Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Search */}
+                  <div>
+                    <label className={`block text-[11px] font-bold uppercase mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Search Keyword</label>
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                      <input
+                        type="text"
+                        value={followupSearch}
+                        onChange={(e) => setFollowupSearch(e.target.value)}
+                        placeholder="Search order, customer, status..."
+                        className={`w-full pl-8 pr-3 py-2 text-xs rounded-xl border ${inputBg}`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Update By Name Filter */}
+                  <div>
+                    <label className={`block text-[11px] font-bold uppercase mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Filter by Update By Name</label>
+                    <select
+                      value={followupFilterName}
+                      onChange={(e) => setFollowupFilterName(e.target.value)}
+                      className={`w-full px-3 py-2 text-xs rounded-xl border font-medium ${inputBg}`}
+                    >
+                      <option value="All" className={isDark ? 'bg-slate-900 text-white' : ''}>All Operators / Managers</option>
+                      {Array.from(new Set(followupHistory.map(h => h.updatedByName || h.updatedBy).filter(Boolean))).map((name) => (
+                        <option key={name} value={name} className={isDark ? 'bg-slate-900 text-white' : ''}>{name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Date Filter */}
+                  <div>
+                    <label className={`block text-[11px] font-bold uppercase mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Filter by Date</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={followupFilterDate}
+                        onChange={(e) => setFollowupFilterDate(e.target.value)}
+                        placeholder="e.g. 2026-10-15 or Oct"
+                        className={`flex-1 px-3 py-2 text-xs rounded-xl border font-mono ${inputBg}`}
+                      />
+                      {followupFilterDate && (
+                        <button
+                          type="button"
+                          onClick={() => setFollowupFilterDate('')}
+                          className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold ${isDark ? 'bg-slate-800 text-slate-200 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className={`${cardBg} rounded-2xl border shadow-xs overflow-hidden`}>
+                <div className={`p-3 border-b flex items-center justify-between ${isDark ? 'bg-slate-800 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-100 text-slate-700'}`}>
+                  <span className="text-xs font-bold">
+                    Showing {followupHistory.filter((h) => {
+                      const isAuthorized = currentManager.role === 'Manager' || 
+                                           h.updatedBy === currentManager.user ||
+                                           agents.some(a => a.user === h.updatedBy && (
+                                             a.teamLeaderId === currentManager.user ||
+                                             a.teamLeaderId?.includes(currentManager.user) ||
+                                             a.teamLeaderId?.includes(currentManager.name) ||
+                                             (Array.isArray(a.teamLeaders) && (
+                                               a.teamLeaders.includes(currentManager.user) ||
+                                               a.teamLeaders.includes(currentManager.name)
+                                             ))
+                                           ));
+                      if (!isAuthorized) return false;
+                      if (followupFilterName !== 'All') {
+                        const nameMatch = h.updatedByName === followupFilterName || h.updatedBy === followupFilterName;
+                        if (!nameMatch) return false;
+                      }
+                      if (followupFilterDate.trim()) {
+                        const histDateStr = String(h.timestamp || '');
+                        if (!histDateStr.includes(followupFilterDate.trim())) return false;
+                      }
+                      if (followupSearch.trim()) {
+                        const q = followupSearch.toLowerCase();
+                        const matches = (
+                          String(h.followupId || '').toLowerCase().includes(q) ||
+                          String(h.orderId || (h as any).order_id || '').toLowerCase().includes(q) ||
+                          String(h.customerName || (h as any).customer_name || '').toLowerCase().includes(q) ||
+                          String(h.previousStatus || '').toLowerCase().includes(q) ||
+                          String(h.newStatus || (h as any).new_status || '').toLowerCase().includes(q) ||
+                          String(h.action || '').toLowerCase().includes(q) ||
+                          String(h.notes || '').toLowerCase().includes(q) ||
+                          String(h.updatedByName || '').toLowerCase().includes(q)
+                        );
+                        if (!matches) return false;
+                      }
+                      return true;
+                    }).length} followup record(s)
+                  </span>
+                </div>
+                <div className="overflow-x-auto max-h-[60vh]">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className={`${tableHeaderBg} font-bold border-b sticky top-0 z-10`}>
+                        <th className={`py-3 px-3.5 whitespace-nowrap ${isDark ? 'text-indigo-300' : 'text-indigo-700'}`}>Followup ID</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Order ID</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Timestamp</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Customer Name</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Contact</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Previous Status</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">New Status</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Order Status</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Order Value</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Schedule</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Updated By</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Updated By Name</th>
+                        <th className={`py-3 px-3.5 whitespace-nowrap ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>Action Name</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Remarks / Notes</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-800">
+                      {followupHistory.filter((h) => {
+                        const isAuthorized = currentManager.role === 'Manager' || 
+                                             h.updatedBy === currentManager.user ||
+                                             agents.some(a => a.user === h.updatedBy && (
+                                               a.teamLeaderId === currentManager.user ||
+                                               a.teamLeaderId?.includes(currentManager.user) ||
+                                               a.teamLeaderId?.includes(currentManager.name) ||
+                                               (Array.isArray(a.teamLeaders) && (
+                                                 a.teamLeaders.includes(currentManager.user) ||
+                                                 a.teamLeaders.includes(currentManager.name)
+                                               ))
+                                             ));
+                        if (!isAuthorized) return false;
+                        if (followupFilterName !== 'All') {
+                          const nameMatch = h.updatedByName === followupFilterName || h.updatedBy === followupFilterName;
+                          if (!nameMatch) return false;
+                        }
+                        if (followupFilterDate.trim()) {
+                          const histDateStr = String(h.timestamp || '');
+                          if (!histDateStr.includes(followupFilterDate.trim())) return false;
+                        }
+                        if (followupSearch.trim()) {
+                          const q = followupSearch.toLowerCase();
+                          const matches = (
+                            String(h.followupId || '').toLowerCase().includes(q) ||
+                            String(h.orderId || (h as any).order_id || '').toLowerCase().includes(q) ||
+                            String(h.customerName || (h as any).customer_name || '').toLowerCase().includes(q) ||
+                            String(h.previousStatus || '').toLowerCase().includes(q) ||
+                            String(h.newStatus || (h as any).new_status || '').toLowerCase().includes(q) ||
+                            String(h.action || '').toLowerCase().includes(q) ||
+                            String(h.notes || '').toLowerCase().includes(q) ||
+                            String(h.updatedByName || '').toLowerCase().includes(q)
+                          );
+                          if (!matches) return false;
+                        }
+                        return true;
+                      }).length === 0 ? (
+                        <tr>
+                          <td colSpan={15} className="text-center py-12 text-slate-400 font-semibold">
+                            No followup history records matching filters.
+                          </td>
+                        </tr>
+                      ) : (
+                        followupHistory.filter((h) => {
+                          const isAuthorized = currentManager.role === 'Manager' || 
+                                               h.updatedBy === currentManager.user ||
+                                               agents.some(a => a.user === h.updatedBy && (
+                                                 a.teamLeaderId === currentManager.user ||
+                                                 a.teamLeaderId?.includes(currentManager.user) ||
+                                                 a.teamLeaderId?.includes(currentManager.name) ||
+                                                 (Array.isArray(a.teamLeaders) && (
+                                                   a.teamLeaders.includes(currentManager.user) ||
+                                                   a.teamLeaders.includes(currentManager.name)
+                                                 ))
+                                               ));
+                          if (!isAuthorized) return false;
+                          if (followupFilterName !== 'All') {
+                            const nameMatch = h.updatedByName === followupFilterName || h.updatedBy === followupFilterName;
+                            if (!nameMatch) return false;
+                          }
+                          if (followupFilterDate.trim()) {
+                            const histDateStr = String(h.timestamp || '');
+                            if (!histDateStr.includes(followupFilterDate.trim())) return false;
+                          }
+                          if (followupSearch.trim()) {
+                            const q = followupSearch.toLowerCase();
+                            const matches = (
+                              String(h.followupId || '').toLowerCase().includes(q) ||
+                              String(h.orderId || (h as any).order_id || '').toLowerCase().includes(q) ||
+                              String(h.customerName || (h as any).customer_name || '').toLowerCase().includes(q) ||
+                              String(h.previousStatus || '').toLowerCase().includes(q) ||
+                              String(h.newStatus || (h as any).new_status || '').toLowerCase().includes(q) ||
+                              String(h.action || '').toLowerCase().includes(q) ||
+                              String(h.notes || '').toLowerCase().includes(q) ||
+                              String(h.updatedByName || '').toLowerCase().includes(q)
+                            );
+                            if (!matches) return false;
+                          }
+                          return true;
+                        }).map((hist, histIdx) => {
+                          const isUndoRecord = !!hist.isUndo;
+                          const isRevertedRecord = !!hist.isUndone;
+
+                          return (
+                            <tr 
+                              key={`followup-tab-hist-${hist.id || hist.followupId || histIdx}-${histIdx}`} 
+                              className={`transition-colors hover:bg-amber-100/90 ${isUndoRecord ? 'bg-amber-50/50 border-l-4 border-l-amber-500' : (isRevertedRecord ? 'opacity-80 bg-slate-50/40' : '')}`}
+                            >
+                              <td className="py-3 px-3.5 font-mono font-bold text-indigo-800 whitespace-nowrap">
+                                #{hist.followupId || hist.id}
+                              </td>
+                              <td className="py-3 px-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const ord = orders.find((o) => String(o.order_id || o.id) === String(hist.orderId));
+                                    if (ord) setViewJourneyOrder(ord);
+                                  }}
+                                  className="font-mono font-bold text-indigo-700 hover:text-indigo-900 hover:underline flex items-center gap-1 cursor-pointer"
+                                >
+                                  <span>#{hist.orderId}</span>
+                                  <ExternalLink className="w-3 h-3 text-indigo-400" />
+                                </button>
+                              </td>
+                              <td className="py-3 px-3.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                                {hist.timestamp}
+                              </td>
+                              <td className="py-3 px-3.5 text-slate-700 whitespace-nowrap font-medium">
+                                {hist.customerName || '-'}
+                              </td>
+                              <td className="py-3 px-3.5 font-mono text-slate-600 whitespace-nowrap">
+                                {hist.customerContact || '-'}
+                              </td>
+                              <td className="py-3 px-3.5 whitespace-nowrap">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                                  {hist.previousStatus || '-'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3.5 whitespace-nowrap">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                  {hist.newStatus || '-'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3.5 whitespace-nowrap">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700">
+                                  {hist.orderStatus || '-'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">
+                                ৳ {(Number(hist.orderValue) || 0).toLocaleString()}
+                              </td>
+                              <td className="py-3 px-3.5 text-[11px] text-slate-600 whitespace-nowrap">
+                                {hist.scheduledTime ? `${hist.scheduleDate || ''} (${hist.scheduledTime})` : (hist.scheduleDate || '-')}
+                              </td>
+                              <td className="py-3 px-3.5 font-mono text-xs text-slate-600 whitespace-nowrap">
+                                {hist.updatedBy || '-'}
+                              </td>
+                              <td className="py-3 px-3.5 font-bold text-slate-900 whitespace-nowrap">
+                                {hist.updatedByName || '-'}
+                              </td>
+                              <td className="py-3 px-3.5 font-bold text-purple-700 whitespace-nowrap">
+                                {hist.action || 'Followup'}
+                              </td>
+                              <td className="py-3 px-3.5 text-slate-600 max-w-xs truncate" title={hist.notes}>
+                                {hist.notes || '-'}
+                              </td>
+                              <td className="py-3 px-3.5 text-center whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const ord = orders.find((o) => String(o.order_id || o.id) === String(hist.orderId));
+                                    if (ord) setViewJourneyOrder(ord);
+                                  }}
+                                  className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold cursor-pointer"
+                                >
+                                  View Order
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -3365,7 +3843,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         paginatedOrders.map((ord, idx) => {
                           const isDelivered = (ord.followup_status || ord.followupStatus || '').toLowerCase() === 'delivered';
                           return (
-                            <tr key={`manager-ord-${ord.order_id || ord.id || idx}-${idx}`} className="hover:bg-indigo-50/40 transition-colors">
+                            <tr key={`manager-ord-${ord.order_id || ord.id || idx}-${idx}`} className="hover:bg-amber-100/90 transition-all duration-150 cursor-pointer">
 
                               <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-indigo-700 sticky left-0 z-10 bg-white border-r border-slate-100">
                                 <button
@@ -3590,7 +4068,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           scheduledTime: quickUpdateScheduledTime,
                           schedule_time: quickUpdateScheduledTime
                         },
-                        'Manager',
+                        'Manager (@1)',
                         quickUpdateNotes
                       );
                       const updatedOId = quickUpdateOrderId;
@@ -3734,10 +4212,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-400/30 bg-slate-900 text-white font-medium focus:border-indigo-400 cursor-pointer"
                       >
                         <option key="quick-slot-default" value="">-- Select Time Slot --</option>
-                        {quickUpdateScheduledTime && !TIME_SLOTS.includes(quickUpdateScheduledTime) && (
+                        {quickUpdateScheduledTime && !getTimeSlots().includes(quickUpdateScheduledTime) && (
                           <option key="quick-slot-custom" value={quickUpdateScheduledTime}>{quickUpdateScheduledTime}</option>
                         )}
-                        {TIME_SLOTS.map((slot, idx) => (
+                        {getTimeSlots().map((slot, idx) => (
                           <option key={`quick-slot-${slot}-${idx}`} value={slot}>
                             {slot}
                           </option>
@@ -3956,10 +4434,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                   {hist.scheduleDate}<br/>{hist.scheduledTime}
                                 </td>
                                 <td className="py-3 px-3.5 font-bold text-slate-700 whitespace-nowrap">
-                                  {hist.updatedBy?.replace(/\s*\(@.*\)/, '').replace('@', '_')}
+                                  {hist.updatedBy === '1' || hist.updatedBy?.toLowerCase() === 'manager' || (hist.updatedBy?.includes('@') && (hist.updatedByName?.toLowerCase().includes('manager') || hist.updatedBy?.includes('abujar')))
+                                    ? '1'
+                                    : (hist.updatedBy?.replace(/\s*\(@.*\)/, '').replace('@', '_') || '1')}
                                 </td>
                                 <td className="py-3 px-3.5 text-slate-600 whitespace-nowrap">
-                                  {hist.updatedByName || '-'}
+                                  {hist.updatedBy === '1' || hist.updatedByName?.toLowerCase() === 'manager' || hist.updatedBy?.toLowerCase() === 'manager' || hist.updatedBy?.includes('abujar')
+                                    ? 'Manager'
+                                    : (hist.updatedByName || '-')}
                                 </td>
                                 <td className="py-3 px-3.5 whitespace-nowrap">
                                   {isUndoRecord ? (
@@ -5108,112 +5590,54 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       <Settings className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="font-extrabold text-slate-900 text-base">Manager Settings &amp; Data Export Hub</h3>
-                      <p className="text-xs text-slate-500">Configure Apps Script integration, export CSV with preview, and manage system data.</p>
+                      <h3 className="font-extrabold text-slate-900 text-base">Manager Settings &amp; Preferences</h3>
+                      <p className="text-xs text-slate-500">Configure theme appearance and export CSV data reports.</p>
                     </div>
                   </div>
                 </div>
 
-                {/* CSV Export with Preview */}
-                <div className="space-y-4">
-                  <h4 className="font-bold text-slate-900 text-sm">CSV Data Export &amp; Preview</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-                      <div>
-                        <h5 className="font-bold text-xs text-slate-800">Followup History CSV</h5>
-                        <p className="text-[11px] text-slate-500">{followupHistory.length} audit logs</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => handlePreviewCsv(followupHistory, 'Followup History CSV Preview', 'followup_history_export.csv')} className="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold cursor-pointer">Preview</button>
-                        <button onClick={() => handleExportCsv(followupHistory, 'followup_history_export.csv')} className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer">Download</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Google Apps Script Integration */}
-                <div className="space-y-4 pt-6 border-t border-slate-100">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <h4 className="font-bold text-slate-900 text-sm">Google Apps Script Web App URL</h4>
-                    <span className="text-[11px] text-slate-400">Live dual-sheet sync ('Sheet1' &amp; 'Followup')</span>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <input
-                      type="url"
-                      value={profileScriptUrl}
-                      onChange={(e) => setProfileScriptUrl(e.target.value)}
-                      placeholder="https://script.google.com/macros/s/.../exec"
-                      className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-medium focus:border-indigo-600"
-                    />
+                {/* Theme Preference Option (Light / Dark) */}
+                <div className="space-y-3 pb-6 border-b border-slate-100">
+                  <h4 className="font-bold text-slate-900 text-sm">Theme Appearance</h4>
+                  <p className="text-xs text-slate-500">Choose your preferred interface theme mode.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                     <button
                       type="button"
-                      onClick={() => {
-                        OrderService.setScriptUrl(profileScriptUrl);
-                        setScriptUrlSaved(true);
-                        setTimeout(() => setScriptUrlSaved(false), 3000);
-                        onRefreshOrders();
-                      }}
-                      className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold cursor-pointer"
+                      onClick={() => handleToggleTheme('light')}
+                      className={`p-4 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                        theme === 'light'
+                          ? 'bg-indigo-50 border-indigo-300 text-indigo-900 font-bold ring-2 ring-indigo-200 shadow-xs'
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
                     >
-                      {scriptUrlSaved ? 'Saved & Synced!' : 'Save & Sync'}
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">☀️</span>
+                        <div>
+                          <h5 className="font-extrabold text-sm">Light Theme</h5>
+                          <p className="text-[11px] text-slate-500">Clean bright interface</p>
+                        </div>
+                      </div>
+                      {theme === 'light' && <Check className="w-5 h-5 text-indigo-600" />}
                     </button>
-                  </div>
 
-                  {/* Apps Script Action Controls: Copy, View, Download */}
-                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <span className="text-xs font-bold text-slate-800">
-                      Google Apps Script Code
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(OrderService.getUpdatedAppsScriptCode());
-                          setCopiedScript(true);
-                          setTimeout(() => setCopiedScript(false), 2500);
-                          showToast('Apps Script copied to clipboard!');
-                        }}
-                        className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-                      >
-                        {copiedScript ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-emerald-300" />
-                            <span>Copied!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>Copy Script Code</span>
-                          </>
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setShowAppsScriptModal(true)}
-                        className="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-                      >
-                        <Code className="w-3.5 h-3.5 text-indigo-300" />
-                        <span>View Script (Pop-up)</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const blob = new Blob([OrderService.getUpdatedAppsScriptCode()], { type: 'text/plain' });
-                          const url = URL.createObjectURL(blob);
-                          const link = document.createElement('a');
-                          link.href = url;
-                          link.download = 'Code.gs';
-                          link.click();
-                          URL.revokeObjectURL(url);
-                        }}
-                        className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                      >
-                        <span>Download .gs</span>
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleTheme('dark')}
+                      className={`p-4 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                        theme === 'dark'
+                          ? 'bg-slate-900 border-slate-700 text-white font-bold ring-2 ring-slate-700 shadow-xs'
+                          : 'bg-slate-800/10 border-slate-200 text-slate-800 hover:bg-slate-800/20 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">🌙</span>
+                        <div>
+                          <h5 className="font-extrabold text-sm">Dark Theme</h5>
+                          <p className="text-[11px] text-slate-400">Low-light dark mode</p>
+                        </div>
+                      </div>
+                      {theme === 'dark' && <Check className="w-5 h-5 text-sky-400" />}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -5648,9 +6072,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           onClose={() => setViewJourneyOrder(null)}
           followupHistory={followupHistory}
           currentUser={{
-            name: currentManager.name || currentManager.user,
-            user: currentManager.user,
-            role: currentManager.role || 'Manager'
+            name: 'Manager',
+            user: '1',
+            role: 'Manager'
           }}
           onUpdateOrderStatus={onUpdateOrderStatus}
           onRefreshOrders={onRefreshOrders}
@@ -5665,9 +6089,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           onClose={() => setStatusModalOrder(null)}
           followupHistory={followupHistory}
           currentUser={{
-            name: currentManager.name || currentManager.user,
-            user: currentManager.user,
-            role: currentManager.role || 'Manager'
+            name: 'Manager',
+            user: '1',
+            role: 'Manager'
           }}
           onUpdateOrderStatus={onUpdateOrderStatus}
           onRefreshOrders={onRefreshOrders}

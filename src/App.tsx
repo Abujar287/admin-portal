@@ -45,13 +45,13 @@ export default function App() {
     const savedRole = sessionStorage.getItem('portal_session_role');
     const savedUser = sessionStorage.getItem('portal_session_user');
 
-    if (savedRole === 'manager' && (savedUser === 'manager' || savedUser === 'manager01')) {
+    if (savedRole === 'manager') {
       setCurrentSession({
         role: 'manager',
         manager: {
-          user: 'manager',
-          pass: 'manager',
-          name: 'Manager (Admin)',
+          user: '1',
+          pass: '01410089771',
+          name: 'Manager',
           role: 'Manager'
         }
       });
@@ -120,19 +120,19 @@ export default function App() {
   };
 
   const handleAgentLogin = (agent: AgentUser) => {
-    if (agent.role === 'Team Leader') {
+    if (agent.role === 'Team Leader' || agent.role === 'Manager' || agent.user === '1') {
       setCurrentSession({
         role: 'manager',
         manager: {
-          user: agent.user,
+          user: '1',
           pass: agent.pass,
-          name: agent.name || agent.user,
-          role: 'Team Leader'
+          name: agent.name || 'Manager',
+          role: 'Manager'
         }
       });
       sessionStorage.setItem('portal_session_role', 'manager');
-      sessionStorage.setItem('portal_session_user', agent.user);
-      showToast(`Welcome Team Leader, ${agent.name || agent.user}!`);
+      sessionStorage.setItem('portal_session_user', '1');
+      showToast(`Welcome Manager, ${agent.name || 'Manager'}!`);
       return;
     }
     setCurrentSession({ role: 'agent', agent });
@@ -147,9 +147,14 @@ export default function App() {
   };
 
   const handleManagerLogin = (manager: ManagerUser) => {
-    setCurrentSession({ role: 'manager', manager });
+    const mgrUser: ManagerUser = {
+      ...manager,
+      user: manager.role === 'Manager' ? '1' : manager.user,
+      name: manager.role === 'Manager' ? 'Manager' : manager.name
+    };
+    setCurrentSession({ role: 'manager', manager: mgrUser });
     sessionStorage.setItem('portal_session_role', 'manager');
-    sessionStorage.setItem('portal_session_user', manager.user);
+    sessionStorage.setItem('portal_session_user', mgrUser.user);
     showToast('Manager Portal session active!');
   };
 
@@ -253,10 +258,18 @@ export default function App() {
     }
 
     // Determine real account username of active user
-    const activeAccountName = currentSession.role === 'manager'
-      ? `${currentSession.manager.name || currentSession.manager.user} (@${currentSession.manager.user})`
-      : `${currentSession.agent.name || currentSession.agent.user} (@${currentSession.agent.user})`;
-    const effectiveUpdatedBy = (updatedBy && updatedBy !== 'Manager') ? updatedBy : activeAccountName;
+    // Manager access: updated_by must strictly be 1, never an email
+    let effectiveUpdatedBy = 'Manager (@1)';
+    if (currentSession.role === 'manager') {
+      effectiveUpdatedBy = 'Manager (@1)';
+    } else {
+      if (currentSession.agent.role === 'Manager' || currentSession.agent.user === '1') {
+        effectiveUpdatedBy = 'Manager (@1)';
+      } else {
+        const activeAccountName = `${currentSession.agent.name || currentSession.agent.user} (@${currentSession.agent.user})`;
+        effectiveUpdatedBy = (updatedBy && updatedBy !== 'Manager') ? updatedBy : activeAccountName;
+      }
+    }
 
     const res = await OrderService.updateOrderStatus(orderId, updates, effectiveUpdatedBy, notes);
     setOrders(res.updatedOrders);

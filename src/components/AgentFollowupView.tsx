@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { AgentUser, OrderItem, FollowupHistoryItem } from '../types';
-import { TIME_SLOTS } from '../data/mockOrders';
+import { TIME_SLOTS, getTimeSlots } from '../data/mockOrders';
 import { isOrderAssignedToAgent } from '../utils/agentMatching';
 import {
   History,
@@ -285,10 +285,10 @@ export const AgentFollowupView: React.FC<AgentFollowupViewProps> = ({
                 className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-400/30 bg-slate-900 text-white font-medium focus:border-indigo-400 cursor-pointer disabled:opacity-50"
               >
                 <option value="">-- Select Time Slot --</option>
-                {quickUpdateScheduledTime && !TIME_SLOTS.includes(quickUpdateScheduledTime) && (
+                {quickUpdateScheduledTime && !getTimeSlots().includes(quickUpdateScheduledTime) && (
                   <option value={quickUpdateScheduledTime}>{quickUpdateScheduledTime}</option>
                 )}
-                {TIME_SLOTS.map((slot, idx) => (
+                {getTimeSlots().map((slot, idx) => (
                   <option key={`slot-${slot}-${idx}`} value={slot}>
                     {slot}
                   </option>

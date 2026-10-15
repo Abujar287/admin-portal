@@ -82,7 +82,37 @@ export const CITY_AREA_MAP: Record<string, string[]> = {
   'Others': ['Barisal', 'Comilla', 'Gazipur', 'Narayanganj', 'Sylhet', 'Tongi', 'Others']
 };
 
-export const TIME_SLOTS = [
+export const parseTimeToMinutes = (timeStr: string): number => {
+  if (!timeStr) return 9999;
+  const cleaned = timeStr.trim().toLowerCase();
+  // Match patterns like "9AM", "9:30 AM", "12PM", "1PM", "09:00"
+  const match = cleaned.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if (!match) return 9999;
+  let hour = parseInt(match[1], 10);
+  const minutes = match[2] ? parseInt(match[2], 10) : 0;
+  const period = match[3] ? match[3].toLowerCase() : '';
+
+  if (period === 'pm' && hour < 12) {
+    hour += 12;
+  } else if (period === 'am' && hour === 12) {
+    hour = 0;
+  } else if (!period && hour < 8) {
+    // If no am/pm specified and hour is small (e.g. 1-7), usually PM in business day
+    hour += 12;
+  }
+  return hour * 60 + minutes;
+};
+
+export const sortTimeSlotsAscending = (slots: string[]): string[] => {
+  return [...slots].sort((a, b) => {
+    const minA = parseTimeToMinutes(a);
+    const minB = parseTimeToMinutes(b);
+    if (minA !== minB) return minA - minB;
+    return a.localeCompare(b);
+  });
+};
+
+export const TIME_SLOTS = sortTimeSlotsAscending([
   '9AM to 10AM',
   '10AM to 11AM',
   '11AM to 12PM',
@@ -95,34 +125,39 @@ export const TIME_SLOTS = [
   '6PM to 7PM',
   '7PM to 8PM',
   '8PM to 9PM'
-];
+]);
 
 export const getTimeSlots = (): string[] => {
   try {
     const stored = localStorage.getItem('agent_portal_time_slots');
     if (stored) {
       const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return sortTimeSlotsAscending(parsed);
+      }
     }
   } catch {
     // fallback
   }
-  return TIME_SLOTS;
+  return sortTimeSlotsAscending(TIME_SLOTS);
 };
 
 export const addTimeSlot = (slot: string): string[] => {
   const list = getTimeSlots();
   if (!list.includes(slot)) {
     list.push(slot);
-    localStorage.setItem('agent_portal_time_slots', JSON.stringify(list));
+    const sorted = sortTimeSlotsAscending(list);
+    localStorage.setItem('agent_portal_time_slots', JSON.stringify(sorted));
+    return sorted;
   }
   return list;
 };
 
 export const removeTimeSlot = (slot: string): string[] => {
   const list = getTimeSlots().filter(s => s !== slot);
-  localStorage.setItem('agent_portal_time_slots', JSON.stringify(list));
-  return list;
+  const sorted = sortTimeSlotsAscending(list);
+  localStorage.setItem('agent_portal_time_slots', JSON.stringify(sorted));
+  return sorted;
 };
 
 export const ORDER_CHANNELS = [

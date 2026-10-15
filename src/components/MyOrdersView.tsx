@@ -24,7 +24,7 @@ import {
   Save,
   AlertTriangle
 } from 'lucide-react';
-import { getOrderStatuses, ORDER_STATUS_LIST, TIME_SLOTS } from '../data/mockOrders';
+import { getOrderStatuses, ORDER_STATUS_LIST, TIME_SLOTS, getTimeSlots } from '../data/mockOrders';
 import { isOrderAssignedToAgent } from '../utils/agentMatching';
 
 interface MyOrdersViewProps {
@@ -708,7 +708,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                           className="w-full px-3 py-2 rounded-xl border border-sky-300 bg-white font-bold text-slate-900 focus:outline-hidden focus:border-sky-600 text-xs shadow-2xs cursor-pointer"
                         >
                           <option value="">-- Choose Time Slot --</option>
-                          {TIME_SLOTS.map((slot) => (
+                          {getTimeSlots().map((slot) => (
                             <option key={slot} value={slot}>{slot}</option>
                           ))}
                         </select>

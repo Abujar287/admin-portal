@@ -86,6 +86,22 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
   const [isUpdatingScheduleTime, setIsUpdatingScheduleTime] = useState(false);
   const [scheduleTimeMsg, setScheduleTimeMsg] = useState<string | null>(null);
 
+  // Format operator name: for manager access, user ID must strictly be '1', never email
+  const sessionRole = typeof window !== 'undefined' ? sessionStorage.getItem('portal_session_role') : null;
+  const isManagerRole = 
+    sessionRole === 'manager' ||
+    currentUser.role === 'Manager' || 
+    currentUser.role === 'Team Leader' ||
+    currentUser.user === '1' ||
+    currentUser.user.toLowerCase() === 'manager' ||
+    currentUser.user.toLowerCase().includes('admin') ||
+    currentUser.user.toLowerCase().includes('abujar') ||
+    currentUser.user.includes('@');
+
+  const actorUserId = isManagerRole ? '1' : currentUser.user;
+  const actorUserName = isManagerRole ? 'Manager' : (currentUser.name || currentUser.user);
+  const userDisplayName = `${actorUserName} (@${actorUserId})`;
+
   const handleProfitChange = (valStr: string) => {
     setSingleProfit(valStr);
     const pVal = parseFloat(valStr);
@@ -122,7 +138,6 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
     setProfitMsg(null);
     try {
       const parsedProfit = parseFloat(singleProfit) || 0;
-      const userDisplayName = `${currentUser.name || currentUser.user} (@${currentUser.user})`;
 
       await onUpdateOrderStatus(
         orderId,
@@ -170,7 +185,6 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
 
       const nowTs = OrderService.getBdtTimestamp();
       const currentVal = singleValue !== '' ? parseFloat(singleValue) : Number(order.order_value ?? order.orderValue ?? 0);
-      const userDisplayName = `${currentUser.name || currentUser.user} (@${currentUser.user})`;
 
       let finalProfit = 0;
       if (isDeliv) {
@@ -223,7 +237,6 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
     try {
       const parsedVal = parseFloat(singleValue);
       const isDeliv = (order.followup_status || order.followupStatus || '').toLowerCase() === 'delivered';
-      const userDisplayName = `${currentUser.name || currentUser.user} (@${currentUser.user})`;
 
       let calculatedProfit = order.profit || 0;
       if (singleProfitPercent !== '') {
@@ -260,7 +273,6 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
     setIsUpdatingScheduleDate(true);
     setScheduleDateMsg(null);
     try {
-      const userDisplayName = `${currentUser.name || currentUser.user} (@${currentUser.user})`;
       await onUpdateOrderStatus(
         orderId,
         {
@@ -285,7 +297,6 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
     setIsUpdatingScheduleTime(true);
     setScheduleTimeMsg(null);
     try {
-      const userDisplayName = `${currentUser.name || currentUser.user} (@${currentUser.user})`;
       await onUpdateOrderStatus(
         orderId,
         {
@@ -679,7 +690,9 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                       <tr key={i} className="text-slate-700 hover:bg-slate-50">
                         <td className="py-2 px-3 font-mono whitespace-nowrap">{h.timestamp}</td>
                         <td className="py-2 px-3 whitespace-nowrap font-medium">
-                          {h.updatedByName || h.updatedBy?.replace(/\s*\(@.*\)/, '').replace('@', '_')}
+                          {h.updatedBy === '1' || h.updatedBy?.toLowerCase() === 'manager' || (h.updatedBy?.includes('@') && (h.updatedByName?.toLowerCase().includes('manager') || h.updatedBy?.includes('abujar')))
+                            ? 'Manager'
+                            : (h.updatedByName || h.updatedBy?.replace(/\s*\(@.*\)/, '').replace('@', '_'))}
                         </td>
                         <td className="py-2 px-3">
                            <div className="font-bold">{h.action}</div>
