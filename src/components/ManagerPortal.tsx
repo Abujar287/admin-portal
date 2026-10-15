@@ -33,6 +33,7 @@ import {
   Calendar,
   History,
   CheckSquare,
+  AlertTriangle,
   Code,
   Copy,
   Check,
@@ -117,17 +118,24 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   onLogout,
   onUpdateOrderStatus
 }) => {
-  const isTeamLeader = currentManager.role === 'Team Leader';
+  const isManager = currentManager.role === 'Manager';
+  const isTeamLeader = !isManager;
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTabState] = useState<
     'profiles' | 'users' | 'orders' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping' | 'sheet-connection'
   >(() => {
     const saved = sessionStorage.getItem('manager_active_tab') as any;
+    if (!isManager && (saved === 'sheet-connection' || saved === 'users' || saved === 'category-mapping' || saved === 'profiles' || saved === 'settings')) {
+      return 'summary';
+    }
     if (saved && saved !== 'followup') return saved;
-    return isTeamLeader ? 'summary' : 'users';
+    return isManager ? 'users' : 'summary';
   });
 
   const setActiveTab = (tab: 'profiles' | 'users' | 'orders' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping' | 'sheet-connection') => {
+    if (!isManager && (tab === 'sheet-connection' || tab === 'users' || tab === 'category-mapping' || tab === 'profiles' || tab === 'settings')) {
+      return;
+    }
     sessionStorage.setItem('manager_active_tab', tab);
     setActiveTabState(tab);
   };
@@ -142,6 +150,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [modalFollowupStatus, setModalFollowupStatus] = useState<string>('Delivered');
   const [modalOrderValue, setModalOrderValue] = useState<string>('');
   const [modalProfit, setModalProfit] = useState<string>('');
+  const [modalProfitPercent, setModalProfitPercent] = useState<string>('');
   const [modalScheduleDate, setModalScheduleDate] = useState<string>('');
   const [modalScheduledTime, setModalScheduledTime] = useState<string>('');
   const [modalNotes, setModalNotes] = useState<string>('');
@@ -192,11 +201,59 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setViewJourneyOrder(ord);
     setStatusModalOrder(ord);
     setModalFollowupStatus(ord.followup_status || ord.followupStatus || 'Pending');
-    setModalOrderValue(String(ord.order_value ?? ord.orderValue ?? ''));
-    setModalProfit(String(ord.profit ?? ''));
+    const oVal = String(ord.order_value ?? ord.orderValue ?? '');
+    setModalOrderValue(oVal);
+    const prVal = String(ord.profit ?? '');
+    setModalProfit(prVal);
+    const numVal = parseFloat(oVal) || 0;
+    const numPr = parseFloat(prVal) || 0;
+    if (numVal > 0 && numPr > 0) {
+      setModalProfitPercent(((numPr / numVal) * 100).toFixed(1).replace(/\.0$/, ''));
+    } else {
+      setModalProfitPercent('');
+    }
     setModalScheduleDate(ord.schedule_date || ord.scheduleDate || '');
     setModalScheduledTime(ord.schedule_time || ord.scheduledTime || '');
     setModalNotes('');
+  };
+
+  const handleModalProfitChange = (valStr: string) => {
+    setModalProfit(valStr);
+    const pr = parseFloat(valStr);
+    const val = modalOrderValue !== '' ? parseFloat(modalOrderValue) : Number(statusModalOrder?.order_value ?? statusModalOrder?.orderValue ?? 0);
+    if (val > 0 && !isNaN(pr)) {
+      setModalProfitPercent(((pr / val) * 100).toFixed(1).replace(/\.0$/, ''));
+    } else {
+      setModalProfitPercent('');
+    }
+  };
+
+  const handleModalProfitPercentChange = (pctStr: string) => {
+    setModalProfitPercent(pctStr);
+    const pct = parseFloat(pctStr);
+    const val = modalOrderValue !== '' ? parseFloat(modalOrderValue) : Number(statusModalOrder?.order_value ?? statusModalOrder?.orderValue ?? 0);
+    if (val > 0 && !isNaN(pct)) {
+      setModalProfit(String(Math.round((val * pct) / 100)));
+    } else {
+      setModalProfit('');
+    }
+  };
+
+  const handleApplyModalProfitPreset = (pct: number) => {
+    setModalProfitPercent(String(pct));
+    const val = modalOrderValue !== '' ? parseFloat(modalOrderValue) : Number(statusModalOrder?.order_value ?? statusModalOrder?.orderValue ?? 0);
+    if (val > 0) {
+      setModalProfit(String(Math.round((val * pct) / 100)));
+    }
+  };
+
+  const handleModalOrderValueChange = (newValStr: string) => {
+    setModalOrderValue(newValStr);
+    const val = parseFloat(newValStr);
+    const pct = parseFloat(modalProfitPercent);
+    if (val > 0 && !isNaN(pct)) {
+      setModalProfit(String(Math.round((val * pct) / 100)));
+    }
   };
 
   // Google Sheet Connection & Dynamic Tabs State
@@ -1416,6 +1473,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         String(ag.id || '').toLowerCase().includes(agentPerformanceSearch.toLowerCase());
       const matchTeam =
         agentPerformanceTeamFilter === 'all' ||
+        ag.team === 'All' ||
         String(ag.team || '').toLowerCase() === agentPerformanceTeamFilter.toLowerCase();
       return matchSearch && matchTeam;
     });
@@ -1484,17 +1542,19 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         </div>
 
         <nav className="flex-1 space-y-1.5">
-          <button
-            onClick={() => setActiveTab('sheet-connection')}
-            className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-              activeTab === 'sheet-connection'
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                : 'text-slate-300 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-            {isSidebarOpen && <span>Google Sheet &amp; Tabs</span>}
-          </button>
+          {isManager && (
+            <button
+              onClick={() => setActiveTab('sheet-connection')}
+              className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                activeTab === 'sheet-connection'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              {isSidebarOpen && <span>Google Sheet &amp; Tabs</span>}
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab('summary')}
@@ -1625,7 +1685,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             </span>
             <span className="text-slate-300">•</span>
             <h1 className="text-lg font-extrabold text-slate-900 capitalize">
-              {activeTab === 'sheet-connection' && 'Google Sheet & Dynamic Tabs Hub'}
+              {isManager && activeTab === 'sheet-connection' && 'Google Sheet & Dynamic Tabs Hub'}
               {activeTab === 'users' && 'User Details (Agent Directory)'}
               {activeTab === 'orders' && 'All Orders Database'}
               {activeTab === 'summary' && 'Analytics & Summary'}
@@ -1651,7 +1711,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         {/* Scrollable Workspace */}
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* TAB: GOOGLE SHEET & DYNAMIC TABS */}
-          {activeTab === 'sheet-connection' && (
+          {isManager && activeTab === 'sheet-connection' && (
             <div className="space-y-6 max-w-5xl mx-auto">
               <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
                 <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -2071,7 +2131,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             : 'border-slate-300 bg-white hover:bg-slate-50 hover:border-indigo-400 text-slate-800'
                         }`}
                       >
-                        <span className="truncate">{newAgentTeam || 'Select Team'}</span>
+                        <span className="truncate">{newAgentTeam === 'All' ? 'All (All Select)' : (newAgentTeam || 'Select Team')}</span>
                         <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 ml-1 transition-transform duration-150 ${openAddAgentPopup === 'team' ? 'rotate-180 text-indigo-600' : ''}`} />
                       </button>
 
@@ -2086,20 +2146,55 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               <Building2 className="w-4 h-4 text-indigo-600" />
                               <h4 className="font-extrabold text-sm text-slate-900">Select Team</h4>
                             </div>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenAddAgentPopup(null);
-                              }}
-                              className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setNewAgentTeam('All');
+                                  setOpenAddAgentPopup(null);
+                                }}
+                                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer px-2 py-0.5 rounded-lg bg-indigo-50 border border-indigo-200"
+                              >
+                                All Select
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenAddAgentPopup(null);
+                                }}
+                                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
 
                           {/* Existing Teams List */}
                           <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
+                            {/* All Select Option */}
+                            <button
+                              key="pop-team-all-select"
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setNewAgentTeam('All');
+                                setOpenAddAgentPopup(null);
+                              }}
+                              className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer border ${
+                                newAgentTeam === 'All'
+                                  ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-bold ring-1 ring-indigo-300'
+                                  : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-indigo-100 text-indigo-700">ALL</span>
+                                <span>All (All Select)</span>
+                              </div>
+                              {newAgentTeam === 'All' && <Check className="w-4 h-4 text-indigo-600" />}
+                            </button>
+
                             {availableChannels.map((team) => {
                               const isSelected = newAgentTeam === team;
                               return (
@@ -5252,225 +5347,19 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
       {/* Modal: Status & Remarks Update Modal */}
       {statusModalOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
-                  ⚡
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-slate-900 text-sm">
-                    Update Followup Status &amp; Sync
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Order #{statusModalOrder.id}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setStatusModalOrder(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3.5 text-xs">
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-500 font-semibold">Customer:</span>
-                  <span className="font-bold text-slate-900">{statusModalOrder.customerName}</span>
-                </div>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-[11px] text-slate-500 font-semibold">Contact:</span>
-                  <span className="font-mono text-slate-700">{statusModalOrder.customerContact}</span>
-                </div>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-[11px] text-slate-500 font-semibold">Current Followup:</span>
-                  <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-                    {statusModalOrder.followupStatus || 'Pending'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Editable Order Fields: Order Value & Profit */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Order Value (৳)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={modalOrderValue}
-                    onChange={(e) => setModalOrderValue(e.target.value)}
-                    placeholder="Enter amount"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-semibold focus:outline-hidden focus:border-indigo-600"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Profit Amount (৳)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={modalProfit}
-                    onChange={(e) => setModalProfit(e.target.value)}
-                    placeholder="Enter profit"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-semibold focus:outline-hidden focus:border-indigo-600 text-emerald-700"
-                  />
-                </div>
-              </div>
-
-              {/* Editable Schedule Date & Time */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Schedule Date
-                  </label>
-                  <input
-                    type="date"
-                    value={modalScheduleDate}
-                    onChange={(e) => setModalScheduleDate(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-medium focus:outline-hidden focus:border-indigo-600"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Scheduled Time (Slot)
-                  </label>
-                  <select
-                    value={modalScheduledTime}
-                    onChange={(e) => setModalScheduledTime(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-medium focus:outline-hidden focus:border-indigo-600 bg-white cursor-pointer"
-                  >
-                    <option key="opt-modal-time-empty" value="">-- Select Time Slot --</option>
-                    {modalScheduledTime && !TIME_SLOTS.includes(modalScheduledTime) && (
-                      <option key="opt-modal-time-custom" value={modalScheduledTime}>{modalScheduledTime}</option>
-                    )}
-                    {TIME_SLOTS.map((slot, idx) => (
-                      <option key={`modal-slot-${slot}-${idx}`} value={slot}>
-                        {slot}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Status Selector: Followup Status only */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Followup Status
-                </label>
-                <select
-                  value={modalFollowupStatus}
-                  onChange={(e) => setModalFollowupStatus(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-semibold focus:outline-hidden focus:border-indigo-600"
-                >
-                  <option value="Pending">Pending</option>
-                  <option value="Confirmed">Confirmed</option>
-                  <option value="Follow-up">Follow-up</option>
-                  <option value="Delivered">Delivered</option>
-                  <option value="Cancelled">Cancelled</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Remarks / Audit Note (Stored in 'Followup' sheet)
-                </label>
-                <textarea
-                  rows={2}
-                  value={modalNotes}
-                  onChange={(e) => setModalNotes(e.target.value)}
-                  placeholder="e.g. Schedule updated, customer requested evening delivery."
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStatusModalOrder(null);
-                    setModalFollowupStatus('Pending');
-                    setModalOrderValue('');
-                    setModalProfit('');
-                    setModalScheduleDate('');
-                    setModalScheduledTime('');
-                    setModalNotes('');
-                  }}
-                  className="flex-1 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={isSavingStatus}
-                  onClick={async () => {
-                    setIsSavingStatus(true);
-                    try {
-                      const isDeliv = modalFollowupStatus.toLowerCase() === 'delivered';
-                      const isCanc = modalFollowupStatus.toLowerCase() === 'cancelled';
-                      const nowTs = new Date().toISOString().replace('T', ' ').slice(0, 19);
-                      const finalVal = modalOrderValue !== '' ? parseFloat(modalOrderValue) : Number(statusModalOrder.order_value ?? statusModalOrder.orderValue ?? 0);
-                      const targetOrderId = String(statusModalOrder.order_id || statusModalOrder.id || '');
-                      await onUpdateOrderStatus?.(
-                        targetOrderId,
-                        {
-                          followup_status: modalFollowupStatus,
-                          followupStatus: modalFollowupStatus,
-                          order_status: 'Pending',
-                          orderStatus: 'Pending',
-                          order_value: modalOrderValue !== '' ? parseFloat(modalOrderValue) : undefined,
-                          orderValue: modalOrderValue !== '' ? parseFloat(modalOrderValue) : undefined,
-                          profit: isDeliv 
-                            ? (modalProfit !== '' ? parseFloat(modalProfit) : Math.round(finalVal * 0.20)) 
-                            : 0,
-                          delivered_date: isDeliv ? nowTs : '',
-                          deliveredDate: isDeliv ? nowTs : '',
-                          cancelled_date: isCanc ? nowTs : '',
-                          cancelledDate: isCanc ? nowTs : '',
-                          schedule_date: modalScheduleDate,
-                          scheduleDate: modalScheduleDate,
-                          schedule_time: modalScheduledTime,
-                          scheduledTime: modalScheduledTime
-                        },
-                        currentManager.name || currentManager.user || 'Manager',
-                        modalNotes
-                      );
-                      setStatusModalOrder(null);
-                      setModalFollowupStatus('Pending');
-                      setModalOrderValue('');
-                      setModalProfit('');
-                      setModalScheduleDate('');
-                      setModalScheduledTime('');
-                      setModalNotes('');
-                      await onRefreshOrders();
-                    } finally {
-                      setIsSavingStatus(false);
-                    }
-                  }}
-                  className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-indigo-600/20"
-                >
-                  {isSavingStatus ? (
-                    <>
-                      <RotateCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Syncing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Update &amp; Sync</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <OrderJourneyModal
+          order={statusModalOrder}
+          onClose={() => setStatusModalOrder(null)}
+          followupHistory={followupHistory}
+          currentUser={{
+            name: currentManager.name || currentManager.user,
+            user: currentManager.user,
+            role: currentManager.role || 'Manager'
+          }}
+          onUpdateOrderStatus={onUpdateOrderStatus}
+          onRefreshOrders={onRefreshOrders}
+          canEdit={true}
+        />
       )}
 
       {/* Modal: Google Apps Script Dual-Sheet Code */}
@@ -5860,6 +5749,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     onChange={(e) => setEditTeam(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-hidden focus:border-indigo-600 bg-white"
                   >
+                    <option value="All">All (All Teams / All Select)</option>
                     {ORDER_CHANNELS.map((team, idx) => (
                       <option key={`team-edit-${team}-${idx}`} value={team}>
                         {team}

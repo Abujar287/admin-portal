@@ -12,7 +12,8 @@ import {
   Edit3,
   Copy,
   Check,
-  Package
+  Package,
+  AlertTriangle
 } from 'lucide-react';
 
 interface OrderJourneyModalProps {
@@ -60,6 +61,17 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
   const [isUpdatingValue, setIsUpdatingValue] = useState(false);
   const [valueMsg, setValueMsg] = useState<string | null>(null);
 
+  const [singleProfit, setSingleProfit] = useState<string>(
+    String(order.profit ?? '')
+  );
+  const [singleProfitPercent, setSingleProfitPercent] = useState<string>(() => {
+    const oVal = Number(order.order_value ?? order.orderValue ?? 0);
+    const prVal = Number(order.profit ?? 0);
+    return oVal > 0 && prVal > 0 ? ((prVal / oVal) * 100).toFixed(1).replace(/\.0$/, '') : '';
+  });
+  const [isUpdatingProfit, setIsUpdatingProfit] = useState(false);
+  const [profitMsg, setProfitMsg] = useState<string | null>(null);
+
   const [singleScheduleDate, setSingleScheduleDate] = useState<string>(
     order.schedule_date || order.scheduleDate || ''
   );
@@ -71,6 +83,62 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
   );
   const [isUpdatingScheduleTime, setIsUpdatingScheduleTime] = useState(false);
   const [scheduleTimeMsg, setScheduleTimeMsg] = useState<string | null>(null);
+
+  const handleProfitChange = (valStr: string) => {
+    setSingleProfit(valStr);
+    const pVal = parseFloat(valStr);
+    const oVal = singleValue !== '' ? parseFloat(singleValue) : Number(order.order_value ?? order.orderValue ?? 0);
+    if (oVal > 0 && !isNaN(pVal)) {
+      setSingleProfitPercent(((pVal / oVal) * 100).toFixed(1).replace(/\.0$/, ''));
+    } else {
+      setSingleProfitPercent('');
+    }
+  };
+
+  const handleProfitPercentChange = (pctStr: string) => {
+    setSingleProfitPercent(pctStr);
+    const pct = parseFloat(pctStr);
+    const oVal = singleValue !== '' ? parseFloat(singleValue) : Number(order.order_value ?? order.orderValue ?? 0);
+    if (oVal > 0 && !isNaN(pct)) {
+      setSingleProfit(String(Math.round((oVal * pct) / 100)));
+    } else {
+      setSingleProfit('');
+    }
+  };
+
+  const handleApplyProfitPreset = (pct: number) => {
+    setSingleProfitPercent(String(pct));
+    const oVal = singleValue !== '' ? parseFloat(singleValue) : Number(order.order_value ?? order.orderValue ?? 0);
+    if (oVal > 0) {
+      setSingleProfit(String(Math.round((oVal * pct) / 100)));
+    }
+  };
+
+  const handleUpdateProfitOnly = async () => {
+    if (!onUpdateOrderStatus || singleProfit === '') return;
+    setIsUpdatingProfit(true);
+    setProfitMsg(null);
+    try {
+      const parsedProfit = parseFloat(singleProfit) || 0;
+      const userDisplayName = `${currentUser.name || currentUser.user} (@${currentUser.user})`;
+
+      await onUpdateOrderStatus(
+        orderId,
+        {
+          profit: parsedProfit
+        },
+        userDisplayName,
+        `Profit updated to ৳${parsedProfit.toLocaleString()}`
+      );
+      setProfitMsg('Updated!');
+      if (onRefreshOrders) await onRefreshOrders();
+      setTimeout(() => setProfitMsg(null), 2000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsUpdatingProfit(false);
+    }
+  };
 
   const handleCopyOrderId = () => {
     if (navigator.clipboard) {
@@ -88,8 +156,21 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
       const isDeliv = singleStatus.toLowerCase() === 'delivered';
       const isCanc = singleStatus.toLowerCase() === 'cancelled';
       const nowTs = new Date().toISOString().replace('T', ' ').slice(0, 19);
-      const currentVal = Number(order.order_value ?? order.orderValue ?? 0);
+      const currentVal = singleValue !== '' ? parseFloat(singleValue) : Number(order.order_value ?? order.orderValue ?? 0);
       const userDisplayName = `${currentUser.name || currentUser.user} (@${currentUser.user})`;
+
+      let finalProfit = 0;
+      if (isDeliv) {
+        if (singleProfit !== '') {
+          finalProfit = parseFloat(singleProfit) || 0;
+        } else if (order.profit) {
+          finalProfit = order.profit;
+        } else {
+          finalProfit = Math.round(currentVal * 0.20);
+        }
+      } else {
+        finalProfit = singleProfit !== '' ? parseFloat(singleProfit) || 0 : (order.profit || 0);
+      }
 
       await onUpdateOrderStatus(
         orderId,
@@ -98,7 +179,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
           followupStatus: singleStatus,
           order_status: 'Pending',
           orderStatus: 'Pending',
-          profit: isDeliv ? Math.round(currentVal * 0.20) : 0,
+          profit: finalProfit,
           delivered_date: isDeliv ? nowTs : '',
           deliveredDate: isDeliv ? nowTs : '',
           cancelled_date: isCanc ? nowTs : '',
@@ -126,12 +207,22 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
       const isDeliv = (order.followup_status || order.followupStatus || '').toLowerCase() === 'delivered';
       const userDisplayName = `${currentUser.name || currentUser.user} (@${currentUser.user})`;
 
+      let calculatedProfit = order.profit || 0;
+      if (singleProfitPercent !== '') {
+        calculatedProfit = Math.round((parsedVal * parseFloat(singleProfitPercent)) / 100);
+        setSingleProfit(String(calculatedProfit));
+      } else if (singleProfit !== '') {
+        calculatedProfit = parseFloat(singleProfit) || 0;
+      } else if (isDeliv) {
+        calculatedProfit = Math.round(parsedVal * 0.20);
+      }
+
       await onUpdateOrderStatus(
         orderId,
         {
           order_value: parsedVal,
           orderValue: parsedVal,
-          profit: isDeliv ? Math.round(parsedVal * 0.20) : (order.profit || 0)
+          profit: calculatedProfit
         },
         userDisplayName,
         `Price updated to ৳${parsedVal.toLocaleString()}`
@@ -198,6 +289,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
 
   const isDelivered = (order.followup_status || order.followupStatus || '').toLowerCase() === 'delivered';
   const isCancelled = (order.followup_status || order.followupStatus || '').toLowerCase() === 'cancelled';
+  const isLocked = isDelivered || isCancelled;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-3 sm:p-5 backdrop-blur-xs overflow-y-auto animate-fadeIn" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -253,8 +345,15 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
         {/* MODAL CONTENT BODY */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-slate-50/60">
 
+          {isLocked && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-2xs">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>This order is {isDelivered ? 'Delivered' : 'Cancelled'} and can no longer be edited.</span>
+            </div>
+          )}
+
           {/* COMPACT INDIVIDUAL UPDATE ACTIONS (SIDE-BY-SIDE WITH SMALL FONT & UPDATE BUTTONS UNDERNEATH) */}
-          {canEdit && (
+          {canEdit && !isLocked && (
             <div className="bg-white rounded-2xl p-4 border border-indigo-100 shadow-2xs space-y-3">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
@@ -264,7 +363,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                 <span className="text-[10px] text-slate-400">Edit fields side-by-side</span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
                 
                 {/* 1. Status */}
                 <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2">
@@ -330,7 +429,71 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                   </div>
                 </div>
 
-                {/* 3. Schedule Date */}
+                {/* 3. Profit (৳ / %) */}
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[10px] font-bold uppercase text-slate-500">
+                        Profit (৳ / %)
+                      </label>
+                      <div className="flex items-center gap-1">
+                        {[10, 20, 30].map((pct) => (
+                          <button
+                            key={`btn-pct-${pct}`}
+                            type="button"
+                            onClick={() => handleApplyProfitPreset(pct)}
+                            className={`px-1 py-0.2 rounded text-[9px] font-bold cursor-pointer transition-colors ${
+                              singleProfitPercent === String(pct)
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-slate-200/80 hover:bg-purple-100 text-slate-700 hover:text-purple-800'
+                            }`}
+                          >
+                            {pct}%
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={singleProfit}
+                        onChange={(e) => handleProfitChange(e.target.value)}
+                        placeholder="৳ Val"
+                        className="w-full px-1.5 py-1 text-xs font-bold rounded-lg border border-slate-300 bg-white text-emerald-700"
+                      />
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="any"
+                          value={singleProfitPercent}
+                          onChange={(e) => handleProfitPercentChange(e.target.value)}
+                          placeholder="%"
+                          className="w-full px-1.5 pr-4 py-1 text-xs font-bold rounded-lg border border-slate-300 bg-white text-indigo-700"
+                        />
+                        <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">%</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    {profitMsg ? (
+                      <span className="text-[10px] font-bold text-emerald-600">{profitMsg}</span>
+                    ) : <span />}
+                    <button
+                      type="button"
+                      disabled={isUpdatingProfit || singleProfit === ''}
+                      onClick={handleUpdateProfitOnly}
+                      className="w-full py-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center"
+                    >
+                      {isUpdatingProfit ? '...' : 'Update'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4. Schedule Date */}
                 <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2">
                   <div>
                     <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
@@ -358,7 +521,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                   </div>
                 </div>
 
-                {/* 4. Time Slot */}
+                {/* 5. Time Slot */}
                 <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2">
                   <div>
                     <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
