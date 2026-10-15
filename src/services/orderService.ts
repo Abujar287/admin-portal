@@ -217,6 +217,215 @@ export class OrderService {
     } catch (e) {
       console.warn('LocalStorage quota limit reached (safely stored in IndexedDB):', e);
     }
+
+    try {
+      let maxCust = 0;
+      let maxOrd = 0;
+      const phoneMap: Record<string, string> = {};
+      for (const o of orders) {
+        const c = Number(o.customer_id || o.customerId);
+        if (!isNaN(c) && c > maxCust) maxCust = c;
+        const ord = Number(o.order_id || o.id);
+        if (!isNaN(ord) && ord > maxOrd) maxOrd = ord;
+
+        const phone = String(o.customer_mobile || o.customerContact || '').replace(/\D/g, '').slice(-10);
+        if (phone && (o.customer_id || o.customerId)) {
+          phoneMap[phone] = String(o.customer_id || o.customerId);
+        }
+      }
+      if (maxCust > 0) {
+        localStorage.setItem('agent_portal_max_customer_id', String(maxCust));
+      }
+      if (maxOrd > 0) {
+        localStorage.setItem('agent_portal_max_order_id', String(maxOrd));
+      }
+      if (Object.keys(phoneMap).length > 0) {
+        const existing = JSON.parse(localStorage.getItem('customer_id_map') || '{}');
+        localStorage.setItem('customer_id_map', JSON.stringify({ ...existing, ...phoneMap }));
+      }
+    } catch {}
+  }
+
+  static getMaxIds(orders?: OrderItem[]): { maxOrderId: number; maxCustomerId: number } {
+    let maxOrd = Number(localStorage.getItem('agent_portal_max_order_id')) || 0;
+    let maxCust = Number(localStorage.getItem('agent_portal_max_customer_id')) || 0;
+
+    const source = (orders && orders.length > 0) ? orders : (memoryOrders || []);
+    for (const o of source) {
+      const c = Number(o.customer_id || o.customerId);
+      if (!isNaN(c) && c > maxCust) maxCust = c;
+      const ord = Number(o.order_id || o.id);
+      if (!isNaN(ord) && ord > maxOrd) maxOrd = ord;
+    }
+    return { maxOrderId: maxOrd, maxCustomerId: maxCust };
+  }
+
+  /**
+   * Generates formatted timestamp in Bangladesh Standard Time (BDT / Asia/Dhaka, GMT+6):
+   * Format: YYYY-MM-DD HH:mm:ss
+   */
+  static getBdtTimestamp(date: Date = new Date()): string {
+    try {
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Dhaka',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      const parts = formatter.formatToParts(date);
+      const getPart = (type: string) => (parts.find(p => p.type === type) || {}).value || '';
+      const yyyy = getPart('year');
+      const mm = getPart('month');
+      const dd = getPart('day');
+      const hh = getPart('hour');
+      const min = getPart('minute');
+      const ss = getPart('second');
+      if (yyyy && mm && dd) {
+        return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
+      }
+    } catch {}
+
+    // Fallback using manual BDT offset (+6 hours from UTC)
+    const bdtMs = date.getTime() + (360 + date.getTimezoneOffset()) * 60000;
+    const bdt = new Date(bdtMs);
+    const y = bdt.getFullYear();
+    const m = String(bdt.getMonth() + 1).padStart(2, '0');
+    const d = String(bdt.getDate()).padStart(2, '0');
+    const h = String(bdt.getHours()).padStart(2, '0');
+    const min = String(bdt.getMinutes()).padStart(2, '0');
+    const s = String(bdt.getSeconds()).padStart(2, '0');
+    return `${y}-${m}-${d} ${h}:${min}:${s}`;
+  }
+
+  /**
+   * Retrieves the maximum sequential followup_id from storage or history.
+   */
+  static getMaxFollowupId(history?: FollowupHistoryItem[]): number {
+    let maxFid = Number(localStorage.getItem('agent_portal_max_followup_id')) || 0;
+    const source = (history && history.length > 0) ? history : this.getFollowupHistory();
+    for (const h of source) {
+      const fid = Number(h.followupId || h.id);
+      if (!isNaN(fid) && fid > maxFid) maxFid = fid;
+    }
+    return maxFid;
+  }
+
+  /**
+   * Fetches the Followup history tab from Google Sheet, parses rows, tracks max followup_id, and caches.
+   */
+  static async fetchFollowupHistory(): Promise<FollowupHistoryItem[]> {
+    try {
+      const res = await fetch('/api/fetch-orders?tab=Followup');
+      if (!res.ok) return this.getFollowupHistory();
+      const json = await res.json();
+      const rows = json.data;
+      if (!Array.isArray(rows) || rows.length < 2) return this.getFollowupHistory();
+
+      const headers = rows[0].map((h: any) => String(h || '').trim().toLowerCase());
+      const findCol = (...names: string[]) => {
+        for (const n of names) {
+          const idx = headers.findIndex((h: string) => h === n || h.includes(n));
+          if (idx !== -1) return idx;
+        }
+        return -1;
+      };
+
+      const idxTs = findCol('log timestamp', 'timestamp', 'date');
+      const idxFid = findCol('followup_id', 'followup id');
+      const idxOid = findCol('order_id', 'order id');
+      const idxCname = findCol('customer_name', 'customer name');
+      const idxCmob = findCol('customer_mobile', 'customer contact', 'mobile');
+      const idxPrev = findCol('previous_followup_status', 'previous status');
+      const idxNew = findCol('new_followup_status', 'new status');
+      const idxOst = findCol('order_status', 'order status');
+      const idxVal = findCol('order_value', 'order value', 'value');
+      const idxScDt = findCol('schedule_date', 'schedule date');
+      const idxScTm = findCol('schedule_time', 'schedule time');
+      const idxUpBy = findCol('updated_by', 'updated by');
+      const idxStCh = findCol('status_change', 'status change');
+      const idxAct = findCol('action');
+
+      let maxFid = Number(localStorage.getItem('agent_portal_max_followup_id')) || 0;
+      const parsedItems: FollowupHistoryItem[] = [];
+
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        if (!r || !Array.isArray(r) || r.length === 0 || !r.some((c: any) => c !== undefined && c !== null && String(c).trim() !== '')) {
+          continue;
+        }
+        const fidRaw = r[idxFid !== -1 ? idxFid : 1];
+        const fidNum = parseInt(String(fidRaw), 10);
+        if (!isNaN(fidNum) && fidNum > maxFid) {
+          maxFid = fidNum;
+        }
+
+        const rawTs = String(r[idxTs !== -1 ? idxTs : 0] || '');
+        parsedItems.push({
+          id: String(fidRaw || i),
+          followupId: !isNaN(fidNum) ? fidNum : (fidRaw || i),
+          orderId: String(r[idxOid !== -1 ? idxOid : 2] || ''),
+          customerName: String(r[idxCname !== -1 ? idxCname : 3] || ''),
+          customerContact: String(r[idxCmob !== -1 ? idxCmob : 4] || ''),
+          previousStatus: String(r[idxPrev !== -1 ? idxPrev : 5] || 'Pending'),
+          newStatus: String(r[idxNew !== -1 ? idxNew : 6] || 'Pending'),
+          orderStatus: String(r[idxOst !== -1 ? idxOst : 7] || 'Pending'),
+          orderValue: Number(r[idxVal !== -1 ? idxVal : 8]) || 0,
+          scheduleDate: String(r[idxScDt !== -1 ? idxScDt : 9] || ''),
+          scheduledTime: String(r[idxScTm !== -1 ? idxScTm : 10] || ''),
+          updatedBy: String(r[idxUpBy !== -1 ? idxUpBy : 11] || 'Manager'),
+          action: String(r[idxAct !== -1 ? idxAct : 13] || r[idxStCh !== -1 ? idxStCh : 12] || 'Follow-up Update'),
+          notes: String(r[idxStCh !== -1 ? idxStCh : 12] || ''),
+          timestamp: rawTs
+        });
+      }
+
+      if (maxFid > 0) {
+        localStorage.setItem('agent_portal_max_followup_id', String(maxFid));
+      }
+
+      if (parsedItems.length > 0) {
+        // Reverse so newest audit entries appear at top
+        const ordered = [...parsedItems].reverse();
+        this.saveFollowupHistory(ordered);
+        return ordered;
+      }
+      return this.getFollowupHistory();
+    } catch (e) {
+      console.warn('Failed to fetch Followup sheet history:', e);
+      return this.getFollowupHistory();
+    }
+  }
+
+  static resolveCustomerIdForPhone(phone: string, orders?: OrderItem[]): { customerId: string; isExisting: boolean } {
+    const cleanPhone = String(phone || '').replace(/\D/g, '').slice(-10);
+    const source = (orders && orders.length > 0) ? orders : (memoryOrders || []);
+
+    if (cleanPhone) {
+      // 1. Look in orders list
+      const match = source.find(o => {
+        const oPhone = String(o.customer_mobile || o.customerContact || '').replace(/\D/g, '').slice(-10);
+        return oPhone && oPhone === cleanPhone;
+      });
+      if (match && (match.customer_id || match.customerId)) {
+        return { customerId: String(match.customer_id || match.customerId), isExisting: true };
+      }
+
+      // 2. Look in customer_id_map
+      try {
+        const map = JSON.parse(localStorage.getItem('customer_id_map') || '{}');
+        if (map[cleanPhone]) {
+          return { customerId: String(map[cleanPhone]), isExisting: true };
+        }
+      } catch {}
+    }
+
+    // 3. New customer: strictly max customer_id from sheet + 1
+    const { maxCustomerId } = this.getMaxIds(source);
+    return { customerId: String(maxCustomerId + 1), isExisting: false };
   }
 
   static resetOrdersToMock(): OrderItem[] {
@@ -353,7 +562,7 @@ export class OrderService {
         const cMobile = String(o.customer_mobile || o.customerContact || o.phone || o.mobile || '-');
         const cName = String(o.customer_name || o.customerName || o.customer || 'Customer');
         const gen = String(o.gender || 'Other');
-        const crDt = String(o.create_date || o.createDate || o.createdAt || new Date().toISOString().replace('T', ' ').slice(0, 19));
+        const crDt = String(o.create_date || o.createDate || o.createdAt || this.getBdtTimestamp());
         const ch = String(o.order_channel || o.orderChannel || o.channel || 'Website');
         const aId = String(o.agent_id || o.agentId || o.agent || '1');
         const aName = String(o.agent_name || o.agentName || `Agent ${aId}`);
@@ -512,7 +721,7 @@ export class OrderService {
         const cMobile = valOrEmpty(idxCustCont, '-', 2);
         const cName = valOrEmpty(idxCustName, 'Customer', 3);
         const gen = valOrEmpty(idxGender, 'Other', 4);
-        const crDt = valOrEmpty(idxCreateDt, new Date().toISOString().replace('T', ' ').slice(0, 19), 5);
+        const crDt = valOrEmpty(idxCreateDt, this.getBdtTimestamp(), 5);
         const ch = valOrEmpty(idxChannel, 'Acquisition', 6);
         const aId = valOrEmpty(idxAgentId, '', 7);
         const rawANm = valOrEmpty(idxAgentNm, '', 8);
@@ -587,38 +796,47 @@ export class OrderService {
   ): Promise<{ success: boolean; order: OrderItem; remoteSynced: boolean }> {
     const localOrders = await this.getLocalOrders();
 
-    let nextNum = 1;
-    if (localOrders.length > 0) {
-      const ids = localOrders.map(o => Number(o.order_id || o.id)).filter(n => !isNaN(n));
-      if (ids.length > 0) {
-        nextNum = Math.max(...ids) + 1;
-      } else {
-        nextNum = 1 + localOrders.length;
-      }
-    }
-    const orderId = String(newOrder.order_id || newOrder.id || nextNum);
+    const { maxOrderId } = this.getMaxIds(localOrders);
+    const orderId = String(newOrder.order_id || newOrder.id || (maxOrderId + 1));
 
-    // Customer Id management
-    const customerMap: Record<string, string> = JSON.parse(localStorage.getItem('customer_id_map') || '{}');
+    // Customer Id management: reuse customer_id if phone exists in sheet, else max customer_id + 1
     const contactPhone = String(newOrder.customer_mobile || newOrder.customerContact || '').trim();
-    let customerId = String(newOrder.customer_id || newOrder.customerId || '');
-    if (!customerId && contactPhone) {
-      customerId = customerMap[contactPhone] || '';
-      if (!customerId) {
-        const existingIds = Object.values(customerMap).map(Number).filter(n => !isNaN(n));
-        const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
-        customerId = String(maxId + 1);
-        customerMap[contactPhone] = customerId;
-        localStorage.setItem('customer_id_map', JSON.stringify(customerMap));
-      }
+    let customerId = String(newOrder.customer_id || newOrder.customerId || '').trim();
+
+    if (!customerId || customerId === '0') {
+      const resolved = this.resolveCustomerIdForPhone(contactPhone, localOrders);
+      customerId = resolved.customerId;
     }
-    if (!customerId) customerId = '1';
+
+    // Cache phone to customerId
+    const cleanPhone = contactPhone.replace(/\D/g, '').slice(-10);
+    if (cleanPhone && customerId) {
+      try {
+        const customerMap: Record<string, string> = JSON.parse(localStorage.getItem('customer_id_map') || '{}');
+        customerMap[cleanPhone] = customerId;
+        localStorage.setItem('customer_id_map', JSON.stringify(customerMap));
+      } catch {}
+    }
+
+    // Update global maximums in storage
+    try {
+      const numCust = Number(customerId);
+      if (!isNaN(numCust) && numCust > 0) {
+        const prev = Number(localStorage.getItem('agent_portal_max_customer_id')) || 0;
+        localStorage.setItem('agent_portal_max_customer_id', String(Math.max(prev, numCust)));
+      }
+      const numOrd = Number(orderId);
+      if (!isNaN(numOrd) && numOrd > 0) {
+        const prev = Number(localStorage.getItem('agent_portal_max_order_id')) || 0;
+        localStorage.setItem('agent_portal_max_order_id', String(Math.max(prev, numOrd)));
+      }
+    } catch {}
 
     const numOrderValue = Number(newOrder.order_value ?? newOrder.orderValue ?? 0);
     const calculatedProfit = newOrder.profit !== undefined ? Number(newOrder.profit) : Math.round(numOrderValue * 0.20);
     const cName = String(newOrder.customer_name || newOrder.customerName || 'Customer');
     const gen = String(newOrder.gender || 'Other');
-    const crDate = String(newOrder.create_date || newOrder.createDate || new Date().toISOString().replace('T', ' ').slice(0, 19));
+    const crDate = String(newOrder.create_date || newOrder.createDate || this.getBdtTimestamp());
     const ch = String(newOrder.order_channel || newOrder.orderChannel || 'Acquisition');
     const agId = String(newOrder.agent_id || newOrder.agentId || '1');
     const rawAgNm = String(newOrder.agent_name || newOrder.agentName || '');
@@ -628,7 +846,7 @@ export class OrderService {
     const ct = String(newOrder.city || 'Dhaka');
     const dArea = String(newOrder.delivery_area || newOrder.deliveryArea || 'Gulshan');
     const addr = String(newOrder.address_details || newOrder.addressDetails || '-');
-    const scDate = String(newOrder.schedule_date || newOrder.scheduleDate || new Date().toISOString().split('T')[0]);
+    const scDate = String(newOrder.schedule_date || newOrder.scheduleDate || this.getBdtTimestamp().slice(0, 10));
     const scTime = String(newOrder.schedule_time || newOrder.scheduledTime || '11AM to 12PM');
     const ordStatus = String(newOrder.order_status || newOrder.orderStatus || 'Pending');
     const folStatus = String(newOrder.followup_status || newOrder.followupStatus || 'Pending');
@@ -797,10 +1015,9 @@ export class OrderService {
     const orders = (await this.getLocalOrders()) || [];
     const existingOrder = orders.find((ord) => String(ord.order_id || ord.id) === String(orderId));
 
-    // The order_status MUST always remain 'Pending'. All status changes apply to followup_status.
     const finalOrderStatus = 'Pending';
     const finalFollowupStatus = updates.followup_status || updates.followupStatus || existingOrder?.followup_status || existingOrder?.followupStatus || 'Pending';
-    const currentTimestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const currentTimestamp = this.getBdtTimestamp();
 
     const isCancelled = (finalFollowupStatus || '').toLowerCase() === 'cancelled';
     const isDelivered = (finalFollowupStatus || '').toLowerCase() === 'delivered';
@@ -816,10 +1033,8 @@ export class OrderService {
       newCancelledDate = updates.cancelled_date || updates.cancelledDate || currentTimestamp;
     }
 
-    let newFollowupDate = '';
-    if (!isDelivered && !isCancelled && finalFollowupStatus) {
-      newFollowupDate = updates.followup_date || updates.followupDate || currentTimestamp;
-    }
+    // Followup action always records followup_date with BDT timestamp matching Log Timestamp
+    let newFollowupDate = updates.followup_date || updates.followupDate || currentTimestamp;
     // Mutually exclusive dates for delivered, cancelled, and followup
     const updated = (orders || []).map((ord) => {
       if (String(ord.order_id || ord.id) === String(orderId)) {
@@ -912,7 +1127,9 @@ export class OrderService {
       const schedTime = updates.schedule_time !== undefined ? updates.schedule_time : (updates.scheduledTime !== undefined ? updates.scheduledTime : (existingOrder.schedule_time || existingOrder.scheduledTime || ''));
 
       const existingHistory = this.getFollowupHistory();
-      nextFollowupId = existingHistory.length + 1;
+      const maxFid = this.getMaxFollowupId(existingHistory);
+      nextFollowupId = maxFid + 1;
+      localStorage.setItem('agent_portal_max_followup_id', String(nextFollowupId));
       const nextId = String(nextFollowupId);
 
       // Detect changes to generate Action name
@@ -1123,8 +1340,9 @@ export class OrderService {
 
     this.saveLocalOrders(updatedOrders);
 
-    const nowTimestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
-    const nextFollowupId = history.length + 1;
+    const nowTimestamp = this.getBdtTimestamp();
+    const nextFollowupId = this.getMaxFollowupId(history) + 1;
+    localStorage.setItem('agent_portal_max_followup_id', String(nextFollowupId));
 
     // Create the new UNDO history audit record (recording from which status to which status)
     const undoHistoryItem: FollowupHistoryItem = {
@@ -1319,7 +1537,7 @@ function doPost(e) {
     var newOrderStatus = 'Pending';
     var updatedBy = data.updatedBy || data.updated_by || 'Manager';
     var note = data.notes || data.remarks || '';
-    var timestamp = new Date();
+    var timestamp = data['Log Timestamp'] || data.logTimestamp || new Date();
 
     var rows = mainSheet.getDataRange().getValues();
     var foundRowIndex = -1;
@@ -1375,14 +1593,16 @@ function doPost(e) {
 
       if (newFollowupStatus === 'Delivered') {
         var delivDt = delivDtInput || new Date();
+        var followDt = followupDtInput || delivDt;
         mainSheet.getRange(foundRowIndex, 21).setValue(delivDt);
         mainSheet.getRange(foundRowIndex, 22).setValue('');
-        mainSheet.getRange(foundRowIndex, 23).setValue('');
+        mainSheet.getRange(foundRowIndex, 23).setValue(followDt);
       } else if (newFollowupStatus === 'Cancelled') {
         var cancDt = cancDtInput || new Date();
+        var followDt = followupDtInput || cancDt;
         mainSheet.getRange(foundRowIndex, 21).setValue('');
         mainSheet.getRange(foundRowIndex, 22).setValue(cancDt);
-        mainSheet.getRange(foundRowIndex, 23).setValue('');
+        mainSheet.getRange(foundRowIndex, 23).setValue(followDt);
       } else if (newFollowupStatus) {
         var followupDt = followupDtInput || new Date();
         mainSheet.getRange(foundRowIndex, 21).setValue('');
@@ -1595,13 +1815,45 @@ function doOptions(e) {
 
   static formatDateTime(val: string): string {
     if (!val) return '-';
-    const d = new Date(val);
-    if (isNaN(d.getTime())) return String(val);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
+    const str = String(val).trim();
+    if (!str || str === '-' || str.toLowerCase() === 'null' || str.toLowerCase() === 'undefined') return '-';
+
+    // 1. Direct YYYY-MM-DD HH:mm:ss matcher (preserves exact BDT hours)
+    const isoMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s](\d{1,2}):(\d{2}))?/);
+    if (isoMatch) {
+      const y = isoMatch[1];
+      const m = isoMatch[2].padStart(2, '0');
+      const d = isoMatch[3].padStart(2, '0');
+      const h = isoMatch[4] ? isoMatch[4].padStart(2, '0') : null;
+      const min = isoMatch[5] || null;
+      if (h && min && !(h === '00' && min === '00')) {
+        return `${y}-${m}-${d} ${h}:${min}`;
+      }
+      return `${y}-${m}-${d}`;
+    }
+
+    // 2. Direct MM/DD/YYYY HH:mm:ss matcher (Google Sheets format)
+    const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[T\s](\d{1,2}):(\d{2}))?/);
+    if (slashMatch) {
+      const m = slashMatch[1].padStart(2, '0');
+      const d = slashMatch[2].padStart(2, '0');
+      const y = slashMatch[3];
+      const h = slashMatch[4] ? slashMatch[4].padStart(2, '0') : null;
+      const min = slashMatch[5] || null;
+      if (h && min && !(h === '00' && min === '00')) {
+        return `${y}-${m}-${d} ${h}:${min}`;
+      }
+      return `${y}-${m}-${d}`;
+    }
+
+    // 3. Fallback to Date parser
+    const dt = new Date(val);
+    if (isNaN(dt.getTime())) return str;
+    const yyyy = dt.getFullYear();
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getDate()).padStart(2, '0');
+    const hh = String(dt.getHours()).padStart(2, '0');
+    const min = String(dt.getMinutes()).padStart(2, '0');
     if (hh === '00' && min === '00') {
       return `${yyyy}-${mm}-${dd}`;
     }

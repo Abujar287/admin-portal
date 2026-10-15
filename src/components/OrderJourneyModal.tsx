@@ -155,7 +155,18 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
     try {
       const isDeliv = singleStatus.toLowerCase() === 'delivered';
       const isCanc = singleStatus.toLowerCase() === 'cancelled';
-      const nowTs = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+      if (isDeliv) {
+        if (!singleProfit || parseFloat(singleProfit) <= 0) {
+          if (!order.profit || order.profit <= 0) {
+            setStatusMsg('Profit required!');
+            setIsUpdatingStatus(false);
+            return;
+          }
+        }
+      }
+
+      const nowTs = OrderService.getBdtTimestamp();
       const currentVal = singleValue !== '' ? parseFloat(singleValue) : Number(order.order_value ?? order.orderValue ?? 0);
       const userDisplayName = `${currentUser.name || currentUser.user} (@${currentUser.user})`;
 
@@ -183,14 +194,19 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
           delivered_date: isDeliv ? nowTs : '',
           deliveredDate: isDeliv ? nowTs : '',
           cancelled_date: isCanc ? nowTs : '',
-          cancelledDate: isCanc ? nowTs : ''
+          cancelledDate: isCanc ? nowTs : '',
+          followup_date: nowTs,
+          followupDate: nowTs
         },
         userDisplayName,
         `Status updated to ${singleStatus}`
       );
       setStatusMsg('Updated!');
       if (onRefreshOrders) await onRefreshOrders();
-      setTimeout(() => setStatusMsg(null), 2000);
+      setTimeout(() => {
+        setStatusMsg(null);
+        onClose();
+      }, 600);
     } catch (err) {
       console.error(err);
     } finally {
@@ -363,106 +379,73 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                 <span className="text-[10px] text-slate-400">Edit fields side-by-side</span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-                
-                {/* 1. Status */}
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                      Status
-                    </label>
-                    <select
-                      value={singleStatus}
-                      onChange={(e) => setSingleStatus(e.target.value)}
-                      className="w-full px-2 py-1 text-xs font-bold rounded-lg border border-slate-300 bg-white cursor-pointer"
-                    >
-                      <option value="Pending">Pending</option>
-                      <option value="Confirmed">Confirmed</option>
-                      <option value="Follow-up">Follow-up</option>
-                      <option value="Delivered">Delivered</option>
-                      <option value="Cancelled">Cancelled</option>
-                    </select>
+              {singleStatus.toLowerCase() === 'delivered' ? (
+                <div className="col-span-2 sm:col-span-3 lg:col-span-5 p-4 rounded-2xl bg-emerald-50/90 border-2 border-emerald-300 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between border-b border-emerald-200 pb-2">
+                    <span className="text-xs font-black text-emerald-900 uppercase tracking-wider">
+                      ✓ Delivered Selected — Enter Profit, Value &amp; % manually
+                    </span>
                   </div>
-                  <div className="flex items-center justify-between pt-1">
-                    {statusMsg ? (
-                      <span className="text-[10px] font-bold text-emerald-600">{statusMsg}</span>
-                    ) : <span />}
-                    <button
-                      type="button"
-                      disabled={isUpdatingStatus}
-                      onClick={handleUpdateStatusOnly}
-                      className="w-full py-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center"
-                    >
-                      {isUpdatingStatus ? '...' : 'Update'}
-                    </button>
-                  </div>
-                </div>
 
-                {/* 2. Order Value */}
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                      Value (৳)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={singleValue}
-                      onChange={(e) => setSingleValue(e.target.value)}
-                      placeholder="Price"
-                      className="w-full px-2 py-1 text-xs font-semibold rounded-lg border border-slate-300 bg-white"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between pt-1">
-                    {valueMsg ? (
-                      <span className="text-[10px] font-bold text-emerald-600">{valueMsg}</span>
-                    ) : <span />}
-                    <button
-                      type="button"
-                      disabled={isUpdatingValue || singleValue === ''}
-                      onClick={handleUpdateValueOnly}
-                      className="w-full py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center"
-                    >
-                      {isUpdatingValue ? '...' : 'Update'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* 3. Profit (৳ / %) */}
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2">
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-[10px] font-bold uppercase text-slate-500">
-                        Profit (৳ / %)
-                      </label>
-                      <div className="flex items-center gap-1">
-                        {[10, 20, 30].map((pct) => (
-                          <button
-                            key={`btn-pct-${pct}`}
-                            type="button"
-                            onClick={() => handleApplyProfitPreset(pct)}
-                            className={`px-1 py-0.2 rounded text-[9px] font-bold cursor-pointer transition-colors ${
-                              singleProfitPercent === String(pct)
-                                ? 'bg-purple-600 text-white'
-                                : 'bg-slate-200/80 hover:bg-purple-100 text-slate-700 hover:text-purple-800'
-                            }`}
-                          >
-                            {pct}%
-                          </button>
-                        ))}
-                      </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                    {/* 1. Status */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Status</label>
+                      <select
+                        value={singleStatus}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSingleStatus(val);
+                          if (val.toLowerCase() !== 'delivered') {
+                            setSingleProfit('');
+                            setSingleProfitPercent('');
+                          } else {
+                            setSingleProfit('');
+                            setSingleProfitPercent('');
+                          }
+                        }}
+                        className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-300 bg-white cursor-pointer"
+                      >
+                        <option value="Pending">Pending</option>
+                        <option value="Confirmed">Confirmed</option>
+                        <option value="Follow-up">Follow-up</option>
+                        <option value="Delivered">Delivered</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
                     </div>
-                    <div className="grid grid-cols-2 gap-1.5">
+
+                    {/* 2. Profit (৳) */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Profit (৳) *Required*</label>
                       <input
                         type="number"
                         min="0"
                         step="any"
+                        required
                         value={singleProfit}
                         onChange={(e) => handleProfitChange(e.target.value)}
-                        placeholder="৳ Val"
-                        className="w-full px-1.5 py-1 text-xs font-bold rounded-lg border border-slate-300 bg-white text-emerald-700"
+                        placeholder="Enter profit manually"
+                        className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-emerald-400 bg-white text-emerald-700 shadow-2xs"
                       />
+                    </div>
+
+                    {/* 3. Value (৳) */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Value (৳)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={singleValue}
+                        onChange={(e) => setSingleValue(e.target.value)}
+                        placeholder="Order value"
+                        className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-300 bg-white shadow-2xs"
+                      />
+                    </div>
+
+                    {/* 4. % */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">% (Percentage)</label>
                       <div className="relative">
                         <input
                           type="number"
@@ -472,88 +455,164 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                           value={singleProfitPercent}
                           onChange={(e) => handleProfitPercentChange(e.target.value)}
                           placeholder="%"
-                          className="w-full px-1.5 pr-4 py-1 text-xs font-bold rounded-lg border border-slate-300 bg-white text-indigo-700"
+                          className="w-full px-3 pr-7 py-2 text-xs font-bold rounded-xl border border-slate-300 bg-white text-indigo-700 shadow-2xs"
                         />
-                        <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">%</span>
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between pt-1">
-                    {profitMsg ? (
-                      <span className="text-[10px] font-bold text-emerald-600">{profitMsg}</span>
+
+                  {/* 5. Update Button Right Below */}
+                  <div className="flex items-center justify-between pt-2">
+                    {statusMsg ? (
+                      <span className="text-xs font-bold text-emerald-700">{statusMsg}</span>
                     ) : <span />}
                     <button
                       type="button"
-                      disabled={isUpdatingProfit || singleProfit === ''}
-                      onClick={handleUpdateProfitOnly}
-                      className="w-full py-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center"
+                      disabled={isUpdatingStatus || !singleProfit || parseFloat(singleProfit) <= 0}
+                      onClick={handleUpdateStatusOnly}
+                      className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-extrabold transition-all cursor-pointer shadow-md"
                     >
-                      {isUpdatingProfit ? '...' : 'Update'}
+                      {isUpdatingStatus ? 'Updating...' : 'Update Delivered Status & Profit'}
                     </button>
                   </div>
                 </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+                  
+                  {/* 1. Status */}
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                        Status
+                      </label>
+                      <select
+                        value={singleStatus}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSingleStatus(val);
+                          if (val.toLowerCase() === 'delivered') {
+                            setSingleProfit('');
+                            setSingleProfitPercent('');
+                          }
+                        }}
+                        className="w-full px-2 py-1 text-xs font-bold rounded-lg border border-slate-300 bg-white cursor-pointer"
+                      >
+                        <option value="Pending">Pending</option>
+                        <option value="Confirmed">Confirmed</option>
+                        <option value="Follow-up">Follow-up</option>
+                        <option value="Delivered">Delivered</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                      {statusMsg ? (
+                        <span className="text-[10px] font-bold text-emerald-600">{statusMsg}</span>
+                      ) : <span />}
+                      <button
+                        type="button"
+                        disabled={isUpdatingStatus}
+                        onClick={handleUpdateStatusOnly}
+                        className="w-full py-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center"
+                      >
+                        {isUpdatingStatus ? '...' : 'Update'}
+                      </button>
+                    </div>
+                  </div>
 
-                {/* 4. Schedule Date */}
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                      Schedule Date
-                    </label>
-                    <input
-                      type="date"
-                      value={singleScheduleDate}
-                      onChange={(e) => setSingleScheduleDate(e.target.value)}
-                      className="w-full px-2 py-1 text-xs rounded-lg border border-slate-300 bg-white"
-                    />
+                  {/* 2. Order Value */}
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                        Value (৳)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={singleValue}
+                        onChange={(e) => setSingleValue(e.target.value)}
+                        placeholder="Price"
+                        className="w-full px-2 py-1 text-xs font-semibold rounded-lg border border-slate-300 bg-white"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                      {valueMsg ? (
+                        <span className="text-[10px] font-bold text-emerald-600">{valueMsg}</span>
+                      ) : <span />}
+                      <button
+                        type="button"
+                        disabled={isUpdatingValue || singleValue === ''}
+                        onClick={handleUpdateValueOnly}
+                        className="w-full py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center"
+                      >
+                        {isUpdatingValue ? '...' : 'Update'}
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between pt-1">
-                    {scheduleDateMsg ? (
-                      <span className="text-[10px] font-bold text-emerald-600">{scheduleDateMsg}</span>
-                    ) : <span />}
-                    <button
-                      type="button"
-                      disabled={isUpdatingScheduleDate}
-                      onClick={handleUpdateScheduleDateOnly}
-                      className="w-full py-1 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center"
-                    >
-                      {isUpdatingScheduleDate ? '...' : 'Update'}
-                    </button>
+
+                  {/* 4. Schedule Date */}
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                        Schedule Date
+                      </label>
+                      <input
+                        type="date"
+                        value={singleScheduleDate}
+                        onChange={(e) => setSingleScheduleDate(e.target.value)}
+                        className="w-full px-2 py-1 text-xs font-bold rounded-lg border border-slate-300 bg-white"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                      {scheduleDateMsg ? (
+                        <span className="text-[10px] font-bold text-emerald-600">{scheduleDateMsg}</span>
+                      ) : <span />}
+                      <button
+                        type="button"
+                        disabled={isUpdatingScheduleDate || !singleScheduleDate}
+                        onClick={handleUpdateScheduleDateOnly}
+                        className="w-full py-1 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center"
+                      >
+                        {isUpdatingScheduleDate ? '...' : 'Update'}
+                      </button>
+                    </div>
                   </div>
+
+                  {/* 5. Schedule Time */}
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                        Time Slot
+                      </label>
+                      <select
+                        value={singleScheduleTime}
+                        onChange={(e) => setSingleScheduleTime(e.target.value)}
+                        className="w-full px-2 py-1 text-xs font-bold rounded-lg border border-slate-300 bg-white cursor-pointer"
+                      >
+                        <option value="">-- Slot --</option>
+                        {TIME_SLOTS.map((slot) => (
+                          <option key={slot} value={slot}>{slot}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                      {scheduleTimeMsg ? (
+                        <span className="text-[10px] font-bold text-emerald-600">{scheduleTimeMsg}</span>
+                      ) : <span />}
+                      <button
+                        type="button"
+                        disabled={isUpdatingScheduleTime}
+                        onClick={handleUpdateScheduleTimeOnly}
+                        className="w-full py-1 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center"
+                      >
+                        {isUpdatingScheduleTime ? '...' : 'Update'}
+                      </button>
+                    </div>
+                  </div>
+
                 </div>
-
-                {/* 5. Time Slot */}
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                      Time Slot
-                    </label>
-                    <select
-                      value={singleScheduleTime}
-                      onChange={(e) => setSingleScheduleTime(e.target.value)}
-                      className="w-full px-2 py-1 text-xs rounded-lg border border-slate-300 bg-white cursor-pointer"
-                    >
-                      <option value="">-- Slot --</option>
-                      {TIME_SLOTS.map((slot, idx) => (
-                        <option key={`slot-single-${slot}-${idx}`} value={slot}>{slot}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex items-center justify-between pt-1">
-                    {scheduleTimeMsg ? (
-                      <span className="text-[10px] font-bold text-emerald-600">{scheduleTimeMsg}</span>
-                    ) : <span />}
-                    <button
-                      type="button"
-                      disabled={isUpdatingScheduleTime}
-                      onClick={handleUpdateScheduleTimeOnly}
-                      className="w-full py-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center"
-                    >
-                      {isUpdatingScheduleTime ? '...' : 'Update'}
-                    </button>
-                  </div>
-                </div>
-
-              </div>
+              )}
             </div>
           )}
 

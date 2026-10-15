@@ -222,6 +222,7 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
         onClose={() => setIsCreateModalOpen(false)}
         currentAgent={currentAgent}
         onOrderCreated={onOrderCreated}
+        orders={orders}
       />
 
       {/* Top Header */}
@@ -619,6 +620,15 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                   }
                 }
 
+                const isEditDelivered = editFollowupStatus.toLowerCase() === 'delivered' || editOrderStatus.toLowerCase() === 'delivered';
+                if (isEditDelivered && (!editProfit || parseFloat(editProfit) <= 0)) {
+                  setOrderSaveMsg({
+                    type: 'error',
+                    text: 'Profit is required when status is Delivered.'
+                  });
+                  return;
+                }
+
                 setIsSavingOrder(true);
                 setOrderSaveMsg(null);
                 try {
@@ -760,69 +770,72 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                       )}
                     </div>
 
-                    {/* Profit (Editable if canAddProfit) */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-[11px] font-bold text-slate-700">
-                          Profit (৳ / %)
-                        </label>
+                    {/* Profit (Visible ONLY when Delivered is selected) */}
+                    {(editFollowupStatus.toLowerCase() === 'delivered' || editOrderStatus.toLowerCase() === 'delivered') && (
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[11px] font-bold text-slate-700">
+                            Profit (৳ / %) *Required*
+                          </label>
+                          {perms.canAddProfit ? (
+                            <div className="flex items-center gap-1">
+                              {[10, 15, 20, 25].map((pct) => (
+                                <button
+                                  key={`agent-pct-${pct}`}
+                                  type="button"
+                                  onClick={() => handleApplyEditProfitPreset(pct)}
+                                  className={`px-1 py-0.5 rounded text-[9px] font-bold cursor-pointer transition-colors ${
+                                    editProfitPercent === String(pct)
+                                      ? 'bg-purple-600 text-white'
+                                      : 'bg-slate-200 hover:bg-purple-50 text-slate-700 hover:text-purple-700'
+                                  }`}
+                                >
+                                  {pct}%
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[9px] font-semibold text-amber-700 flex items-center gap-0.5">
+                              <Lock className="w-2.5 h-2.5" /> Read-Only
+                            </span>
+                          )}
+                        </div>
                         {perms.canAddProfit ? (
-                          <div className="flex items-center gap-1">
-                            {[10, 15, 20, 25].map((pct) => (
-                              <button
-                                key={`agent-pct-${pct}`}
-                                type="button"
-                                onClick={() => handleApplyEditProfitPreset(pct)}
-                                className={`px-1 py-0.5 rounded text-[9px] font-bold cursor-pointer transition-colors ${
-                                  editProfitPercent === String(pct)
-                                    ? 'bg-purple-600 text-white'
-                                    : 'bg-slate-200 hover:bg-purple-50 text-slate-700 hover:text-purple-700'
-                                }`}
-                              >
-                                {pct}%
-                              </button>
-                            ))}
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">৳</span>
+                              <input
+                                type="number"
+                                step="any"
+                                min="0"
+                                required
+                                value={editProfit}
+                                onChange={(e) => handleEditProfitChange(e.target.value)}
+                                placeholder="Direct ৳"
+                                className="w-full pl-5 pr-1.5 py-1.5 rounded-xl border border-slate-300 bg-white font-bold text-emerald-700 focus:outline-hidden focus:border-indigo-600 text-xs"
+                              />
+                            </div>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="any"
+                                min="0"
+                                max="100"
+                                value={editProfitPercent}
+                                onChange={(e) => handleEditProfitPercentChange(e.target.value)}
+                                placeholder="%"
+                                className="w-full pl-2 pr-5 py-1.5 rounded-xl border border-slate-300 bg-white font-bold text-indigo-700 focus:outline-hidden focus:border-indigo-600 text-xs"
+                              />
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
+                            </div>
                           </div>
                         ) : (
-                          <span className="text-[9px] font-semibold text-amber-700 flex items-center gap-0.5">
-                            <Lock className="w-2.5 h-2.5" /> Read-Only
-                          </span>
+                          <div className="px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 font-extrabold text-emerald-700 text-xs">
+                            ৳ {((selectedOrder.profit ?? 0) || 0).toLocaleString()}
+                          </div>
                         )}
                       </div>
-                      {perms.canAddProfit ? (
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <div className="relative">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">৳</span>
-                            <input
-                              type="number"
-                              step="any"
-                              min="0"
-                              value={editProfit}
-                              onChange={(e) => handleEditProfitChange(e.target.value)}
-                              placeholder="Direct ৳"
-                              className="w-full pl-5 pr-1.5 py-1.5 rounded-xl border border-slate-300 bg-white font-bold text-emerald-700 focus:outline-hidden focus:border-indigo-600 text-xs"
-                            />
-                          </div>
-                          <div className="relative">
-                            <input
-                              type="number"
-                              step="any"
-                              min="0"
-                              max="100"
-                              value={editProfitPercent}
-                              onChange={(e) => handleEditProfitPercentChange(e.target.value)}
-                              placeholder="%"
-                              className="w-full pl-2 pr-5 py-1.5 rounded-xl border border-slate-300 bg-white font-bold text-indigo-700 focus:outline-hidden focus:border-indigo-600 text-xs"
-                            />
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 font-extrabold text-emerald-700 text-xs">
-                          ৳ {((selectedOrder.profit ?? 0) || 0).toLocaleString()}
-                        </div>
-                      )}
-                    </div>
+                    )}
 
                     {/* Order Status (Granular Access Control) */}
                     <div>
@@ -882,7 +895,14 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                       {perms.canUpdateStatus ? (
                         <select
                           value={editFollowupStatus}
-                          onChange={(e) => setEditFollowupStatus(e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setEditFollowupStatus(val);
+                            if (val.toLowerCase() === 'delivered') {
+                              setEditProfit('');
+                              setEditProfitPercent('');
+                            }
+                          }}
                           className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold text-slate-900 focus:outline-hidden focus:border-indigo-600 text-xs cursor-pointer"
                         >
                           {['Pending', 'Confirmed', 'Follow-up', 'Delivered', 'Cancelled'].map((st) => {

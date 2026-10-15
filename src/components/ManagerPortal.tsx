@@ -81,6 +81,7 @@ import {
 } from '../data/mockOrders';
 import { OrderJourneyModal } from './OrderJourneyModal';
 import { SelectionModal } from './SelectionModal';
+import { CreateOrderModal } from './CreateOrderModal';
 
 export const AGENT_MANAGEABLE_TABS: { id: AgentNavTab; label: string; description: string }[] = [
   { id: 'summary', label: 'Summary', description: 'Analytics, KPI metrics & sales summary' },
@@ -159,6 +160,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [isSavingStatus, setIsSavingStatus] = useState<boolean>(false);
   const [showAppsScriptModal, setShowAppsScriptModal] = useState<boolean>(false);
   const [copiedScript, setCopiedScript] = useState<boolean>(false);
+  const [isManagerCreateOrderOpen, setIsManagerCreateOrderOpen] = useState(false);
 
   // User Edit Modal Popup State
   const [editingAgentModal, setEditingAgentModal] = useState<AgentUser | null>(null);
@@ -1698,6 +1700,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
           <div className="flex items-center gap-3">
             <button
+              onClick={() => setIsManagerCreateOrderOpen(true)}
+              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Order</span>
+            </button>
+
+            <button
               onClick={() => onRefreshOrders()}
               disabled={isRefreshing}
               className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition-colors cursor-pointer"
@@ -3091,12 +3101,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <th className="py-3.5 px-3.5 whitespace-nowrap">profit</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">delivered_date</th>
                         <th className="py-3.5 px-3.5 whitespace-nowrap">cancelled_date</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap">followup_date</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-800">
                       {filteredOrders.length === 0 ? (
                         <tr>
-                          <td colSpan={22} className="text-center py-12 text-slate-400 font-semibold">
+                          <td colSpan={23} className="text-center py-12 text-slate-400 font-semibold">
                             No orders found matching filters.
                           </td>
                         </tr>
@@ -3198,6 +3209,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-red-700 font-medium">
                                 {ord.cancelled_date ? OrderService.formatDateTime(ord.cancelled_date) : '-'}
+                              </td>
+                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-blue-700 font-medium">
+                                {ord.followup_date || ord.followupDate ? OrderService.formatDateTime(ord.followup_date || ord.followupDate) : '-'}
                               </td>
                             </tr>
                           );
@@ -3302,7 +3316,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     try {
                       const isDeliv = quickUpdateStatus.toLowerCase() === 'delivered';
                       const isCanc = quickUpdateStatus.toLowerCase() === 'cancelled';
-                      const nowTs = new Date().toISOString().replace('T', ' ').slice(0, 19);
+                      const nowTs = OrderService.getBdtTimestamp();
                       await onUpdateOrderStatus?.(
                         quickUpdateOrderId,
                         {
@@ -3319,6 +3333,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           delivered_date: isDeliv ? nowTs : '',
                           cancelledDate: isCanc ? nowTs : '',
                           cancelled_date: isCanc ? nowTs : '',
+                          followupDate: nowTs,
+                          followup_date: nowTs,
                           scheduleDate: quickUpdateScheduleDate,
                           schedule_date: quickUpdateScheduleDate,
                           scheduledTime: quickUpdateScheduledTime,
@@ -6154,6 +6170,41 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           onClose={() => { setEditingAgent(null); setEditingField(null); }}
         />
       )}
+      {/* Create Order Modal for Manager */}
+      <CreateOrderModal
+        isOpen={isManagerCreateOrderOpen}
+        onClose={() => setIsManagerCreateOrderOpen(false)}
+        currentAgent={{
+          user: currentManager.user,
+          name: currentManager.name || currentManager.user,
+          role: currentManager.role || 'Manager',
+          team: 'All',
+          pass: '',
+          status: 'active',
+          contact: '',
+          email: '',
+          bloodGroup: '',
+          teamLeaders: [],
+          permissions: {
+            canCreate: true,
+            canUpdateStatus: true,
+            canChangeSchedule: true,
+            canChangeValue: true,
+            canAddProfit: true,
+            canCancel: true,
+            allowedOrderStatuses: getOrderStatuses(),
+            allowedTabs: ['summary', 'orders', 'agent-performance', 'profiles']
+          }
+        }}
+        onOrderCreated={(newOrd) => {
+          if (onUpdateOrders) {
+            onUpdateOrders([newOrd, ...orders]);
+          }
+          showToast(`Order #${newOrd.id || newOrd.order_id} created successfully!`);
+          onRefreshOrders();
+        }}
+        orders={orders}
+      />
     </div>
   );
 };

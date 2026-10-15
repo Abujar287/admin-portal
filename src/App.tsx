@@ -14,7 +14,8 @@ import { DashboardView } from './components/DashboardView';
 import { AgentFollowupView } from './components/AgentFollowupView';
 import { AgentSummaryView } from './components/AgentSummaryView';
 import { ManagerPortal } from './components/ManagerPortal';
-import { Menu, Shield, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { CreateOrderModal } from './components/CreateOrderModal';
+import { Menu, Shield, RefreshCw, CheckCircle2, Plus } from 'lucide-react';
 
 export default function App() {
   const [agents, setAgents] = useState<AgentUser[]>(() => OrderService.getAgents());
@@ -32,6 +33,7 @@ export default function App() {
   const [followupHistory, setFollowupHistory] = useState<FollowupHistoryItem[]>(() => OrderService.getFollowupHistory());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isAgentCreateOrderOpen, setIsAgentCreateOrderOpen] = useState(false);
 
   useEffect(() => {
     OrderService.getLocalOrders().then(setOrders);
@@ -89,12 +91,18 @@ export default function App() {
   const loadOrdersData = async (forceRefresh = false) => {
     setIsRefreshing(true);
     try {
-      const res = await OrderService.fetchOrders(forceRefresh);
+      const [res, followupHist] = await Promise.all([
+        OrderService.fetchOrders(forceRefresh),
+        OrderService.fetchFollowupHistory()
+      ]);
       if (res.orders && res.orders.length > 0) {
         setOrders(res.orders);
       }
+      if (followupHist && followupHist.length > 0) {
+        setFollowupHistory(followupHist);
+      }
       if (forceRefresh) {
-        showToast(`Synced ${res.orders.length} orders from Google Sheet!`);
+        showToast(`Synced ${res.orders.length} orders & ${followupHist.length} followups from Google Sheet!`);
       }
       if (res.error) {
         console.warn('Sync error:', res.error);
@@ -394,6 +402,16 @@ export default function App() {
               </div>
 
               <div className="flex items-center gap-2">
+                {currentSession.agent.permissions?.canCreate !== false && (
+                  <button
+                    onClick={() => setIsAgentCreateOrderOpen(true)}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Order</span>
+                  </button>
+                )}
+
                 <button
                   onClick={() => loadOrdersData(true)}
                   disabled={isRefreshing}
@@ -405,6 +423,20 @@ export default function App() {
                 </button>
               </div>
             </header>
+
+            {/* Create Order Modal for Agent from Header */}
+            {isAgentCreateOrderOpen && (
+              <CreateOrderModal
+                isOpen={isAgentCreateOrderOpen}
+                onClose={() => setIsAgentCreateOrderOpen(false)}
+                currentAgent={currentSession.agent}
+                onOrderCreated={(newOrd) => {
+                  handleOrderCreated(newOrd);
+                  setIsAgentCreateOrderOpen(false);
+                }}
+                orders={orders}
+              />
+            )}
 
             {/* Scrollable Agent Workspace */}
             <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50">

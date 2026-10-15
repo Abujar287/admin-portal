@@ -9,13 +9,15 @@ interface CreateOrderModalProps {
   onClose: () => void;
   currentAgent: AgentUser;
   onOrderCreated: (order: OrderItem) => void;
+  orders?: OrderItem[];
 }
 
 export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   isOpen,
   onClose,
   currentAgent,
-  onOrderCreated
+  onOrderCreated,
+  orders: propOrders = []
 }) => {
   // Form States
   const [customerName, setCustomerName] = useState('');
@@ -57,6 +59,37 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
   const [submitting, setSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [allOrdersCache, setAllOrdersCache] = useState<OrderItem[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      OrderService.getLocalOrders().then(orders => {
+        if (orders && orders.length > 0) {
+          setAllOrdersCache(orders);
+        }
+      });
+    }
+  }, [isOpen]);
+
+  const ordersList = React.useMemo(() => {
+    if (propOrders && propOrders.length > 0) return propOrders;
+    return allOrdersCache;
+  }, [propOrders, allOrdersCache]);
+
+  const { previewOrderId, previewCustomerId, isExistingCustomer } = React.useMemo(() => {
+    // 1. Order ID calculation (max of sheet orders + 1)
+    const { maxOrderId } = OrderService.getMaxIds(ordersList);
+    const nextOrderId = String(maxOrderId + 1);
+
+    // 2. Customer ID calculation (if phone exists in sheet, reuse customer_id; else max customer_id + 1)
+    const resolved = OrderService.resolveCustomerIdForPhone(customerContact, ordersList);
+
+    return {
+      previewOrderId: nextOrderId,
+      previewCustomerId: resolved.customerId,
+      isExistingCustomer: resolved.isExisting
+    };
+  }, [ordersList, customerContact]);
 
   const resetForm = () => {
     setCustomerName('');
@@ -77,18 +110,14 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     setScheduledTime('');
     setStatusMessage(null);
 
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const hh = String(now.getHours()).padStart(2, '0');
-    const min = String(now.getMinutes()).padStart(2, '0');
-    const ss = String(now.getSeconds()).padStart(2, '0');
-    setCreateDate(`${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`);
+    setCreateDate(OrderService.getBdtTimestamp());
 
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    setScheduleDate(tomorrow.toISOString().split('T')[0]);
+    const tomY = tomorrow.getFullYear();
+    const tomM = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const tomD = String(tomorrow.getDate()).padStart(2, '0');
+    setScheduleDate(`${tomY}-${tomM}-${tomD}`);
   };
 
   useEffect(() => {
@@ -140,8 +169,11 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     const finalProfit = customProfit !== '' ? parseFloat(customProfit) || 0 : calculatedProfit;
 
     const newOrderPayload = {
+      order_id: previewOrderId,
+      id: previewOrderId,
+      customer_id: previewCustomerId,
+      customerId: previewCustomerId,
       customer_name: customerName.trim(),
-      customer_id: customerContact.trim(),
       customer_mobile: customerContact.trim(),
       gender: gender || 'Other',
       create_date: createDate,
@@ -165,7 +197,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       const res = await OrderService.createOrder(newOrderPayload);
       if (res.success) {
         setStatusMessage({
-          text: '✓ Order placed successfully and synced!',
+          text: `✓ Order #${res.order.id || previewOrderId} placed successfully for Customer #${res.order.customer_id || previewCustomerId}!`,
           type: 'success'
         });
         onOrderCreated(res.order);
@@ -189,9 +221,22 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div>
             <h2 className="text-lg font-bold text-slate-900">Create New Order</h2>
-            <p className="text-xs text-slate-500">
-              Booking under Agent: <span className="font-semibold text-blue-700">{currentAgent.user}</span>
-            </p>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
+              <span className="text-xs text-slate-500">
+                Agent: <span className="font-semibold text-blue-700">{currentAgent.user}</span>
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-mono text-[11px] font-bold rounded-md border border-blue-200">
+                Auto Order ID: #{previewOrderId}
+              </span>
+              <span className={`px-2 py-0.5 font-mono text-[11px] font-bold rounded-md border ${
+                isExistingCustomer 
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                  : 'bg-purple-50 text-purple-700 border-purple-200'
+              }`}>
+                {isExistingCustomer ? 'Existing Customer ID' : 'Auto Customer ID'}: #{previewCustomerId}
+              </span>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -239,15 +284,26 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Customer Contact *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Customer Contact *
+                  </label>
+                  {customerContact.trim() && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                      isExistingCustomer 
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                        : 'bg-purple-50 text-purple-700 border border-purple-200'
+                    }`}>
+                      {isExistingCustomer ? `✓ Existing #${previewCustomerId}` : `New #${previewCustomerId}`}
+                    </span>
+                  )}
+                </div>
                 <input
                   type="tel"
                   required
                   value={customer_mobile}
                   onChange={(e) => setCustomerMobile(e.target.value)}
-                  placeholder="Phone number"
+                  placeholder="e.g. 01711223344"
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white"
                 />
               </div>
