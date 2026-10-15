@@ -101,6 +101,7 @@ export interface FollowupHistoryItem {
   scheduleDate?: string;
   scheduledTime?: string;
   updatedBy: string;
+  updatedByName?: string;
   timestamp: string;
   action?: string;
   notes?: string;

@@ -499,6 +499,7 @@ export class OrderService {
       const idxScDt = findCol('schedule_date', 'schedule date');
       const idxScTm = findCol('schedule_time', 'schedule time');
       const idxUpBy = findCol('updated_by', 'updated by');
+      const idxUpByNm = findCol('updated_by_name', 'updated by name');
       const idxStCh = findCol('status_change', 'status change');
       const idxAct = findCol('action');
 
@@ -530,8 +531,9 @@ export class OrderService {
           scheduleDate: String(r[idxScDt !== -1 ? idxScDt : 9] || ''),
           scheduledTime: String(r[idxScTm !== -1 ? idxScTm : 10] || ''),
           updatedBy: String(r[idxUpBy !== -1 ? idxUpBy : 11] || 'Manager'),
-          action: String(r[idxAct !== -1 ? idxAct : 13] || r[idxStCh !== -1 ? idxStCh : 12] || 'Follow-up Update'),
-          notes: String(r[idxStCh !== -1 ? idxStCh : 12] || ''),
+          updatedByName: String(r[idxUpByNm !== -1 ? idxUpByNm : 12] || ''),
+          action: String(r[idxAct !== -1 ? idxAct : 14] || r[idxStCh !== -1 ? idxStCh : 13] || 'Follow-up Update'),
+          notes: String(r[idxStCh !== -1 ? idxStCh : 13] || ''),
           timestamp: rawTs
         });
       }

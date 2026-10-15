@@ -309,6 +309,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   // Agent Management Form State (with no demo names)
   const [newAgentUser, setNewAgentUser] = useState('');
+  const [newAgentEmail, setNewAgentEmail] = useState('');
   const [newAgentPass, setNewAgentPass] = useState('');
   const [newAgentTeam, setNewAgentTeam] = useState('Acquisition');
   const [newTeamName, setNewTeamName] = useState('');
@@ -681,10 +682,40 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setCsvPreviewModal({ title, data, filename });
   };
 
+  const formatForExport = (data: any[]) => {
+    if (data.length === 0) return data;
+    return data.map(item => ({
+      order_id: item.order_id || item.id || '',
+      customer_id: item.customer_id || item.customerId || '',
+      customer_mobile: item.customer_mobile || item.customerContact || '',
+      customer_name: item.customer_name || item.customerName || '',
+      gender: item.gender || '',
+      create_date: item.create_date || item.createDate || item.createdAt || '',
+      order_channel: item.order_channel || item.orderChannel || '',
+      agent_id: item.agent_id || item.agentId || '',
+      agent_name: item.agent_name || item.agentName || '',
+      product_category: item.product_category || item.productCategory || '',
+      product_name: item.product_name || item.productName || '',
+      city: item.city || '',
+      delivery_area: item.delivery_area || item.deliveryArea || '',
+      address_details: item.address_details || item.addressDetails || '',
+      schedule_date: item.schedule_date || item.scheduleDate || '',
+      schedule_time: item.schedule_time || item.scheduledTime || '',
+      order_value: item.order_value || item.orderValue || 0,
+      order_status: item.order_status || item.orderStatus || '',
+      followup_status: item.followup_status || item.followupStatus || '',
+      profit: item.profit || 0,
+      delivered_date: item.delivered_date || item.deliveredDate || '',
+      cancelled_date: item.cancelled_date || item.cancelledDate || '',
+      followup_date: item.followup_date || item.followupDate || ''
+    }));
+  };
+
   const handleExportCsv = (data: any[], filename: string) => {
     if (data.length === 0) return;
-    const headers = Object.keys(data[0]).join(",");
-    const rows = data.map(row => 
+    const formatted = formatForExport(data);
+    const headers = Object.keys(formatted[0]).join(",");
+    const rows = formatted.map(row => 
       Object.values(row).map(value => `"${String(value).replace(/"/g, '""')}"`).join(",")
     );
     const csvContent = [headers, ...rows].join("\n");
@@ -701,37 +732,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const handleExportXlsx = (data: any[], filename: string) => {
     if (data.length === 0) return;
     
-    // Check if data likely contains OrderItems (which have duplicate camelCase aliases)
-    const isOrderItem = data.some(item => item.order_id || item.id);
-    
-    let exportData = data;
-    if (isOrderItem) {
-      exportData = data.map(item => ({
-        order_id: item.order_id || item.id || '',
-        customer_id: item.customer_id || item.customerId || '',
-        customer_mobile: item.customer_mobile || item.customerContact || '',
-        customer_name: item.customer_name || item.customerName || '',
-        gender: item.gender || '',
-        create_date: item.create_date || item.createDate || item.createdAt || '',
-        order_channel: item.order_channel || item.orderChannel || '',
-        agent_id: item.agent_id || item.agentId || '',
-        agent_name: item.agent_name || item.agentName || '',
-        product_category: item.product_category || item.productCategory || '',
-        product_name: item.product_name || item.productName || '',
-        city: item.city || '',
-        delivery_area: item.delivery_area || item.deliveryArea || '',
-        address_details: item.address_details || item.addressDetails || '',
-        schedule_date: item.schedule_date || item.scheduleDate || '',
-        schedule_time: item.schedule_time || item.scheduledTime || '',
-        order_value: item.order_value || item.orderValue || 0,
-        order_status: item.order_status || item.orderStatus || '',
-        followup_status: item.followup_status || item.followupStatus || '',
-        profit: item.profit || 0,
-        delivered_date: item.delivered_date || item.deliveredDate || '',
-        cancelled_date: item.cancelled_date || item.cancelledDate || '',
-        followup_date: item.followup_date || item.followupDate || ''
-      }));
-    }
+    const exportData = formatForExport(data);
 
     const ws = XLSX.utils.json_to_sheet(exportData, { header: Object.keys(exportData[0]) });
     const wb = XLSX.utils.book_new();
@@ -844,7 +845,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     e.preventDefault();
     const u = newAgentUser.trim();
     const p = newAgentPass.trim();
-    if (!u || !p) return;
+    const email = newAgentEmail.trim();
+    if (!u || !p || !email) return;
 
     const permissions: AgentPermissions = {
       canCreate: newCanCreate,
@@ -872,6 +874,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               teamLeaders: assignedTLs,
               name: newAgentName.trim() || agent.name || `Agent ${u}`,
               role: newAgentRole,
+              email: email,
               permissions: permissions
             }
           : agent
@@ -891,6 +894,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 teamLeaders: assignedTLs,
                 name: newAgentName.trim() || agent.name,
                 role: newAgentRole,
+                email: email,
                 permissions: permissions
               }
             : agent
@@ -905,7 +909,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             teamLeaderId: primaryTL,
             teamLeaders: assignedTLs,
             name: newAgentName.trim() || `Agent ${u}`,
-            email: `${u.toLowerCase()}@portal.local`,
+            email: email,
             status: 'active',
             failedAttempts: 0,
             role: newAgentRole,
@@ -918,6 +922,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     onUpdateAgents(updated, true);
     setOpenAddAgentPopup(null);
     setNewAgentUser('');
+    setNewAgentEmail('');
     setNewAgentPass('');
     setNewAgentName('');
     setNewAgentTeam('Acquisition');
@@ -1057,46 +1062,46 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         const val = searchValue.trim().toLowerCase();
         if (searchType === 'order_id') {
           const idStr = String(r.order_id || r.id || '').toLowerCase();
-          if (!idStr.includes(val)) return false;
+          if (idStr !== val) return false;
         } else if (searchType === 'customer_id') {
           const cIdStr = String(r.customer_id || r.customerId || '').trim().toLowerCase();
-          if (!cIdStr.includes(val)) return false;
+          if (cIdStr !== val) return false;
         } else if (searchType === 'customer_mobile') {
           const cStr = String(r.customer_mobile || r.customerContact || '').toLowerCase();
-          if (!cStr.includes(val)) return false;
+          if (cStr !== val) return false;
         } else if (searchType === 'customer_name') {
           const nStr = String(r.customer_name || r.customerName || '').toLowerCase();
           if (!nStr.includes(val)) return false;
         } else if (searchType === 'gender') {
           const gStr = String(r.gender || '').toLowerCase();
-          if (!gStr.includes(val)) return false;
+          if (gStr !== val) return false;
         } else if (searchType === 'create_date') {
           const crStr = String(r.create_date || r.createDate || '').toLowerCase();
-          if (!crStr.includes(val)) return false;
+          if (crStr !== val) return false;
         } else if (searchType === 'agent_id') {
           const aIdStr = String(r.agent_id || r.agentId || '').toLowerCase();
-          if (!aIdStr.includes(val)) return false;
+          if (aIdStr !== val) return false;
         } else if (searchType === 'agent_name') {
           const aNmStr = String(r.agent_name || r.agentName || '').toLowerCase();
-          if (!aNmStr.includes(val)) return false;
+          if (aNmStr !== val) return false;
         } else if (searchType === 'product_category') {
           const catStr = String(r.product_category || r.productCategory || '').toLowerCase();
-          if (!catStr.includes(val)) return false;
+          if (catStr !== val) return false;
         } else if (searchType === 'product_name') {
           const prodStr = String(r.product_name || r.productName || '').toLowerCase();
-          if (!prodStr.includes(val)) return false;
+          if (prodStr !== val) return false;
         } else if (searchType === 'city') {
           const cityStr = String(r.city || '').toLowerCase();
-          if (!cityStr.includes(val)) return false;
+          if (cityStr !== val) return false;
         } else if (searchType === 'delivery_area') {
           const areaStr = String(r.delivery_area || r.deliveryArea || '').toLowerCase();
-          if (!areaStr.includes(val)) return false;
+          if (areaStr !== val) return false;
         } else if (searchType === 'address_details') {
           const addrStr = String(r.address_details || r.addressDetails || '').toLowerCase();
-          if (!addrStr.includes(val)) return false;
+          if (addrStr !== val) return false;
         } else if (searchType === 'schedule_date') {
           const scDtStr = String(r.schedule_date || r.scheduleDate || '').toLowerCase();
-          if (!scDtStr.includes(val)) return false;
+          if (scDtStr !== val) return false;
         } else if (searchType === 'schedule_time') {
           const scTmStr = String(r.schedule_time || r.scheduledTime || '').toLowerCase();
           if (!scTmStr.includes(val)) return false;
@@ -2013,6 +2018,21 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     {/* 3. password (2 cols) */}
                     <div className="lg:col-span-2">
                       <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        email <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="e.g. agent@example.com"
+                        value={newAgentEmail}
+                        onChange={(e) => setNewAgentEmail(e.target.value)}
+                        className="w-full px-3 py-2 text-xs font-medium rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100"
+                      />
+                    </div>
+                    
+                    {/* 4. password (2 cols) */}
+                    <div className="lg:col-span-2">
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
                         password <span className="text-rose-500">*</span>
                       </label>
                       <input
@@ -2715,6 +2735,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <thead>
                       <tr className="bg-slate-100/80 text-slate-700 border-b border-slate-200 font-bold uppercase tracking-wider text-[11px]">
                         <th className="py-3 px-3.5">user_id</th>
+                        <th className="py-3 px-3.5">email</th>
                         <th className="py-3 px-3.5">user_name</th>
                         <th className="py-3 px-3.5">password</th>
                         <th className="py-3 px-3.5">role</th>
@@ -2750,6 +2771,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             {/* user_id */}
                             <td className="py-3 px-3.5 font-mono font-bold text-indigo-700 whitespace-nowrap">
                               @{agent.user}
+                            </td>
+
+                            {/* email */}
+                            <td className="py-3 px-3.5 font-medium text-slate-700 whitespace-nowrap">
+                              {agent.email || '-'}
                             </td>
 
                             {/* user_name */}
@@ -3622,6 +3648,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <th className="py-3 px-3.5 whitespace-nowrap">Order Value</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Schedule</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Updated By</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Updated By Name</th>
                         <th className="py-3 px-3.5 whitespace-nowrap text-purple-700">Action Name</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Remarks / Notes</th>
                         <th className="py-3 px-3.5 whitespace-nowrap text-center">Actions</th>
@@ -3738,7 +3765,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                   {hist.scheduleDate}<br/>{hist.scheduledTime}
                                 </td>
                                 <td className="py-3 px-3.5 font-bold text-slate-700 whitespace-nowrap">
-                                  {hist.updatedBy}
+                                  {hist.updatedBy?.replace(/\s*\(@.*\)/, '').replace('@', '_')}
+                                </td>
+                                <td className="py-3 px-3.5 text-slate-600 whitespace-nowrap">
+                                  {hist.updatedByName || '-'}
                                 </td>
                                 <td className="py-3 px-3.5 whitespace-nowrap">
                                   {isUndoRecord ? (
@@ -3753,7 +3783,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                   )}
                                 </td>
                                 <td className="py-3 px-3.5 text-slate-600 max-w-[200px] truncate" title={hist.notes}>
-                                  {hist.notes || '-'}
+                                  {hist.notes?.replace(/\(Status: (.*) -> (.*)\).*/, 'Status: $1 -> $2') || '-'}
                                 </td>
                                 <td className="py-3 px-3.5 text-center whitespace-nowrap">
                                   <div className="flex items-center justify-center gap-1.5">

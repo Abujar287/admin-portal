@@ -38,6 +38,7 @@ interface OrderJourneyModalProps {
 export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
   order,
   onClose,
+  followupHistory,
   currentUser,
   onUpdateOrderStatus,
   onRefreshOrders,
@@ -654,6 +655,46 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                   <span className="font-semibold text-slate-800 break-words">{col.value || '-'}</span>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* ORDER HISTORY */}
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-2xs space-y-3">
+            <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-700 border-b pb-2">Order History</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-[11px] border-collapse">
+                <thead>
+                  <tr className="text-slate-500 border-b border-slate-100">
+                    <th className="py-2 px-2">Timestamp</th>
+                    <th className="py-2 px-2">Status</th>
+                    <th className="py-2 px-2">Value</th>
+                    <th className="py-2 px-2">Schedule</th>
+                    <th className="py-2 px-2">Updated By</th>
+                    <th className="py-2 px-2">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {followupHistory
+                    .filter(h => String(h.orderId) === orderId)
+                    .map((h, i) => (
+                      <tr key={i} className="text-slate-700 hover:bg-slate-50">
+                        <td className="py-2 px-2 font-mono whitespace-nowrap">{h.timestamp}</td>
+                        <td className="py-2 px-2">
+                           <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">{h.previousStatus} ➔ {h.newStatus}</span>
+                        </td>
+                        <td className="py-2 px-2 whitespace-nowrap">৳ {(h.orderValue || 0).toLocaleString()}</td>
+                        <td className="py-2 px-2 whitespace-nowrap">{h.scheduleDate} {h.scheduledTime}</td>
+                        <td className="py-2 px-2 whitespace-nowrap">
+                          {h.updatedByName || h.updatedBy?.replace(/\s*\(@.*\)/, '').replace('@', '_')}
+                        </td>
+                        <td className="py-2 px-2">
+                           <div className="font-bold">{h.action}</div>
+                           <div className="text-slate-500">{h.notes?.replace(/\(Status: (.*) -> (.*)\).*/, 'Status: $1 -> $2')}</div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
             </div>
           </div>
 
