@@ -9,6 +9,7 @@ export interface AgentPermissions {
   canCancel?: boolean;
   allowedOrderStatuses?: string[];
   allowedTabs?: AgentNavTab[];
+  orderScope?: 'my_orders' | 'all_orders';
 }
 
 export interface AgentUser {

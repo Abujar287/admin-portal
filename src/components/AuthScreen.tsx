@@ -96,9 +96,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         // 3. Fallback: Check local agent list
         const agent = agents.find(a => (a.email?.toLowerCase() === normalizedEmail || a.user?.toLowerCase() === normalizedEmail) && a.pass === password);
         if (agent) {
-          if (agent.role === 'Manager' || agent.user === '1') {
+          if (agent.role === 'Manager') {
             onManagerLogin({
-              user: '1',
+              user: agent.user || '1',
               pass: agent.pass,
               name: agent.name || 'Manager',
               role: 'Manager'

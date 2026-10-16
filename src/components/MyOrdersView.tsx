@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AgentUser, DateFilterType, OrderItem } from '../types';
 import { OrderService } from '../services/orderService';
 import { CreateOrderModal } from './CreateOrderModal';
@@ -153,10 +153,30 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
     setOrderSaveMsg(null);
   };
 
-  // STRICTLY only this agent's orders (data isolation for agent portal with flexible matching)
+  const [orderViewScope, setOrderViewScope] = useState<'my_orders' | 'all_orders'>(
+    currentAgent.permissions?.orderScope === 'all_orders' ? 'all_orders' : 'my_orders'
+  );
+
+  useEffect(() => {
+    if (currentAgent.permissions?.orderScope === 'all_orders') {
+      setOrderViewScope('all_orders');
+    } else {
+      setOrderViewScope('my_orders');
+    }
+  }, [currentAgent.permissions?.orderScope]);
+
+  // Filter agent orders (strict exact match by default, or all orders if permitted)
   const myAgentOrders = useMemo(() => {
+    if (currentAgent.permissions?.orderScope === 'all_orders') {
+      if (orderViewScope === 'all_orders') {
+        return orders;
+      }
+      const strictAgent = { ...currentAgent, permissions: { ...currentAgent.permissions, orderScope: 'my_orders' as const } };
+      return orders.filter((o) => isOrderAssignedToAgent(o, strictAgent));
+    }
     return orders.filter((o) => isOrderAssignedToAgent(o, currentAgent));
-  }, [orders, currentAgent]);
+  }, [orders, currentAgent, orderViewScope]);
+
 
   // Apply search and date filters
   const filteredOrders = useMemo(() => {
@@ -228,9 +248,32 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">My Orders</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Orders logged by <span className="font-semibold text-blue-700">{currentAgent.user}</span> ({myAgentOrders.length} total orders)
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">My Orders</h1>
+            {currentAgent.permissions?.orderScope === 'all_orders' ? (
+              <div className="inline-flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+                <span className="text-[11px] font-bold text-slate-500 pl-1.5">Orders Show:</span>
+                <select
+                  value={orderViewScope}
+                  onChange={(e) => setOrderViewScope(e.target.value as 'my_orders' | 'all_orders')}
+                  className="bg-white border border-slate-200 text-slate-800 font-bold px-2 py-0.5 rounded-lg text-xs cursor-pointer focus:outline-hidden shadow-2xs"
+                >
+                  <option value="all_orders">All Orders ({orders.length})</option>
+                  <option value="my_orders">Only My Orders (@{currentAgent.user})</option>
+                </select>
+              </div>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                Only My Orders (Exact User ID: @{currentAgent.user})
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-500 mt-1">
+            {orderViewScope === 'all_orders'
+              ? `Showing all orders across system (${myAgentOrders.length} total orders)`
+              : `Orders matching exact user ID: ${currentAgent.user} (${myAgentOrders.length} total orders)`
+            }
           </p>
         </div>
 
@@ -380,8 +423,11 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
         <div className="overflow-x-auto overflow-y-auto max-h-[65vh]">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-slate-100/90 text-slate-700 sticky top-0 z-10 font-bold border-b border-slate-200">
-                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">order_id</th>
+              <tr className="bg-slate-100 text-slate-700 sticky top-0 z-20 font-bold border-b border-slate-200 shadow-xs">
+                {/* Frozen Order ID Column Header */}
+                <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100 sticky left-0 z-30 font-bold border-r border-slate-200/90 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.08)]">
+                  order_id
+                </th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">customer_id</th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">customer_mobile</th>
                 <th className="py-3 px-3.5 whitespace-nowrap bg-slate-100">customer_name</th>
@@ -420,36 +466,55 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                   const isDelivered = (ord.followup_status || ord.followupStatus || '').toLowerCase() === 'delivered';
 
                   return (
-                    <tr key={`agent-ord-${ord.order_id || ord.id || idx}-${idx}`} className="hover:bg-blue-50/40 transition-colors">
-                      <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-blue-700">
-                        <button type="button" onClick={() => handleOpenOrder(ord)} className="hover:underline text-blue-700 font-bold cursor-pointer">
+                    <tr
+                      key={`agent-ord-${ord.order_id || ord.id || idx}-${idx}`}
+                      onClick={() => handleOpenOrder(ord)}
+                      className="group hover:bg-amber-100/90 transition-colors duration-150 cursor-pointer"
+                    >
+                      {/* Frozen Order ID Cell */}
+                      <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-blue-700 sticky left-0 z-10 bg-white group-hover:bg-amber-100/90 border-r border-slate-200/90 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.08)] transition-colors duration-150">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenOrder(ord);
+                          }}
+                          className="hover:underline text-blue-700 hover:text-blue-900 font-bold cursor-pointer inline-flex items-center gap-1"
+                        >
                           #{ord.order_id || ord.id}
                         </button>
                       </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">{ord.customer_id || ord.customerId}</td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600">{ord.customer_mobile || ord.customerContact}</td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">{ord.customer_name || ord.customerName}</td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">{ord.gender}</td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-600 font-mono text-[11px]">{OrderService.formatDateTime(ord.create_date || ord.createDate)}</td>
-                      <td className="py-3 px-3.5 whitespace-nowrap"><span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700">{ord.order_channel || ord.orderChannel}</span></td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600">{ord.agent_id || ord.agentId}</td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">{ord.agent_name || ord.agentName}</td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">{ord.product_category || ord.productCategory}</td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-800 truncate" title={ord.product_name || ord.productName}>{ord.product_name || ord.productName}</td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">{ord.city}</td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">{ord.delivery_area || ord.deliveryArea}</td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-500 truncate" title={ord.address_details || ord.addressDetails}>{ord.address_details || ord.addressDetails}</td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-slate-700">{OrderService.formatDateTime(ord.schedule_date || ord.scheduleDate)}</td>
-                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">{ord.schedule_time || ord.scheduledTime}</td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-bold text-slate-900">৳ {((ord.order_value ?? ord.orderValue) || 0).toLocaleString()}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900 group-hover:text-slate-950">{ord.customer_id || ord.customerId}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600 group-hover:text-slate-950">{ord.customer_mobile || ord.customerContact}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900 group-hover:text-slate-950">{ord.customer_name || ord.customerName}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-600 group-hover:text-slate-950">{ord.gender}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-600 font-mono text-[11px] group-hover:text-slate-950">{OrderService.formatDateTime(ord.create_date || ord.createDate)}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap"><span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 group-hover:bg-white">{ord.order_channel || ord.orderChannel}</span></td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-slate-700 group-hover:text-slate-950">{ord.agent_id || ord.agentId}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-600 group-hover:text-slate-950">{ord.agent_name || ord.agentName}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-700 group-hover:text-slate-950">{ord.product_category || ord.productCategory}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-800 truncate group-hover:text-slate-950" title={ord.product_name || ord.productName}>{ord.product_name || ord.productName}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-700 group-hover:text-slate-950">{ord.city}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-700 group-hover:text-slate-950">{ord.delivery_area || ord.deliveryArea}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-500 truncate group-hover:text-slate-800" title={ord.address_details || ord.addressDetails}>{ord.address_details || ord.addressDetails}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-slate-700 group-hover:text-slate-950">{OrderService.formatDateTime(ord.schedule_date || ord.scheduleDate)}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap text-slate-600 group-hover:text-slate-950">{ord.schedule_time || ord.scheduledTime}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-bold text-slate-900 group-hover:text-slate-950">৳ {((ord.order_value ?? ord.orderValue) || 0).toLocaleString()}</td>
                       <td className="py-3 px-3.5 whitespace-nowrap"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">{ord.order_status || ord.orderStatus}</span></td>
                       <td className="py-3 px-3.5 whitespace-nowrap"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isDelivered ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{ord.followup_status || ord.followupStatus}</span></td>
-                      <td className="py-3 px-3.5 whitespace-nowrap font-bold text-emerald-600">৳ {((ord.profit ?? 0) || 0).toLocaleString()}</td>
+                      <td className="py-3 px-3.5 whitespace-nowrap font-bold text-emerald-600 group-hover:text-emerald-800">৳ {((ord.profit ?? 0) || 0).toLocaleString()}</td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-emerald-700 font-medium">{ord.delivered_date || ord.deliveredDate ? OrderService.formatDateTime(ord.delivered_date || ord.deliveredDate) : '-'}</td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-red-700 font-medium">{ord.cancelled_date || ord.cancelledDate ? OrderService.formatDateTime(ord.cancelled_date || ord.cancelledDate) : '-'}</td>
                       <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-blue-700 font-medium">{ord.followup_date || ord.followupDate ? OrderService.formatDateTime(ord.followup_date || ord.followupDate) : '-'}</td>
                       <td className="py-3 px-3.5 whitespace-nowrap text-center">
-                        <button onClick={() => handleOpenOrder(ord)} className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 cursor-pointer">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenOrder(ord);
+                          }}
+                          className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 transition-colors cursor-pointer border border-indigo-200"
+                        >
                           Update
                         </button>
                       </td>

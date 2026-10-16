@@ -2,9 +2,15 @@ import { AgentUser, OrderItem } from '../types';
 
 /**
  * Checks whether an order is assigned to or belongs to a given agent.
- * Handles exact matches, case-insensitivity, leading '@',
- * and flexible numeric/prefix variations:
- * e.g. agent_id "2" matches "2", "02", "agent2", "agent02", "Agent 2", etc.
+ *
+ * Rules:
+ * 1. If agent has orderScope === 'all_orders', all orders are visible.
+ * 2. Otherwise, performs a STRICT EXACT MATCH against the agent's user_id:
+ *    - Strict exact string match (case-insensitive, trimmed)
+ *    - Strict numeric equality (e.g. "02" matches "2", but strictly NOT "21", "12", "20", etc.)
+ *    - Order with agent_id = 1 will NEVER match logged in user 2, even if they have similar names.
+ *    - Substring matching (.includes) is completely disallowed.
+ *    - Only if order has no agent_id at all: check if agent_name strictly equals agent.user.
  */
 export function isOrderAssignedToAgent(
   order?: OrderItem | null,
@@ -12,57 +18,41 @@ export function isOrderAssignedToAgent(
 ): boolean {
   if (!order || !agent) return false;
 
-  const agentUser = String(agent.user || '').trim().toLowerCase();
-  const agentName = String(agent.name || '').trim().toLowerCase();
-
-  const oAgentId = String(order.agent_id || (order as any).agentId || '').trim().toLowerCase();
-  const oAgentName = String(order.agent_name || (order as any).agentName || '').trim().toLowerCase();
-
-  if (!oAgentId && !oAgentName) return false;
-
-  // 1. Exact matches
-  if (oAgentId === agentUser || oAgentName === agentUser) return true;
-  if (agentName && (oAgentId === agentName || oAgentName === agentName)) return true;
-
-  // 2. Normalized exact matches (ignoring spaces, underscores, hyphens)
-  const normUser = agentUser.replace(/[\s_-]+/g, '');
-  const normId = oAgentId.replace(/[\s_-]+/g, '');
-  const normName = agentName.replace(/[\s_-]+/g, '');
-  const normOName = oAgentName.replace(/[\s_-]+/g, '');
-
-  if (normId && (normId === normUser || normId === normName)) return true;
-  if (normOName && (normOName === normName || normOName === normUser)) return true;
-
-  // 3. Special known mapping for Agent 1 / aqn01 / agent01
-  const isAgent1Equiv = (u: string, n: string) => {
-    return u === '1' || u === '01' || u === 'agent1' || u === 'agent01' || n.includes('aqn01') || n.includes('agent 1');
-  };
-
-  const isOrder1Equiv = (id: string, nm: string) => {
-    return id === '1' || id === '01' || id === 'agent1' || id === 'agent01' || id.includes('aqn01') ||
-           nm === '1' || nm === '01' || nm === 'agent1' || nm === 'agent01' || nm.includes('aqn01');
-  };
-
-  if (isAgent1Equiv(agentUser, agentName) && isOrder1Equiv(oAgentId, oAgentName)) {
+  // 1. If agent's permission explicitly grants visibility to all orders
+  if (agent.permissions?.orderScope === 'all_orders') {
     return true;
   }
 
-  // 4. Extract digits (e.g. '1' matches '01', 'agent1', 'agent01')
-  const extractDigits = (s: string) => {
-    const m = s.match(/\d+/);
-    return m ? String(parseInt(m[0], 10)) : '';
-  };
+  const rawAgentUser = String(agent.user || '').trim().toLowerCase();
+  if (!rawAgentUser) return false;
 
-  const agentDigits = extractDigits(agentUser) || extractDigits(agentName);
-  const orderDigits = extractDigits(oAgentId) || extractDigits(oAgentName);
+  const rawOrderId = String(order.agent_id ?? (order as any).agentId ?? '').trim().toLowerCase();
 
-  if (agentDigits && orderDigits && agentDigits === orderDigits) {
-    return true;
+  // 2. If the order has an agent_id, it MUST strictly match the logged-in agent's user ID
+  if (rawOrderId) {
+    // Strict exact string match on user ID
+    if (rawOrderId === rawAgentUser) return true;
+
+    // Strict numeric equality (e.g. '02' === '2', but strictly NOT '21' === '2' or '22' === '2')
+    const isAgentInt = /^\d+$/.test(rawAgentUser);
+    const isOrderInt = /^\d+$/.test(rawOrderId);
+    if (isAgentInt && isOrderInt) {
+      return parseInt(rawOrderId, 10) === parseInt(rawAgentUser, 10);
+    }
+
+    // If order has an agent_id and it did not match, it belongs to another agent!
+    return false;
   }
 
-  // 5. Partial inclusion if names overlap significantly
-  if (agentName && (oAgentId.includes(agentName) || oAgentName.includes(agentName))) return true;
-  if (agentUser && (oAgentId.includes(agentUser) || oAgentName.includes(agentUser))) return true;
+  // 3. Fallback ONLY if order has NO agent_id: match on exact agent_name equalling agent's user ID or exact agent.name
+  const rawOrderName = String(order.agent_name ?? (order as any).agentName ?? '').trim().toLowerCase();
+  const rawAgentName = String(agent.name || '').trim().toLowerCase();
+  if (rawOrderName) {
+    if (rawOrderName === rawAgentUser) return true;
+    if (rawAgentName && rawOrderName === rawAgentName) return true;
+  }
 
   return false;
 }
+
+

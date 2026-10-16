@@ -269,6 +269,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [editCanAddProfit, setEditCanAddProfit] = useState(true);
   const [editAllowedOrderStatuses, setEditAllowedOrderStatuses] = useState<string[]>(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
   const [editAllowedTabs, setEditAllowedTabs] = useState<AgentNavTab[]>(['summary', 'orders', 'followup', 'agent-performance', 'profiles']);
+  const [editOrderScope, setEditOrderScope] = useState<'my_orders' | 'all_orders'>('my_orders');
 
   // Agent Performance Tab Filters & Search
   const [agentPerformanceSearch, setAgentPerformanceSearch] = useState('');
@@ -410,6 +411,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [newCanAddProfit, setNewCanAddProfit] = useState(true);
   const [newAllowedOrderStatuses, setNewAllowedOrderStatuses] = useState<string[]>(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
   const [newAllowedTabs, setNewAllowedTabs] = useState<AgentNavTab[]>(['summary', 'orders', 'followup', 'agent-performance', 'profiles']);
+  const [newOrderScope, setNewOrderScope] = useState<'my_orders' | 'all_orders'>('my_orders');
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [availableRoles, setAvailableRoles] = useState<string[]>(['Agent', 'Sr Agent', 'Team Leader']);
@@ -973,7 +975,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       canChangeValue: newCanChangeValue,
       canAddProfit: newCanAddProfit,
       allowedOrderStatuses: newCanUpdateStatus ? newAllowedOrderStatuses : [],
-      allowedTabs: newAllowedTabs
+      allowedTabs: newAllowedTabs,
+      orderScope: newOrderScope
     };
 
     const assignedTLs = newAgentTeamLeaders;
@@ -1054,6 +1057,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setNewCanAddProfit(true);
     setNewAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
     setNewAllowedTabs(['summary', 'orders', 'agent-performance', 'profiles']);
+    setNewOrderScope('my_orders');
     showToast('Agent created locally! Syncing to Google Sheet...');
 
     const savedAgent = updated.find(a => a.user.toLowerCase() === u.toLowerCase());
@@ -1102,6 +1106,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setEditAllowedTabs(
       ag.permissions?.allowedTabs || ['summary', 'orders', 'followup', 'agent-performance', 'profiles']
     );
+    setEditOrderScope(ag.permissions?.orderScope || 'my_orders');
   };
 
   const handleSaveEditedAgentModal = (e: React.FormEvent) => {
@@ -1119,7 +1124,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       canChangeValue: editCanChangeValue,
       canAddProfit: editCanAddProfit,
       allowedOrderStatuses: editCanUpdateStatus ? editAllowedOrderStatuses : [],
-      allowedTabs: editAllowedTabs
+      allowedTabs: editAllowedTabs,
+      orderScope: editOrderScope
     };
 
     const assignedTLs = editTeamLeaders;
@@ -2814,8 +2820,27 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
                           {/* 2 Side-by-Side Columns for All Controls without Scrolling */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {/* Left Column: Order Creation & Placed Order Permissions */}
+                            {/* Left Column: Orders Show & Order Creation & Placed Order Permissions */}
                             <div className="space-y-2">
+                              <div>
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                  Orders Show / Visibility
+                                </span>
+                                <select
+                                  value={newOrderScope}
+                                  onChange={(e) => setNewOrderScope(e.target.value as 'my_orders' | 'all_orders')}
+                                  className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs font-bold bg-white text-slate-800 focus:outline-hidden focus:border-indigo-600 shadow-2xs"
+                                >
+                                  <option value="my_orders">Only My Orders (Exact User ID)</option>
+                                  <option value="all_orders">All Orders (Show All System Orders)</option>
+                                </select>
+                                <span className="text-[10px] text-slate-500 block mt-0.5">
+                                  {newOrderScope === 'all_orders'
+                                    ? 'Agent can view all orders across all agents'
+                                    : 'Agent only views orders matching exact user ID'}
+                                </span>
+                              </div>
+
                               <div>
                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
                                   Order Creation
@@ -3843,12 +3868,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         paginatedOrders.map((ord, idx) => {
                           const isDelivered = (ord.followup_status || ord.followupStatus || '').toLowerCase() === 'delivered';
                           return (
-                            <tr key={`manager-ord-${ord.order_id || ord.id || idx}-${idx}`} className="hover:bg-amber-100/90 transition-all duration-150 cursor-pointer">
-
-                              <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-indigo-700 sticky left-0 z-10 bg-white border-r border-slate-100">
+                            <tr
+                              key={`manager-ord-${ord.order_id || ord.id || idx}-${idx}`}
+                              onClick={() => setViewJourneyOrder(ord)}
+                              className="group hover:bg-amber-100/90 transition-all duration-150 cursor-pointer"
+                            >
+                              <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-indigo-700 sticky left-0 z-10 bg-white group-hover:bg-amber-100/90 border-r border-slate-200/90 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.08)] transition-colors duration-150">
                                 <button
                                   type="button"
-                                  onClick={() => setViewJourneyOrder(ord)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setViewJourneyOrder(ord);
+                                  }}
                                   className="hover:underline text-indigo-700 hover:text-indigo-900 flex items-center gap-1 cursor-pointer font-bold"
                                   title="Click to open order details"
                                 >
@@ -6260,6 +6291,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${selectedAgentDetails.permissions?.canAddProfit ?? true ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-400 line-through'}`}>
                     Profit
                   </span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${selectedAgentDetails.permissions?.orderScope === 'all_orders' ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-blue-100 text-blue-900 border border-blue-200'}`}>
+                    Scope: {selectedAgentDetails.permissions?.orderScope === 'all_orders' ? 'All Orders' : 'Only My Orders'}
+                  </span>
                 </div>
 
                 {/* Granular Order Statuses in Details */}
@@ -6676,6 +6710,26 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       </p>
                     </div>
                   </div>
+                </div>
+
+                {/* 0. Order Visibility / Show Orders Scope */}
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-1.5">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                    Orders Show / Visibility
+                  </span>
+                  <select
+                    value={editOrderScope}
+                    onChange={(e) => setEditOrderScope(e.target.value as 'my_orders' | 'all_orders')}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs font-bold bg-white text-slate-800 focus:outline-hidden focus:border-indigo-600 shadow-2xs"
+                  >
+                    <option value="my_orders">Only My Orders (Exact User ID Match)</option>
+                    <option value="all_orders">All Orders (Show All System Orders)</option>
+                  </select>
+                  <span className="text-[11px] text-slate-500 block">
+                    {editOrderScope === 'all_orders'
+                      ? 'Agent can view all system orders in their My Orders & Performance views'
+                      : 'Agent will strictly only view orders matching their exact User ID'}
+                  </span>
                 </div>
 
                 {/* 1. Order Creation Access */}

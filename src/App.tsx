@@ -15,6 +15,7 @@ import { AgentFollowupView } from './components/AgentFollowupView';
 import { AgentSummaryView } from './components/AgentSummaryView';
 import { ManagerPortal } from './components/ManagerPortal';
 import { CreateOrderModal } from './components/CreateOrderModal';
+import { isOrderAssignedToAgent } from './utils/agentMatching';
 import { Menu, Shield, RefreshCw, CheckCircle2, Plus } from 'lucide-react';
 
 export default function App() {
@@ -91,15 +92,29 @@ export default function App() {
   const loadOrdersData = async (forceRefresh = false) => {
     setIsRefreshing(true);
     try {
-      const [res, followupHist] = await Promise.all([
+      const [res, followupHist, sheetAgents] = await Promise.all([
         OrderService.fetchOrders(forceRefresh),
-        OrderService.fetchFollowupHistory()
+        OrderService.fetchFollowupHistory(),
+        OrderService.fetchAgentsFromSheet()
       ]);
       if (res.orders && res.orders.length > 0) {
         setOrders(res.orders);
       }
       if (followupHist && followupHist.length > 0) {
         setFollowupHistory(followupHist);
+      }
+      if (sheetAgents && sheetAgents.length > 0) {
+        setAgents(sheetAgents);
+        // Also update current active agent session if permissions changed
+        setCurrentSession((prev) => {
+          if (prev?.role === 'agent') {
+            const updated = sheetAgents.find((a) => (a.user || '').toLowerCase() === prev.agent.user.toLowerCase());
+            if (updated) {
+              return { role: 'agent', agent: updated };
+            }
+          }
+          return prev;
+        });
       }
       if (forceRefresh) {
         showToast(`Synced ${res.orders.length} orders & ${followupHist.length} followups from Google Sheet!`);
@@ -120,18 +135,19 @@ export default function App() {
   };
 
   const handleAgentLogin = (agent: AgentUser) => {
-    if (agent.role === 'Team Leader' || agent.role === 'Manager' || agent.user === '1') {
+    // Only users with explicit Manager role route to the Manager portal
+    if (agent.role === 'Manager') {
       setCurrentSession({
         role: 'manager',
         manager: {
-          user: '1',
+          user: agent.user || '1',
           pass: agent.pass,
           name: agent.name || 'Manager',
           role: 'Manager'
         }
       });
       sessionStorage.setItem('portal_session_role', 'manager');
-      sessionStorage.setItem('portal_session_user', '1');
+      sessionStorage.setItem('portal_session_user', agent.user || '1');
       showToast(`Welcome Manager, ${agent.name || 'Manager'}!`);
       return;
     }
@@ -352,9 +368,7 @@ export default function App() {
               setCollapsed={setSidebarCollapsed}
               onLogout={handleLogout}
               ordersCount={
-                orders.filter(
-                  (o) => o && (String(o.agent_id || (o as any).agentId || '')).trim().toLowerCase() === (currentSession.agent?.user || '').trim().toLowerCase()
-                ).length
+                orders.filter((o) => isOrderAssignedToAgent(o, currentSession.agent)).length
               }
             />
           </div>
@@ -378,9 +392,7 @@ export default function App() {
                   setCollapsed={() => {}}
                   onLogout={handleLogout}
                   ordersCount={
-                    orders.filter(
-                      (o) => o && (String(o.agent_id || (o as any).agentId || '')).trim().toLowerCase() === (currentSession.agent?.user || '').trim().toLowerCase()
-                    ).length
+                    orders.filter((o) => isOrderAssignedToAgent(o, currentSession.agent)).length
                   }
                 />
               </div>

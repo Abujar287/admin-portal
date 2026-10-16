@@ -433,7 +433,7 @@ export const AgentFollowupView: React.FC<AgentFollowupViewProps> = ({
                 </tr>
               ) : (
                 filteredHistory.map((h, idx) => (
-                  <tr key={`fhist-${h.id || idx}`} className="hover:bg-slate-50 transition-colors">
+                  <tr key={`fhist-${h.id || idx}`} className="group hover:bg-amber-100/90 transition-colors cursor-pointer">
                     <td className="py-2.5 px-3.5 font-mono text-[11px] text-indigo-600 font-bold">
                       {h.followupId || `#${h.id}`}
                     </td>
