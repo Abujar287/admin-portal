@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { AgentUser, DateFilterType, OrderItem } from '../types';
 import { OrderService } from '../services/orderService';
-import { CreateOrderModal } from './CreateOrderModal';
 import { 
   RotateCw, 
   Search, 
@@ -57,7 +56,6 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
   const [agentPage, setAgentPage] = useState<number>(1);
   const agentPageSize = 50;
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // Edit fields for opened order
   const [editOrderStatus, setEditOrderStatus] = useState<string>('Pending');
@@ -153,29 +151,10 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
     setOrderSaveMsg(null);
   };
 
-  const [orderViewScope, setOrderViewScope] = useState<'my_orders' | 'all_orders'>(
-    currentAgent.permissions?.orderScope === 'all_orders' ? 'all_orders' : 'my_orders'
-  );
-
-  useEffect(() => {
-    if (currentAgent.permissions?.orderScope === 'all_orders') {
-      setOrderViewScope('all_orders');
-    } else {
-      setOrderViewScope('my_orders');
-    }
-  }, [currentAgent.permissions?.orderScope]);
-
-  // Filter agent orders (strict exact match by default, or all orders if permitted)
+  // Filter agent orders strictly by logged-in agent user ID
   const myAgentOrders = useMemo(() => {
-    if (currentAgent.permissions?.orderScope === 'all_orders') {
-      if (orderViewScope === 'all_orders') {
-        return orders;
-      }
-      const strictAgent = { ...currentAgent, permissions: { ...currentAgent.permissions, orderScope: 'my_orders' as const } };
-      return orders.filter((o) => isOrderAssignedToAgent(o, strictAgent));
-    }
     return orders.filter((o) => isOrderAssignedToAgent(o, currentAgent));
-  }, [orders, currentAgent, orderViewScope]);
+  }, [orders, currentAgent]);
 
 
   // Apply search and date filters
@@ -236,68 +215,23 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
 
   return (
     <div className="w-full space-y-4">
-      {/* Create Order Modal (Triggered by the button in My Orders) */}
-      <CreateOrderModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        currentAgent={currentAgent}
-        onOrderCreated={onOrderCreated}
-        orders={orders}
-      />
-
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">My Orders</h1>
-            {currentAgent.permissions?.orderScope === 'all_orders' ? (
-              <div className="inline-flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
-                <span className="text-[11px] font-bold text-slate-500 pl-1.5">Orders Show:</span>
-                <select
-                  value={orderViewScope}
-                  onChange={(e) => setOrderViewScope(e.target.value as 'my_orders' | 'all_orders')}
-                  className="bg-white border border-slate-200 text-slate-800 font-bold px-2 py-0.5 rounded-lg text-xs cursor-pointer focus:outline-hidden shadow-2xs"
-                >
-                  <option value="all_orders">All Orders ({orders.length})</option>
-                  <option value="my_orders">Only My Orders (@{currentAgent.user})</option>
-                </select>
-              </div>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                Only My Orders (Exact User ID: @{currentAgent.user})
-              </span>
-            )}
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+              Only My Orders (Exact User ID: @{currentAgent.user})
+            </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            {orderViewScope === 'all_orders'
-              ? `Showing all orders across system (${myAgentOrders.length} total orders)`
-              : `Orders matching exact user ID: ${currentAgent.user} (${myAgentOrders.length} total orders)`
-            }
+            Orders matching exact user ID: {currentAgent.user} ({myAgentOrders.length} total orders)
           </p>
         </div>
 
-        {/* Action Buttons: ➕ Create Order & 🔄 Refresh (NO export button for agent) */}
+        {/* Action Buttons: 🔄 Refresh (Create Order button is only in header) */}
         <div className="flex items-center gap-2">
-          {perms.canCreate ? (
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="px-3.5 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold shadow-sm shadow-blue-700/20 flex items-center gap-1.5 transition-all cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Create Order</span>
-            </button>
-          ) : (
-            <button
-              disabled
-              title="Order creation restricted by Manager"
-              className="px-3.5 py-2 bg-slate-200 text-slate-400 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-not-allowed opacity-75"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Create Order (Disabled)</span>
-            </button>
-          )}
-
           <button
             onClick={() => onRefresh()}
             disabled={isRefreshing}

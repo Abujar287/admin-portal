@@ -426,25 +426,24 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                {currentSession.agent.permissions?.canCreate !== false && (
-                  <button
-                    onClick={() => setIsAgentCreateOrderOpen(true)}
-                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Order</span>
-                  </button>
-                )}
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => setIsAgentCreateOrderOpen(true)}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                  title="Add New Order"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Order</span>
+                </button>
 
                 <button
                   onClick={() => loadOrdersData(true)}
                   disabled={isRefreshing}
                   title="Refresh Orders Data"
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition-colors cursor-pointer"
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition-colors cursor-pointer shrink-0 w-[95px] justify-center"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-600' : 'text-slate-600'}`} />
-                  <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                  <span>Refresh</span>
                 </button>
               </div>
             </header>
