@@ -597,7 +597,12 @@ export const MyOrdersView: React.FC<MyOrdersViewProps> = ({
                       <span className="font-bold text-slate-900">{selectedOrder.city} • {selectedOrder.delivery_area || selectedOrder.deliveryArea}</span>
                     </div>
                     <div>
-                      <span className="text-[11px] text-slate-500 block">Address:</span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-slate-500 block">Address:</span>
+                        <span className="text-[9px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                          Manager Edit Only
+                        </span>
+                      </div>
                       <span className="font-medium text-slate-700">{selectedOrder.address_details || selectedOrder.addressDetails || '-'}</span>
                     </div>
                   </div>

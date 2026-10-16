@@ -43,12 +43,12 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
 
   return (
     <aside
-      className={`h-screen bg-gradient-to-b from-[#1e3a8a] via-[#1e40af] to-[#1e3a8a] text-white flex flex-col transition-all duration-300 ease-in-out shrink-0 select-none z-30 shadow-xl ${
+      className={`h-screen max-h-screen overflow-hidden bg-gradient-to-b from-[#1e3a8a] via-[#1e40af] to-[#1e3a8a] text-white flex flex-col transition-all duration-300 ease-in-out shrink-0 select-none z-30 shadow-xl ${
         collapsed ? 'w-[72px] px-2.5 py-4' : 'w-[260px] px-4 py-4'
       }`}
     >
       {/* Header */}
-      <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/15">
+      <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/15 shrink-0">
         <div className="flex items-center gap-2.5 overflow-hidden">
           <div className="w-9 h-9 rounded-xl bg-white/15 backdrop-blur-xs flex items-center justify-center shrink-0 border border-white/20">
             <Layers className="w-5 h-5 text-sky-300" />
@@ -69,14 +69,14 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
         <button
           onClick={() => setCollapsed(!collapsed)}
           title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-          className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/90 hover:text-white transition-colors cursor-pointer"
+          className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/90 hover:text-white transition-colors cursor-pointer shrink-0"
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <MoreVertical className="w-4 h-4" />}
         </button>
       </div>
 
       {/* Navigation (Only 3 tabs, No Create Order) */}
-      <nav className="flex-1 space-y-2 overflow-y-auto">
+      <nav className="flex-1 min-h-0 space-y-1.5 overflow-y-auto overflow-x-hidden pr-1 -mr-1 sidebar-scroll">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive =
@@ -111,11 +111,11 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
       </nav>
 
       {/* Footer Sign Out */}
-      <div className="pt-3 border-t border-white/15">
+      <div className="pt-3 mt-auto border-t border-white/15 shrink-0">
         <button
           onClick={onLogout}
           title={collapsed ? 'Sign Out' : undefined}
-          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold bg-red-500/20 text-red-200 hover:bg-red-500/30 hover:text-red-100 transition-colors cursor-pointer ${
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold bg-red-500/20 text-red-200 hover:bg-red-500/30 hover:text-red-100 transition-colors cursor-pointer shrink-0 ${
             collapsed ? 'justify-center px-0' : ''
           }`}
         >

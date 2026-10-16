@@ -14,7 +14,8 @@ import {
   Copy,
   Check,
   Package,
-  AlertTriangle
+  AlertTriangle,
+  MapPin
 } from 'lucide-react';
 
 interface OrderJourneyModalProps {
@@ -85,6 +86,12 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
   );
   const [isUpdatingScheduleTime, setIsUpdatingScheduleTime] = useState(false);
   const [scheduleTimeMsg, setScheduleTimeMsg] = useState<string | null>(null);
+
+  const [singleAddress, setSingleAddress] = useState<string>(
+    order.address_details || order.addressDetails || ''
+  );
+  const [isUpdatingAddress, setIsUpdatingAddress] = useState(false);
+  const [addressMsg, setAddressMsg] = useState<string | null>(null);
 
   // Format operator name: for manager access, user ID must strictly be '1', never email
   const sessionRole = typeof window !== 'undefined' ? sessionStorage.getItem('portal_session_role') : null;
@@ -313,6 +320,32 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
       console.error(err);
     } finally {
       setIsUpdatingScheduleTime(false);
+    }
+  };
+
+  const handleUpdateAddressOnly = async () => {
+    if (!onUpdateOrderStatus || isUpdatingAddress || !isManagerRole) return;
+    setIsUpdatingAddress(true);
+    setAddressMsg(null);
+    try {
+      const trimmed = singleAddress.trim();
+      await onUpdateOrderStatus(
+        orderId,
+        {
+          address_details: trimmed,
+          addressDetails: trimmed
+        },
+        userDisplayName,
+        `Address updated to "${trimmed}"`
+      );
+      setAddressMsg('Updated!');
+      if (onRefreshOrders) await onRefreshOrders();
+      setTimeout(() => setAddressMsg(null), 2500);
+    } catch (err) {
+      console.error(err);
+      setAddressMsg('Failed');
+    } finally {
+      setIsUpdatingAddress(false);
     }
   };
 
@@ -625,6 +658,43 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                     </div>
                   </div>
 
+                </div>
+              )}
+
+              {/* 6. Address Update - EXCLUSIVE TO MANAGER ACCESS ONLY */}
+              {isManagerRole && (
+                <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-black uppercase text-amber-900 tracking-wider flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Customer Delivery Address (Manager Only Access)</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-md">
+                      🔒 Only Manager Can Edit Address
+                    </span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <textarea
+                      rows={2}
+                      value={singleAddress}
+                      onChange={(e) => setSingleAddress(e.target.value)}
+                      placeholder="Enter customer delivery address (e.g. House, Road, Area)..."
+                      className="flex-1 px-3 py-2 text-xs font-semibold rounded-lg border border-amber-300 bg-white focus:outline-hidden focus:ring-1 focus:ring-amber-500 text-slate-800"
+                    />
+                    <div className="flex sm:flex-col items-center justify-end sm:justify-center gap-2">
+                      {addressMsg && (
+                        <span className="text-[10px] font-bold text-emerald-600 whitespace-nowrap">{addressMsg}</span>
+                      )}
+                      <button
+                        type="button"
+                        disabled={isUpdatingAddress || !singleAddress.trim()}
+                        onClick={handleUpdateAddressOnly}
+                        className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shadow-xs"
+                      >
+                        {isUpdatingAddress ? 'Saving...' : 'Update Address'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

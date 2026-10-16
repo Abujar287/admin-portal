@@ -55,7 +55,9 @@ import {
   Sliders,
   FolderTree,
   FileSpreadsheet,
-  CheckCircle
+  CheckCircle,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { 
   ORDER_CHANNELS, 
@@ -188,18 +190,19 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const isTeamLeader = !isManager;
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTabState] = useState<
-    'profiles' | 'users' | 'orders' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping' | 'sheet-connection' | 'followup'
+    'summary' | 'orders' | 'followup' | 'agent-performance' | 'users' | 'category-mapping' | 'sheet-connection' | 'profiles'
   >(() => {
     const saved = sessionStorage.getItem('manager_active_tab') as any;
-    if (!isManager && (saved === 'sheet-connection' || saved === 'users' || saved === 'category-mapping' || saved === 'profiles' || saved === 'settings')) {
+    if (saved === 'settings') return 'summary';
+    if (!isManager && (saved === 'sheet-connection' || saved === 'users' || saved === 'category-mapping' || saved === 'profiles')) {
       return 'summary';
     }
     if (saved) return saved;
-    return isManager ? 'users' : 'summary';
+    return 'summary';
   });
 
-  const setActiveTab = (tab: 'profiles' | 'users' | 'orders' | 'summary' | 'agent-performance' | 'settings' | 'category-mapping' | 'city-area-mapping' | 'sheet-connection' | 'followup') => {
-    if (!isManager && (tab === 'sheet-connection' || tab === 'users' || tab === 'category-mapping' || tab === 'profiles' || tab === 'settings')) {
+  const setActiveTab = (tab: 'summary' | 'orders' | 'followup' | 'agent-performance' | 'users' | 'category-mapping' | 'sheet-connection' | 'profiles') => {
+    if (!isManager && (tab === 'sheet-connection' || tab === 'users' || tab === 'category-mapping' || tab === 'profiles')) {
       return;
     }
     sessionStorage.setItem('manager_active_tab', tab);
@@ -211,25 +214,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setTimeout(() => setManagerToast(null), 3000);
   };
 
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    return (localStorage.getItem('portal_theme') as 'light' | 'dark') || 'light';
-  });
-
-  const isDark = theme === 'dark';
-  const cardBg = isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900';
-  const cardHeaderBg = isDark ? 'bg-slate-800/80 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-100 text-slate-800';
-  const tableHeaderBg = isDark ? 'bg-slate-800 text-slate-200 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-200';
-  const tableRowBg = isDark ? 'divide-slate-800 text-slate-200 hover:bg-slate-800/60' : 'divide-slate-100 text-slate-800 hover:bg-amber-100/50';
-  const inputBg = isDark ? 'bg-slate-800 border-slate-700 text-slate-100 placeholder-slate-400 focus:border-indigo-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-indigo-600';
-
-  const handleToggleTheme = (newTheme: 'light' | 'dark') => {
-    setTheme(newTheme);
-    localStorage.setItem('portal_theme', newTheme);
-    showToast(`Switched to ${newTheme === 'dark' ? 'Dark' : 'Light'} Theme!`);
-  };
+  const cardBg = 'bg-white border-slate-200 text-slate-900';
+  const cardHeaderBg = 'bg-slate-50 border-slate-100 text-slate-800';
+  const tableHeaderBg = 'bg-slate-100 text-slate-700 border-slate-200';
+  const tableRowBg = 'divide-slate-100 text-slate-800 hover:bg-amber-100/50';
+  const inputBg = 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-indigo-600';
+  const isDark = false;
+  const theme = 'light';
 
   const [followupFilterName, setFollowupFilterName] = useState<string>('All');
   const [followupFilterDate, setFollowupFilterDate] = useState<string>('');
+  const [followupSearchType, setFollowupSearchType] = useState<string>('order_id');
+  const [followupSearchValue, setFollowupSearchValue] = useState<string>('');
 
   // Status & Details Modal State
   const [statusModalOrder, setStatusModalOrder] = useState<OrderItem | null>(null);
@@ -259,6 +255,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [editContact, setEditContact] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editBloodGroup, setEditBloodGroup] = useState('');
+  const [editAddress, setEditAddress] = useState('');
   const [editTeamLeaders, setEditTeamLeaders] = useState<string[]>([]);
   const [editCustomTLInput, setEditCustomTLInput] = useState('');
   const [editStatus, setEditStatus] = useState<'active' | 'deactivated'>('active');
@@ -441,7 +438,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [summaryDateFilter, setSummaryDateFilter] = useState<DateFilterType>('all');
   const [summaryStartDate, setSummaryStartDate] = useState('');
   const [summaryEndDate, setSummaryEndDate] = useState('');
-  const [summaryBreakdownTab, setSummaryBreakdownTab] = useState<'all' | 'channel' | 'category' | 'city'>('all');
+  const [summaryBreakdownTab, setSummaryBreakdownTab] = useState<'all' | 'channel' | 'category' | 'city' | 'date'>('all');
 
   // Sorting states for tables
   const [channelSortKey, setChannelSortKey] = useState<string>('createOrders');
@@ -452,6 +449,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   const [citySortKey, setCitySortKey] = useState<string>('createOrders');
   const [citySortDirection, setCitySortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const [dateSortKey, setDateSortKey] = useState<string>('date');
+  const [dateSortDirection, setDateSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const [agentSortKey, setAgentSortKey] = useState<string>('createOrders');
   const [agentSortDirection, setAgentSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -576,12 +576,252 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   // Matrix mappings
   const [categoryMappings, setCategoryMappings] = useState<CategoryTeamMapping[]>(() => getCategoryMappings());
+  const [mappingSearchQuery, setMappingSearchQuery] = useState('');
+  const [showDemoGuide, setShowDemoGuide] = useState(true);
+
+  // Demo Category Mapping CSV Data - 10 Completely Unique Categories with Channels & Time Slots
+  const DEMO_CATEGORY_MAPPINGS_DATA: CategoryTeamMapping[] = [
+    { id: 'demo-1', category: 'Electronics', team: 'Acquisition', orderStatus: 'Pending', channel: 'Facebook', teamLeader: 'MD Abujar', timeSlot: '10AM to 11AM' },
+    { id: 'demo-2', category: 'Room Accessories', team: 'Retention', orderStatus: 'Confirmed', channel: 'Retention', teamLeader: 'Manager (Admin)', timeSlot: '11AM to 12PM' },
+    { id: 'demo-3', category: 'Cloths & Apparel', team: 'Facebook', orderStatus: 'Follow-up', channel: 'Call-Center', teamLeader: 'TL Rahim', timeSlot: '12PM to 1PM' },
+    { id: 'demo-4', category: 'Medicines & Health', team: 'Call-Center', orderStatus: 'In Progress', channel: 'VOC', teamLeader: 'TL Karim', timeSlot: '1PM to 2PM' },
+    { id: 'demo-5', category: 'Home Appliances', team: 'KAM', orderStatus: 'Delivered', channel: 'KAM', teamLeader: 'MD Abujar', timeSlot: '2PM to 3PM' },
+    { id: 'demo-6', category: 'Cosmetics & Beauty', team: 'Back-Office', orderStatus: 'Cancelled', channel: 'Back-Office', teamLeader: 'TL Rahim', timeSlot: '3PM to 4PM' },
+    { id: 'demo-7', category: 'Sports & Fitness', team: 'Retention', orderStatus: 'Confirmed', channel: 'Retention', teamLeader: 'Manager (Admin)', timeSlot: '4PM to 5PM' },
+    { id: 'demo-8', category: 'Kitchen & Dining', team: 'VOC', orderStatus: 'Pending', channel: 'Facebook', teamLeader: 'TL Karim', timeSlot: '5PM to 6PM' },
+    { id: 'demo-9', category: 'Mobile & Gadgets', team: 'Acquisition', orderStatus: 'In Progress', channel: 'Call-Center', teamLeader: 'MD Abujar', timeSlot: '6PM to 7PM' },
+    { id: 'demo-10', category: 'Jewelry & Watches', team: 'Facebook', orderStatus: 'Delivered', channel: 'Facebook', teamLeader: 'TL Rahim', timeSlot: '7PM to 8PM' },
+  ];
+
+  const handleDownloadDemoCsv = () => {
+    const headers = "category,team,orderStatus,channel,teamLeader,timeSlot";
+    const rows = DEMO_CATEGORY_MAPPINGS_DATA.map(r => `"${r.category}","${r.team}","${r.orderStatus}","${r.channel || 'Facebook'}","${r.teamLeader}","${r.timeSlot || '10AM to 11AM'}"`);
+    const csvContent = [headers, ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "demo_category_mapping.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast("Demo Category Mapping CSV (10 unique categories with Channel & Time Slot) downloaded!");
+  };
+
+  const handlePreviewDemoCsv = () => {
+    setCsvPreviewModal({
+      title: 'Demo Category Mapping CSV Template (10 Unique Categories)',
+      data: DEMO_CATEGORY_MAPPINGS_DATA.map(d => ({
+        category: d.category,
+        team: d.team,
+        orderStatus: d.orderStatus,
+        channel: d.channel || 'Facebook',
+        teamLeader: d.teamLeader,
+        timeSlot: d.timeSlot || '10AM to 11AM'
+      })),
+      filename: 'demo_category_mapping.csv'
+    });
+  };
+
+  const handleLoadDemoCategoryMappings = () => {
+    // Ensure 100% unique categories
+    const seen = new Set<string>();
+    const uniqueDemoData = DEMO_CATEGORY_MAPPINGS_DATA.filter(r => {
+      const key = r.category.trim().toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    const newMappings: CategoryTeamMapping[] = uniqueDemoData.map((r, idx) => ({
+      id: String(Date.now() + idx),
+      category: r.category,
+      team: r.team,
+      orderStatus: r.orderStatus,
+      channel: r.channel || 'Facebook',
+      teamLeader: r.teamLeader,
+      timeSlot: r.timeSlot || '10AM to 11AM'
+    }));
+
+    setCategoryMappings(newMappings);
+    saveCategoryMappings(newMappings);
+
+    // Sync items into master lists without duplicates
+    uniqueDemoData.forEach(r => {
+      addProductCategory(r.category);
+      addOrderStatus(r.orderStatus);
+      addTeamItem(r.team);
+      if (r.channel) addOrderChannel(r.channel);
+      addTeamLeaderItem(r.teamLeader);
+      if (r.timeSlot) addTimeSlot(r.timeSlot);
+    });
+    setCategories(getProductCategories());
+    setOrderStatuses(getOrderStatuses());
+    setTeamsList(getTeamsList());
+    setChannelsList(getOrderChannels());
+    setAvailableChannels(getOrderChannels());
+    setTeamLeadersList(getTeamLeadersList());
+    setTimeSlotsList(getTimeSlots());
+
+    showToast(`Loaded ${newMappings.length} unique demo category mappings (with channel & time slot) successfully!`);
+  };
+
+  const handleCleanDuplicateMappings = () => {
+    const seen = new Set<string>();
+    const cleaned: CategoryTeamMapping[] = [];
+    categoryMappings.forEach(m => {
+      const key = (m.category || '').trim().toLowerCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        cleaned.push(m);
+      }
+    });
+    setCategoryMappings(cleaned);
+    saveCategoryMappings(cleaned);
+    showToast(`Deduplicated: ${cleaned.length} unique category mappings preserved.`);
+  };
+
+  const handleExportCategoryMappingsCsv = () => {
+    if (categoryMappings.length === 0) {
+      showToast("No category mappings to export.");
+      return;
+    }
+    const headers = "category,team,orderStatus,channel,teamLeader,timeSlot";
+    const rows = categoryMappings.map(m => `"${m.category}","${m.team}","${m.orderStatus || (m as any).status || 'Pending'}","${m.channel || 'Facebook'}","${m.teamLeader}","${m.timeSlot || '10AM to 11AM'}"`);
+    const csvContent = [headers, ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "category_mappings.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast("Category mappings exported to CSV successfully!");
+  };
+
+  const handleImportCategoryMappingsCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+        if (lines.length <= 1) {
+          showToast("CSV file is empty or missing rows.");
+          return;
+        }
+
+        // Dynamically detect column header indices
+        const headerCols = lines[0].split(',').map(c => c.replace(/^"|"$/g, '').trim().toLowerCase());
+        const hasHeader = headerCols.some(h => 
+          ['category', 'team', 'status', 'orderstatus', 'channel', 'time', 'timeslot', 'leader', 'teamleader'].includes(h)
+        );
+
+        let catIdx = headerCols.indexOf('category');
+        let teamIdx = headerCols.indexOf('team');
+        let statusIdx = headerCols.findIndex(h => h === 'orderstatus' || h === 'status');
+        let channelIdx = headerCols.findIndex(h => h === 'channel' || h === 'orderchannel');
+        let leaderIdx = headerCols.findIndex(h => h === 'teamleader' || h === 'leader');
+        let slotIdx = headerCols.findIndex(h => h === 'timeslot' || h === 'time_slot' || h === 'slot' || h === 'time');
+
+        const startLine = hasHeader ? 1 : 0;
+        if (catIdx === -1) catIdx = 0;
+        if (teamIdx === -1) teamIdx = 1;
+        if (statusIdx === -1) statusIdx = 2;
+        if (channelIdx === -1) channelIdx = headerCols.length >= 6 ? 3 : -1;
+        if (leaderIdx === -1) leaderIdx = headerCols.length >= 6 ? 4 : 3;
+        if (slotIdx === -1) slotIdx = headerCols.length >= 6 ? 5 : -1;
+
+        const newMappings: CategoryTeamMapping[] = [];
+        let duplicateCount = 0;
+
+        for (let i = startLine; i < lines.length; i++) {
+          const cols = lines[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
+          if (cols.length >= 2) {
+            const cat = cols[catIdx] || '';
+            const team = (teamIdx !== -1 && cols[teamIdx]) ? cols[teamIdx] : 'Acquisition';
+            const orderStatus = (statusIdx !== -1 && cols[statusIdx]) ? cols[statusIdx] : 'Pending';
+            const channel = (channelIdx !== -1 && cols[channelIdx]) ? cols[channelIdx] : 'Facebook';
+            const tl = (leaderIdx !== -1 && cols[leaderIdx]) ? cols[leaderIdx] : 'MD Abujar';
+            const timeSlot = (slotIdx !== -1 && cols[slotIdx]) ? cols[slotIdx] : '10AM to 11AM';
+
+            // Check for duplicate category
+            const isDuplicate = newMappings.some(
+              m => m.category.toLowerCase().trim() === cat.toLowerCase().trim()
+            );
+
+            if (cat && !isDuplicate) {
+              newMappings.push({
+                id: String(Date.now() + i),
+                category: cat,
+                team,
+                orderStatus,
+                channel,
+                teamLeader: tl,
+                timeSlot
+              });
+            } else if (isDuplicate) {
+              duplicateCount++;
+            }
+          }
+        }
+
+        if (newMappings.length > 0) {
+          setCategoryMappings(newMappings);
+          saveCategoryMappings(newMappings);
+
+          // Sync master lists
+          newMappings.forEach(m => {
+            if (m.category) addProductCategory(m.category);
+            if (m.orderStatus) addOrderStatus(m.orderStatus);
+            if (m.team) addTeamItem(m.team);
+            if (m.channel) addOrderChannel(m.channel);
+            if (m.teamLeader) addTeamLeaderItem(m.teamLeader);
+            if (m.timeSlot) addTimeSlot(m.timeSlot);
+          });
+          setCategories(getProductCategories());
+          setOrderStatuses(getOrderStatuses());
+          setTeamsList(getTeamsList());
+          setChannelsList(getOrderChannels());
+          setAvailableChannels(getOrderChannels());
+          setTeamLeadersList(getTeamLeadersList());
+          setTimeSlotsList(getTimeSlots());
+
+          const dupMsg = duplicateCount > 0 ? ` (${duplicateCount} duplicate status rows skipped)` : '';
+          showToast(`Successfully updated ${newMappings.length} category mappings from CSV!${dupMsg}`);
+        } else {
+          showToast("No valid mappings found in CSV.");
+        }
+      } catch (err: any) {
+        showToast(`Failed to parse CSV: ${err.message}`);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const filteredCategoryMappings = useMemo(() => {
+    if (!mappingSearchQuery.trim()) return categoryMappings;
+    const q = mappingSearchQuery.toLowerCase();
+    return categoryMappings.filter(m =>
+      m.category.toLowerCase().includes(q) ||
+      m.team.toLowerCase().includes(q) ||
+      (m.orderStatus || (m as any).status || '').toLowerCase().includes(q) ||
+      (m.channel || '').toLowerCase().includes(q) ||
+      m.teamLeader.toLowerCase().includes(q) ||
+      (m.timeSlot || '').toLowerCase().includes(q)
+    );
+  }, [categoryMappings, mappingSearchQuery]);
 
   // Mapping Form State
   const [newMappingCategory, setNewMappingCategory] = useState('');
   const [newMappingTeam, setNewMappingTeam] = useState('Acquisition');
   const [newMappingStatus, setNewMappingStatus] = useState('Pending');
+  const [newMappingChannel, setNewMappingChannel] = useState('Facebook');
   const [newMappingTeamLeader, setNewMappingTeamLeader] = useState('MD Abujar');
+  const [newMappingTimeSlot, setNewMappingTimeSlot] = useState('10AM to 11AM');
 
   // 1. Category Handlers
   const handleAddNewCategory = (e: React.FormEvent) => {
@@ -716,11 +956,20 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       const updatedCats = addProductCategory(cat);
       setCategories([...updatedCats]);
     }
-    const existingIdx = categoryMappings.findIndex(m => m.category.toLowerCase() === cat.toLowerCase());
+    const existingIdx = categoryMappings.findIndex(
+      m => m.category.toLowerCase().trim() === cat.toLowerCase().trim()
+    );
     let updated: CategoryTeamMapping[];
     if (existingIdx !== -1) {
       updated = categoryMappings.map((m, idx) => 
-        idx === existingIdx ? { ...m, team: newMappingTeam, orderStatus: newMappingStatus, teamLeader: newMappingTeamLeader || 'Unassigned' } : m
+        idx === existingIdx ? {
+          ...m,
+          team: newMappingTeam,
+          orderStatus: newMappingStatus,
+          channel: newMappingChannel || 'Facebook',
+          teamLeader: newMappingTeamLeader || 'Unassigned',
+          timeSlot: newMappingTimeSlot || '10AM to 11AM'
+        } : m
       );
     } else {
       updated = [
@@ -730,7 +979,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           category: cat,
           orderStatus: newMappingStatus,
           team: newMappingTeam,
-          teamLeader: newMappingTeamLeader || 'Unassigned'
+          channel: newMappingChannel || 'Facebook',
+          teamLeader: newMappingTeamLeader || 'Unassigned',
+          timeSlot: newMappingTimeSlot || '10AM to 11AM'
         }
       ];
     }
@@ -741,7 +992,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     showToast(`Category mapping row for "${cat}" saved!`);
   };
 
-  const handleUpdateMappingField = (id: string, field: 'category' | 'team' | 'orderStatus' | 'teamLeader', value: string) => {
+  const handleUpdateMappingField = (id: string, field: 'category' | 'team' | 'orderStatus' | 'channel' | 'teamLeader' | 'timeSlot', value: string) => {
     const updated = categoryMappings.map(m => m.id === id ? { ...m, [field]: value } : m);
     setCategoryMappings(updated);
     saveCategoryMappings(updated);
@@ -796,31 +1047,109 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   const formatForExport = (data: any[]) => {
     if (data.length === 0) return data;
-    return data.map(item => ({
-      order_id: item.order_id || item.id || '',
-      customer_id: item.customer_id || item.customerId || '',
-      customer_mobile: item.customer_mobile || item.customerContact || '',
-      customer_name: item.customer_name || item.customerName || '',
-      gender: item.gender || '',
-      create_date: item.create_date || item.createDate || item.createdAt || '',
-      order_channel: item.order_channel || item.orderChannel || '',
-      agent_id: item.agent_id || item.agentId || '',
-      agent_name: item.agent_name || item.agentName || '',
-      product_category: item.product_category || item.productCategory || '',
-      product_name: item.product_name || item.productName || '',
-      city: item.city || '',
-      delivery_area: item.delivery_area || item.deliveryArea || '',
-      address_details: item.address_details || item.addressDetails || '',
-      schedule_date: item.schedule_date || item.scheduleDate || '',
-      schedule_time: item.schedule_time || item.scheduledTime || '',
-      order_value: item.order_value || item.orderValue || 0,
-      order_status: item.order_status || item.orderStatus || '',
-      followup_status: item.followup_status || item.followupStatus || '',
-      profit: item.profit || 0,
-      delivered_date: item.delivered_date || item.deliveredDate || '',
-      cancelled_date: item.cancelled_date || item.cancelledDate || '',
-      followup_date: item.followup_date || item.followupDate || ''
-    }));
+    const first = data[0];
+
+    // Case 1: Agent Performance item
+    if ('agentId' in first || ('user' in first && 'role' in first && 'servedOrders' in first) || ('createOrders' in first && 'team' in first)) {
+      return data.map(item => ({
+        agent_id: item.agentId || item.user || '',
+        agent_name: item.name || '',
+        team: item.team || '',
+        role: item.role || '',
+        status: item.status || 'active',
+        create_orders: item.createOrders ?? 0,
+        served_orders: item.servedOrders ?? 0,
+        cancelled_orders: item.cancelledOrders ?? 0,
+        pending_orders: item.pendingOrders ?? 0,
+        order_value: item.orderValue ?? 0,
+        delivered_order_value: item.deliveredOrderValue ?? 0,
+        profit: item.profit ?? 0,
+        bucket_size: item.bucketSize ?? 0,
+        delivered_ratio: `${item.deliveredRatio ?? 0}%`,
+        cancelled_ratio: `${item.cancelledRatio ?? 0}%`,
+        nr_ratio: `${item.nrRatio ?? 0}%`,
+        followup_count: item.followupCount ?? 0
+      }));
+    }
+
+    // Case 2: Date Wise Summary item
+    if ('date' in first || ('name' in first && /^\d{4}-\d{2}-\d{2}/.test(String(first.name)))) {
+      return data.map(item => ({
+        date: item.date || item.name,
+        create_orders: item.createOrders ?? 0,
+        served_orders: item.servedOrders ?? 0,
+        cancelled_orders: item.cancelledOrders ?? 0,
+        pending_orders: item.pendingOrders ?? 0,
+        order_value: item.orderValue ?? 0,
+        delivered_order_value: item.deliveredOrderValue ?? 0,
+        profit: item.profit ?? 0,
+        bucket_size: item.bucketSize ?? 0,
+        delivered_ratio: `${item.deliveredRatio ?? 0}%`,
+        cancelled_ratio: `${item.cancelledRatio ?? 0}%`,
+        nr_ratio: `${item.nrRatio ?? 0}%`
+      }));
+    }
+
+    // Case 3: Channel / Category / City Summary item
+    if ('createOrders' in first && 'servedOrders' in first && 'name' in first) {
+      return data.map(item => ({
+        name: item.name,
+        create_orders: item.createOrders ?? 0,
+        served_orders: item.servedOrders ?? 0,
+        cancelled_orders: item.cancelledOrders ?? 0,
+        order_value: item.orderValue ?? 0,
+        delivered_order_value: item.deliveredOrderValue ?? 0,
+        profit: item.profit ?? 0,
+        bucket_size: item.bucketSize ?? 0,
+        delivered_ratio: `${item.deliveredRatio ?? 0}%`,
+        cancelled_ratio: `${item.cancelledRatio ?? 0}%`,
+        nr_ratio: `${item.nrRatio ?? 0}%`
+      }));
+    }
+
+    // Case 4: Followup History item
+    if ('action' in first && 'timestamp' in first) {
+      return data.map(item => ({
+        order_id: item.orderId || '',
+        timestamp: item.timestamp || '',
+        updated_by: item.updatedByName || item.updatedBy || '',
+        action: item.action || '',
+        previous_status: item.prevStatus || '',
+        new_status: item.newStatus || '',
+        notes: item.notes || ''
+      }));
+    }
+
+    // Case 5: Standard Order item
+    if ('order_id' in first || 'customer_mobile' in first || 'product_name' in first || 'customer_name' in first || 'id' in first) {
+      return data.map(item => ({
+        order_id: item.order_id || item.id || '',
+        customer_id: item.customer_id || item.customerId || '',
+        customer_mobile: item.customer_mobile || item.customerContact || '',
+        customer_name: item.customer_name || item.customerName || '',
+        gender: item.gender || '',
+        create_date: item.create_date || item.createDate || item.createdAt || '',
+        order_channel: item.order_channel || item.orderChannel || '',
+        agent_id: item.agent_id || item.agentId || '',
+        agent_name: item.agent_name || item.agentName || '',
+        product_category: item.product_category || item.productCategory || '',
+        product_name: item.product_name || item.productName || '',
+        city: item.city || '',
+        delivery_area: item.delivery_area || item.deliveryArea || '',
+        address_details: item.address_details || item.addressDetails || '',
+        schedule_date: item.schedule_date || item.scheduleDate || '',
+        schedule_time: item.schedule_time || item.scheduledTime || '',
+        order_value: item.order_value || item.orderValue || 0,
+        order_status: item.order_status || item.orderStatus || '',
+        followup_status: item.followup_status || item.followupStatus || '',
+        profit: item.profit || 0,
+        delivered_date: item.delivered_date || item.deliveredDate || '',
+        cancelled_date: item.cancelled_date || item.cancelledDate || '',
+        followup_date: item.followup_date || item.followupDate || ''
+      }));
+    }
+
+    return data;
   };
 
   const handleExportCsv = (data: any[], filename: string) => {
@@ -1088,6 +1417,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setEditContact(ag.contact || '');
     setEditEmail(ag.email || '');
     setEditBloodGroup(ag.bloodGroup || '');
+    setEditAddress(ag.address || '');
     setEditStatus(ag.status || 'active');
     const agTLs = Array.isArray(ag.teamLeaders) && ag.teamLeaders.length > 0
       ? ag.teamLeaders
@@ -1146,6 +1476,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             contact: editContact.trim(),
             email: editEmail.trim(),
             bloodGroup: editBloodGroup.trim(),
+            address: editAddress.trim(),
             status: editStatus,
             failedAttempts: editStatus === 'active' ? 0 : (agent.failedAttempts || 3),
             permissions: permissions
@@ -1437,6 +1768,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       return map[cleanKey];
     };
 
+    const dateMap: Record<string, ReturnType<typeof buildGroupMap> & { pendingOrders: number }> = {};
+    const getOrInitDate = (dateKey: string) => {
+      const cleanKey = dateKey || 'Unknown Date';
+      if (!dateMap[cleanKey]) {
+        dateMap[cleanKey] = {
+          ...buildGroupMap(),
+          pendingOrders: 0
+        };
+      }
+      return dateMap[cleanKey];
+    };
+
     orders.forEach((r) => {
       const val = Number(r.order_value) || 0;
       const profit = Number(r.profit) || 0;
@@ -1448,6 +1791,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       const catItem = getOrInit(catMap, r.product_category);
       const cityItem = getOrInit(cityMap, r.city);
       const agItem = getOrInitAgent(r.agent_id, r.agent_name);
+
+      const orderDateStr = r.create_date
+        ? (r.create_date.includes(' ') ? r.create_date.split(' ')[0] : (r.create_date.includes('T') ? r.create_date.split('T')[0] : r.create_date)).trim()
+        : 'Unknown Date';
 
       // 1. Create Orders (Create Date)
       if (matchDate(r.create_date, summaryDateFilter, summaryStartDate, summaryEndDate)) {
@@ -1465,6 +1812,19 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
         agItem.createOrders += 1;
         agItem.orderValue += val;
+
+        const dtItem = getOrInitDate(orderDateStr);
+        dtItem.createOrders += 1;
+        dtItem.orderValue += val;
+        if (fStatus === 'delivered') {
+          dtItem.servedOrders += 1;
+          dtItem.deliveredOrderValue += val;
+          dtItem.profit += profit;
+        } else if (fStatus === 'cancelled') {
+          dtItem.cancelledOrders += 1;
+        } else {
+          dtItem.pendingOrders += 1;
+        }
       }
 
       // 2. Delivered Orders (Followup status = Delivered & Delivered date exists)
@@ -1554,6 +1914,30 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     const categorySummary = finalizeGroups(catMap);
     const citySummary = finalizeGroups(cityMap);
 
+    const dateSummary = Object.entries(dateMap).map(([name, item]) => {
+      const totalDelivCanc = item.servedOrders + item.cancelledOrders;
+      const delivRatio = totalDelivCanc > 0 ? Math.round((item.servedOrders / totalDelivCanc) * 100) : 0;
+      const cancRatio = totalDelivCanc > 0 ? Math.round((item.cancelledOrders / totalDelivCanc) * 100) : 0;
+      const bSize = item.servedOrders > 0 ? Math.round(item.deliveredOrderValue / item.servedOrders) : 0;
+      const netRevRatio = item.deliveredOrderValue > 0 ? Number(((item.profit / item.deliveredOrderValue) * 100).toFixed(1)) : 0;
+
+      return {
+        name,
+        date: name,
+        createOrders: item.createOrders,
+        servedOrders: item.servedOrders,
+        cancelledOrders: item.cancelledOrders,
+        pendingOrders: item.pendingOrders,
+        orderValue: item.orderValue,
+        deliveredOrderValue: item.deliveredOrderValue,
+        profit: item.profit,
+        bucketSize: bSize,
+        deliveredRatio: delivRatio,
+        cancelledRatio: cancRatio,
+        nrRatio: netRevRatio
+      };
+    });
+
     // Filter out agents who have no data
     const agentSummary = Object.values(agentMap)
       .filter((item) => (item.createOrders + item.servedOrders + item.cancelledOrders + item.pendingOrders + item.followupCount) > 0)
@@ -1611,6 +1995,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     const channelGrandTotal = computeGrandTotal(channelSummary);
     const categoryGrandTotal = computeGrandTotal(categorySummary);
     const cityGrandTotal = computeGrandTotal(citySummary);
+    const dateGrandTotal = {
+      ...computeGrandTotal(dateSummary),
+      pendingOrders: dateSummary.reduce((acc, cur) => acc + (cur.pendingOrders || 0), 0)
+    };
     const agentGrandTotal = computeGrandTotal(agentSummary);
 
     return {
@@ -1629,10 +2017,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       channelSummary,
       categorySummary,
       citySummary,
+      dateSummary,
       agentSummary,
       channelGrandTotal,
       categoryGrandTotal,
       cityGrandTotal,
+      dateGrandTotal,
       agentGrandTotal
     };
   }, [orders, agents, followupHistory, summaryDateFilter, summaryStartDate, summaryEndDate, orderDeliveredDateMap, orderCancelledDateMap]);
@@ -1649,6 +2039,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const sortedCitySummary = useMemo(() => {
     return sortItems(summaryStats.citySummary, citySortKey, citySortDirection);
   }, [summaryStats.citySummary, citySortKey, citySortDirection]);
+
+  const sortedDateSummary = useMemo(() => {
+    return sortItems(summaryStats.dateSummary, dateSortKey, dateSortDirection);
+  }, [summaryStats.dateSummary, dateSortKey, dateSortDirection]);
 
   const filteredAgentPerformance = useMemo(() => {
     const list = summaryStats.agentSummary.filter((ag) => {
@@ -1715,7 +2109,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   }, [filteredAgentPerformance]);
 
   return (
-    <div className={`flex h-screen font-sans antialiased overflow-hidden select-none ${theme === 'dark' ? 'bg-slate-950 text-slate-100 dark' : 'bg-slate-50 text-slate-900'}`}>
+    <div className="flex h-screen font-sans antialiased overflow-hidden select-none bg-slate-50 text-slate-900">
       {managerToast && (
         <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xl flex items-center gap-2 border border-slate-700 animate-fadeIn">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -1723,14 +2117,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         </div>
       )}
       {/* Manager Sidebar */}
-      <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col p-5 border-r border-white/10 shrink-0 transition-all duration-300 z-10`}>
-        <div className="flex items-center justify-between pb-6 mb-6 border-b border-white/10">
+      <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} h-screen max-h-screen bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col p-4 border-r border-white/10 shrink-0 transition-all duration-300 z-10 overflow-hidden`}>
+        <div className="flex items-center justify-between pb-4 mb-3 border-b border-white/10 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white shadow-lg">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white shadow-lg shrink-0">
               📊
             </div>
             {isSidebarOpen && (
-              <div>
+              <div className="min-w-0">
                 <h2 className="font-extrabold text-sm tracking-tight text-white truncate max-w-[130px]">{currentManager.name || currentManager.user}</h2>
                 <span className="inline-block px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-bold bg-indigo-500/25 text-indigo-200 border border-indigo-400/30">
                   ID: @{currentManager.user}
@@ -1738,33 +2132,23 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               </div>
             )}
           </div>
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-white/10 rounded-lg">
+          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-white/10 rounded-lg shrink-0 cursor-pointer" title={isSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
             <span className="text-xl">⋮</span>
           </button>
         </div>
 
-        <nav className="flex-1 space-y-2">
-          {isManager && (
-            <button
-              onClick={() => setActiveTab('sheet-connection')}
-              className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
-                activeTab === 'sheet-connection'
-                  ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                  : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
-              }`}
-            >
-              <FileSpreadsheet className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'sheet-connection' ? 'text-emerald-300 scale-110' : 'text-emerald-400'}`} />
-              {isSidebarOpen && (
-                <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'sheet-connection' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
-                  Google Sheet &amp; Tabs
-                </span>
-              )}
-            </button>
+        <nav className="flex-1 min-h-0 space-y-1.5 overflow-y-auto overflow-x-hidden pr-1 -mr-1 sidebar-scroll">
+          {/* Operations Section */}
+          {isSidebarOpen && (
+            <div className="px-3 pt-1 pb-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+              Operations
+            </div>
           )}
 
+          {/* 1. Summary */}
           <button
             onClick={() => setActiveTab('summary')}
-            className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
+            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
               activeTab === 'summary'
                 ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
                 : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
@@ -1778,9 +2162,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             )}
           </button>
 
+          {/* 2. Orders */}
           <button
             onClick={() => setActiveTab('orders')}
-            className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
+            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
               activeTab === 'orders'
                 ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
                 : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
@@ -1799,9 +2184,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             )}
           </button>
 
+          {/* 3. Followup History */}
           <button
             onClick={() => setActiveTab('followup')}
-            className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
+            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
               activeTab === 'followup'
                 ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
                 : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
@@ -1820,32 +2206,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             )}
           </button>
 
-          {!isTeamLeader && (
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
-                activeTab === 'users'
-                  ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                  : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
-              }`}
-            >
-              <Users className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'users' ? 'text-purple-300 scale-110' : 'text-slate-400'}`} />
-              {isSidebarOpen && (
-                <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'users' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
-                  User Details
-                </span>
-              )}
-              {isSidebarOpen && (
-                <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'users' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
-                  {agents.length}
-                </span>
-              )}
-            </button>
-          )}
-
+          {/* 4. Agent Performance */}
           <button
             onClick={() => setActiveTab('agent-performance')}
-            className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
+            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
               activeTab === 'agent-performance'
                 ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
                 : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
@@ -1864,11 +2228,41 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             )}
           </button>
 
+          {/* Administration Section (Manager Only) */}
           {!isTeamLeader && (
             <>
+              {isSidebarOpen && (
+                <div className="px-3 pt-3 pb-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase border-t border-white/10 mt-2">
+                  Administration
+                </div>
+              )}
+
+              {/* 5. User Details */}
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
+                  activeTab === 'users'
+                    ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                    : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+                }`}
+              >
+                <Users className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'users' ? 'text-purple-300 scale-110' : 'text-slate-400'}`} />
+                {isSidebarOpen && (
+                  <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'users' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                    User Details
+                  </span>
+                )}
+                {isSidebarOpen && (
+                  <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'users' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
+                    {agents.length}
+                  </span>
+                )}
+              </button>
+
+              {/* 6. Category Mapping */}
               <button
                 onClick={() => setActiveTab('category-mapping')}
-                className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
+                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
                   activeTab === 'category-mapping'
                     ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
                     : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
@@ -1880,11 +2274,39 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     Category Mapping
                   </span>
                 )}
+                {isSidebarOpen && (
+                  <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'category-mapping' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
+                    {categoryMappings.length}
+                  </span>
+                )}
               </button>
 
+              {/* 7. Google Sheet & Tabs */}
+              <button
+                onClick={() => setActiveTab('sheet-connection')}
+                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
+                  activeTab === 'sheet-connection'
+                    ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                    : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+                }`}
+              >
+                <FileSpreadsheet className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'sheet-connection' ? 'text-emerald-300 scale-110' : 'text-emerald-400'}`} />
+                {isSidebarOpen && (
+                  <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'sheet-connection' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                    Google Sheet &amp; Tabs
+                  </span>
+                )}
+                {isSidebarOpen && connectedSheetTabs.length > 0 && (
+                  <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'sheet-connection' ? 'bg-white text-indigo-900' : 'bg-emerald-500/30 text-emerald-200'}`}>
+                    {connectedSheetTabs.length}
+                  </span>
+                )}
+              </button>
+
+              {/* 8. Manager Profile */}
               <button
                 onClick={() => setActiveTab('profiles')}
-                className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
+                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
                   activeTab === 'profiles'
                     ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
                     : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
@@ -1893,23 +2315,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 <User className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'profiles' ? 'text-sky-300 scale-110' : 'text-slate-400'}`} />
                 {isSidebarOpen && (
                   <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'profiles' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
-                    Profiles
-                  </span>
-                )}
-              </button>
-
-              <button
-                onClick={() => setActiveTab('settings')}
-                className={`w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
-                  activeTab === 'settings'
-                    ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                    : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
-                }`}
-              >
-                <Settings className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'settings' ? 'text-indigo-300 scale-110' : 'text-indigo-400'}`} />
-                {isSidebarOpen && (
-                  <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'settings' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
-                    Settings &amp; Export
+                    Profile
                   </span>
                 )}
               </button>
@@ -1917,12 +2323,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           )}
         </nav>
 
-        <div className="pt-4 border-t border-white/10">
+        <div className="pt-3 mt-auto border-t border-white/10 shrink-0">
           <button
             onClick={onLogout}
-            className="w-full py-2.5 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/30 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+            title={isSidebarOpen ? undefined : 'Sign Out'}
+            className="w-full py-2.5 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/30 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-4 h-4 shrink-0" />
             {isSidebarOpen && <span>Sign Out</span>}
           </button>
         </div>
@@ -1931,22 +2338,21 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Top Header */}
-        <header className="h-16 border-b border-slate-200 bg-white px-6 flex items-center justify-between shrink-0 shadow-xs">
+        <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#121212] px-6 flex items-center justify-between shrink-0 shadow-xs">
           <div className="flex items-center gap-2.5">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               Manager Desk
             </span>
-            <span className="text-slate-300">•</span>
-            <h1 className="text-lg font-extrabold text-slate-900 capitalize">
-              {isManager && activeTab === 'sheet-connection' && 'Google Sheet & Dynamic Tabs Hub'}
-              {activeTab === 'users' && 'User Details (Agent Directory)'}
-              {activeTab === 'followup' && 'All Followup History & Audit Logs'}
-              {activeTab === 'orders' && 'All Orders Database'}
+            <span className="text-slate-300 dark:text-slate-700">•</span>
+            <h1 className="text-lg font-extrabold text-slate-900 dark:text-white capitalize">
               {activeTab === 'summary' && 'Analytics & Summary'}
+              {activeTab === 'orders' && 'All Orders Database'}
+              {activeTab === 'followup' && 'All Followup History & Audit Logs'}
               {activeTab === 'agent-performance' && 'Agent Performance Report'}
+              {activeTab === 'users' && 'User Details (Agent Directory)'}
               {activeTab === 'category-mapping' && 'Category, Team & Status Mapping'}
-              {activeTab === 'profiles' && 'Manager Profile & Sheet Integration'}
-              {activeTab === 'settings' && 'System Settings & Data Export Hub'}
+              {isManager && activeTab === 'sheet-connection' && 'Google Sheet & Dynamic Tabs Hub'}
+              {activeTab === 'profiles' && 'Manager Profile & Account'}
             </h1>
           </div>
 
@@ -2059,8 +2465,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     let targetTabKey: any = 'orders';
                     if (normalized.includes('summary')) targetTabKey = 'summary';
                     else if (normalized.includes('performance') || normalized.includes('agent')) targetTabKey = 'agent-performance';
-                    else if (normalized.includes('profile')) targetTabKey = 'profiles';
-                    else if (normalized.includes('setting')) targetTabKey = 'settings';
+                    else if (normalized.includes('profile') || normalized.includes('setting')) targetTabKey = 'profiles';
                     else if (normalized.includes('mapping')) targetTabKey = 'category-mapping';
                     else targetTabKey = 'orders';
 
@@ -4321,15 +4726,27 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     </p>
                   </div>
 
-                  <div className="relative w-full sm:w-64">
-                    <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-                    <input
-                      type="text"
-                      value={followupSearch}
-                      onChange={(e) => setFollowupSearch(e.target.value)}
-                      placeholder="Search history by order, customer..."
-                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white"
-                    />
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <select
+                      value={followupSearchType}
+                      onChange={(e) => setFollowupSearchType(e.target.value)}
+                      className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-white font-medium"
+                    >
+                      <option value="order_id">order_id</option>
+                      <option value="customer_id">customer_id</option>
+                      <option value="customer_mobile">customer_mobile</option>
+                      <option value="customer_name">customer_name</option>
+                    </select>
+                    <div className="relative flex-1 sm:w-64">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                      <input
+                        type="text"
+                        value={followupSearchValue}
+                        onChange={(e) => setFollowupSearchValue(e.target.value)}
+                        placeholder={`Search by ${followupSearchType}...`}
+                        className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -4378,18 +4795,22 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                                  ));
                             if (!isAuthorized) return false;
                             
-                            if (!followupSearch.trim()) return true;
-                            const q = followupSearch.toLowerCase();
-                            return (
-                              String(h.followupId || '').toLowerCase().includes(q) ||
-                              String(h.orderId || (h as any).order_id || '').toLowerCase().includes(q) ||
-                              String(h.customerName || (h as any).customer_name || '').toLowerCase().includes(q) ||
-                              String(h.previousStatus || '').toLowerCase().includes(q) ||
-                              String(h.newStatus || (h as any).new_status || '').toLowerCase().includes(q) ||
-                              String(h.action || '').toLowerCase().includes(q) ||
-                              String(h.notes || '').toLowerCase().includes(q) ||
-                              (h.isUndo ? 'undo revert'.includes(q) : false)
-                            );
+                            if (!followupSearchValue.trim()) return true;
+                            const q = followupSearchValue.trim().toLowerCase();
+                            const ordId = String(h.orderId || (h as any).order_id || '');
+                            const ord = orders.find(o => String(o.id || o.order_id) === ordId);
+
+                            let targetVal = '';
+                            if (followupSearchType === 'order_id') {
+                              targetVal = ordId;
+                            } else if (followupSearchType === 'customer_id') {
+                              targetVal = String(ord?.customer_id || ord?.customerId || (h as any).customer_id || '').toLowerCase();
+                            } else if (followupSearchType === 'customer_name') {
+                              targetVal = String(ord?.customer_name || ord?.customerName || h.customerName || (h as any).customer_name || '').toLowerCase();
+                            } else if (followupSearchType === 'customer_mobile') {
+                              targetVal = String(ord?.customer_mobile || ord?.customerContact || (h as any).customer_mobile || '').toLowerCase();
+                            }
+                            return targetVal.includes(q);
                           })
                           .map((hist, histIdx) => {
                             const isUndoRecord = !!hist.isUndo;
@@ -4684,6 +5105,17 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       }`}
                     >
                       City Wise ({summaryStats.citySummary.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSummaryBreakdownTab('date')}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        summaryBreakdownTab === 'date'
+                          ? 'bg-white text-indigo-700 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Date Wise ({summaryStats.dateSummary.length})
                     </button>
                   </div>
                 </div>
@@ -5357,6 +5789,262 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Date Wise Operational Summary */}
+              {(summaryBreakdownTab === 'all' || summaryBreakdownTab === 'date') && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                  <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                    <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-indigo-600" />
+                      <span>Date Wise Summary</span>
+                    </h4>
+                    <div className="flex items-center gap-2 relative">
+                      <button
+                        type="button"
+                        onClick={() => setOpenExportMenuId(openExportMenuId === 'date' ? null : 'date')}
+                        className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer text-slate-700 shadow-2xs"
+                      >
+                        📥 Export
+                      </button>
+                      {openExportMenuId === 'date' && (
+                        <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-20 p-1.5 w-32">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleExportCsv(summaryStats.dateSummary, 'date_wise_summary.csv');
+                              setOpenExportMenuId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs font-semibold hover:bg-slate-100 rounded-lg cursor-pointer flex items-center gap-1.5"
+                          >
+                            <span>📄 Export CSV</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleExportXlsx(summaryStats.dateSummary, 'date_wise_summary.xlsx');
+                              setOpenExportMenuId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs font-semibold hover:bg-slate-100 rounded-lg cursor-pointer flex items-center gap-1.5"
+                          >
+                            <span>📊 Export XLSX</span>
+                          </button>
+                        </div>
+                      )}
+                      <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2.5 py-0.5 rounded-full">
+                        {summaryStats.dateSummary.length} Dates
+                      </span>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 whitespace-nowrap select-none">
+                          <th
+                            onClick={() => handleSortToggle(dateSortKey, dateSortDirection, 'date', setDateSortKey, setDateSortDirection)}
+                            className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center gap-1">
+                              <span>Date</span>
+                              {dateSortKey === 'date' ? (
+                                dateSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(dateSortKey, dateSortDirection, 'createOrders', setDateSortKey, setDateSortDirection)}
+                            className="py-3 px-3.5 text-right text-indigo-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Create Orders</span>
+                              {dateSortKey === 'createOrders' ? (
+                                dateSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(dateSortKey, dateSortDirection, 'servedOrders', setDateSortKey, setDateSortDirection)}
+                            className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Served Orders</span>
+                              {dateSortKey === 'servedOrders' ? (
+                                dateSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(dateSortKey, dateSortDirection, 'cancelledOrders', setDateSortKey, setDateSortDirection)}
+                            className="py-3 px-3.5 text-right text-red-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Cancelled Orders</span>
+                              {dateSortKey === 'cancelledOrders' ? (
+                                dateSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(dateSortKey, dateSortDirection, 'pendingOrders', setDateSortKey, setDateSortDirection)}
+                            className="py-3 px-3.5 text-right text-amber-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Pending Orders</span>
+                              {dateSortKey === 'pendingOrders' ? (
+                                dateSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(dateSortKey, dateSortDirection, 'orderValue', setDateSortKey, setDateSortDirection)}
+                            className="py-3 px-3.5 text-right cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Order Value</span>
+                              {dateSortKey === 'orderValue' ? (
+                                dateSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(dateSortKey, dateSortDirection, 'deliveredOrderValue', setDateSortKey, setDateSortDirection)}
+                            className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Delivered Value</span>
+                              {dateSortKey === 'deliveredOrderValue' ? (
+                                dateSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(dateSortKey, dateSortDirection, 'profit', setDateSortKey, setDateSortDirection)}
+                            className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Profit</span>
+                              {dateSortKey === 'profit' ? (
+                                dateSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(dateSortKey, dateSortDirection, 'bucketSize', setDateSortKey, setDateSortDirection)}
+                            className="py-3 px-3.5 text-right text-blue-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Bucket Size</span>
+                              {dateSortKey === 'bucketSize' ? (
+                                dateSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(dateSortKey, dateSortDirection, 'deliveredRatio', setDateSortKey, setDateSortDirection)}
+                            className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Delivered Ratio</span>
+                              {dateSortKey === 'deliveredRatio' ? (
+                                dateSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(dateSortKey, dateSortDirection, 'cancelledRatio', setDateSortKey, setDateSortDirection)}
+                            className="py-3 px-3.5 text-right text-red-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>Cancelled Ratio</span>
+                              {dateSortKey === 'cancelledRatio' ? (
+                                dateSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => handleSortToggle(dateSortKey, dateSortDirection, 'nrRatio', setDateSortKey, setDateSortDirection)}
+                            className="py-3 px-3.5 text-right text-purple-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
+                          >
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <span>NR Ratio</span>
+                              {dateSortKey === 'nrRatio' ? (
+                                dateSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                              )}
+                            </div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-800">
+                        {sortedDateSummary.length === 0 ? (
+                          <tr>
+                            <td colSpan={12} className="text-center py-6 text-slate-400 font-semibold">
+                              No date summary data available for the selected date filter.
+                            </td>
+                          </tr>
+                        ) : (
+                          sortedDateSummary.map((row) => (
+                            <tr key={row.name} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
+                              <td className="py-3 px-3.5 font-bold font-mono text-slate-900">{row.name}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-indigo-700">{row.createOrders}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledOrders}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-amber-600">{row.pendingOrders}</td>
+                              <td className="py-3 px-3.5 text-right font-medium">৳ {(row.orderValue || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">৳ {(row.deliveredOrderValue || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">৳ {(row.profit || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium text-blue-700">৳ {(row.bucketSize || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">{row.deliveredRatio}%</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledRatio}%</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-purple-700">{row.nrRatio}%</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                      {sortedDateSummary.length > 0 && (
+                        <tfoot className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300">
+                          <tr className="whitespace-nowrap">
+                            <td className="py-3.5 px-3.5 font-black uppercase text-slate-900">Grand Total</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-indigo-700">{summaryStats.dateGrandTotal.createOrders}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.dateGrandTotal.servedOrders}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.dateGrandTotal.cancelledOrders}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-amber-700">{summaryStats.dateGrandTotal.pendingOrders}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black">৳ {(summaryStats.dateGrandTotal.orderValue || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {(summaryStats.dateGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {(summaryStats.dateGrandTotal.profit || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {(summaryStats.dateGrandTotal.bucketSize || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.dateGrandTotal.deliveredRatio}%</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.dateGrandTotal.cancelledRatio}%</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-purple-700">{summaryStats.dateGrandTotal.nrRatio}%</td>
+                          </tr>
+                        </tfoot>
+                      )}
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -5410,6 +6098,41 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       />
                     </div>
                   )}
+
+                  {/* Export Options for Agent Performance */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setOpenExportMenuId(openExportMenuId === 'agent-performance' ? null : 'agent-performance')}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                    >
+                      <span>📥 Export Report</span>
+                    </button>
+                    {openExportMenuId === 'agent-performance' && (
+                      <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-30 p-1.5 w-36">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleExportCsv(filteredAgentPerformance, `agent_performance_report_${new Date().toISOString().slice(0, 10)}.csv`);
+                            setOpenExportMenuId(null);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-indigo-50 hover:text-indigo-700 rounded-lg cursor-pointer flex items-center gap-1.5"
+                        >
+                          <span>📄 Export CSV</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleExportXlsx(filteredAgentPerformance, `agent_performance_report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                            setOpenExportMenuId(null);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-emerald-50 hover:text-emerald-700 rounded-lg cursor-pointer flex items-center gap-1.5"
+                        >
+                          <span>📊 Export Excel</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -5475,9 +6198,25 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <Award className="w-4 h-4 text-amber-500" />
                     <span>Agent Performance Breakdown</span>
                   </h4>
-                  <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2.5 py-0.5 rounded-full">
-                    {filteredAgentPerformance.length} Results
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleExportCsv(filteredAgentPerformance, `agent_performance_report_${new Date().toISOString().slice(0, 10)}.csv`)}
+                      className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer text-slate-700 shadow-2xs"
+                    >
+                      📥 CSV
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleExportXlsx(filteredAgentPerformance, `agent_performance_report_${new Date().toISOString().slice(0, 10)}.xlsx`)}
+                      className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer text-slate-700 shadow-2xs"
+                    >
+                      📊 XLSX
+                    </button>
+                    <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2.5 py-0.5 rounded-full">
+                      {filteredAgentPerformance.length} Results
+                    </span>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -5611,69 +6350,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           )}
 
 
-          {/* TAB: SETTINGS & EXPORT HUB */}
-          {activeTab === 'settings' && (
-            <div className="max-w-4xl space-y-6">
-              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-6">
-                <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center font-bold text-indigo-700">
-                      <Settings className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-slate-900 text-base">Manager Settings &amp; Preferences</h3>
-                      <p className="text-xs text-slate-500">Configure theme appearance and export CSV data reports.</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Theme Preference Option (Light / Dark) */}
-                <div className="space-y-3 pb-6 border-b border-slate-100">
-                  <h4 className="font-bold text-slate-900 text-sm">Theme Appearance</h4>
-                  <p className="text-xs text-slate-500">Choose your preferred interface theme mode.</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleTheme('light')}
-                      className={`p-4 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
-                        theme === 'light'
-                          ? 'bg-indigo-50 border-indigo-300 text-indigo-900 font-bold ring-2 ring-indigo-200 shadow-xs'
-                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-xl">☀️</span>
-                        <div>
-                          <h5 className="font-extrabold text-sm">Light Theme</h5>
-                          <p className="text-[11px] text-slate-500">Clean bright interface</p>
-                        </div>
-                      </div>
-                      {theme === 'light' && <Check className="w-5 h-5 text-indigo-600" />}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleToggleTheme('dark')}
-                      className={`p-4 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
-                        theme === 'dark'
-                          ? 'bg-slate-900 border-slate-700 text-white font-bold ring-2 ring-slate-700 shadow-xs'
-                          : 'bg-slate-800/10 border-slate-200 text-slate-800 hover:bg-slate-800/20 font-medium'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-xl">🌙</span>
-                        <div>
-                          <h5 className="font-extrabold text-sm">Dark Theme</h5>
-                          <p className="text-[11px] text-slate-400">Low-light dark mode</p>
-                        </div>
-                      </div>
-                      {theme === 'dark' && <Check className="w-5 h-5 text-sky-400" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* TAB: CATEGORY & TEAM MAPPING */}
           {activeTab === 'category-mapping' && (
@@ -5692,7 +6368,52 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDownloadDemoCsv}
+                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                      title="Download Demo CSV template for category mappings"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5" />
+                      <span>Demo CSV</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handlePreviewDemoCsv}
+                      className="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                      title="Preview Demo CSV template data format"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Preview Demo</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExportCategoryMappingsCsv}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                      title="Export Category Mappings to CSV"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Export CSV</span>
+                    </button>
+                    <label className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer">
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Update CSV</span>
+                      <input
+                        type="file"
+                        accept=".csv"
+                        onChange={handleImportCategoryMappingsCsv}
+                        className="hidden"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowDemoGuide(!showDemoGuide)}
+                      className="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 text-indigo-200 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                      title="Toggle Demo CSV sample format"
+                    >
+                      <span>{showDemoGuide ? 'Hide Sample' : 'Sample Format'}</span>
+                    </button>
                     <span className="text-xs bg-white/10 text-indigo-100 font-bold px-3 py-1.5 rounded-xl border border-white/10">
                       6 Master Columns
                     </span>
@@ -5727,6 +6448,101 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* DEMO CSV FORMAT & IMPORT GUIDE */}
+              {showDemoGuide && (
+                <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-indigo-500/10 border border-amber-300/40 rounded-2xl p-4 shadow-xs">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-amber-200/40">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-800 flex items-center justify-center font-bold text-sm">
+                        📄
+                      </span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-extrabold text-xs text-slate-900 tracking-wide">Demo CSV Template &amp; Import Guide</h4>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                            category, team, orderStatus, channel, teamLeader, timeSlot
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 mt-0.5">
+                          Use the demo format to bulk upload mappings. Duplicate status for the same category will be automatically avoided.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={handleDownloadDemoCsv}
+                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download Demo CSV</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handlePreviewDemoCsv}
+                        className="px-2.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>View Table</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleLoadDemoCategoryMappings}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                        title="Load demo mapping rows into category mapping table"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Load Demo Data</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Sample CSV Data Preview Table */}
+                  <div className="pt-3 overflow-x-auto">
+                    <table className="w-full text-[11px] text-left border border-amber-200/60 rounded-lg overflow-hidden bg-white">
+                      <thead>
+                        <tr className="bg-amber-50 text-slate-700 font-bold border-b border-amber-200/60">
+                          <th className="py-1.5 px-3">category</th>
+                          <th className="py-1.5 px-3">team</th>
+                          <th className="py-1.5 px-3">orderStatus</th>
+                          <th className="py-1.5 px-3">channel</th>
+                          <th className="py-1.5 px-3">teamLeader</th>
+                          <th className="py-1.5 px-3">timeSlot</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
+                        {DEMO_CATEGORY_MAPPINGS_DATA.slice(0, 4).map((row, idx) => (
+                          <tr key={idx} className="hover:bg-amber-50/40">
+                            <td className="py-1 px-3 font-semibold text-slate-900">{row.category}</td>
+                            <td className="py-1 px-3">{row.team}</td>
+                            <td className="py-1 px-3">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                {row.orderStatus}
+                              </span>
+                            </td>
+                            <td className="py-1 px-3">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                {row.channel}
+                              </span>
+                            </td>
+                            <td className="py-1 px-3">{row.teamLeader}</td>
+                            <td className="py-1 px-3">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                                {row.timeSlot}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium mt-1.5 px-1">
+                      <span>Showing 4 of {DEMO_CATEGORY_MAPPINGS_DATA.length} sample rows with Channel &amp; Time Slot. Click &quot;Download Demo CSV&quot; for complete file.</span>
+                      <span className="text-amber-700 font-bold">✓ Duplicate Status Filter Active</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* 6 MASTER CONFIGURATION COLUMNS SIDE BY SIDE */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
@@ -6021,6 +6837,241 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         </button>
                       </div>
                     ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* CATEGORY MAPPINGS MATRIX (LIVE ACTIVE RULES) */}
+              <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-lg">🗂️</span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-extrabold text-sm text-slate-900">Active Category Mappings Matrix</h4>
+                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          {filteredCategoryMappings.length} Rules Active
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Rules mapping category to team, order status, and team leader. Update via CSV, download Demo CSV, or add rules manually.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {categoryMappings.length > new Set(categoryMappings.map(m => (m.category || '').toLowerCase().trim())).size && (
+                      <button
+                        type="button"
+                        onClick={handleCleanDuplicateMappings}
+                        className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                        title="Remove duplicate category mappings"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Clean Duplicates</span>
+                      </button>
+                    )}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={mappingSearchQuery}
+                        onChange={(e) => setMappingSearchQuery(e.target.value)}
+                        placeholder="Search mappings..."
+                        className="pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:border-indigo-600 w-44 sm:w-56"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Add New Rule Form */}
+                <form onSubmit={handleAddNewMapping} className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
+                  <div className="text-[11px] font-bold text-slate-700 mb-2 uppercase tracking-wider flex items-center gap-1.5">
+                    <Plus className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Add New Mapping Rule</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Category</label>
+                      <input
+                        type="text"
+                        list="category-suggestions"
+                        value={newMappingCategory}
+                        onChange={(e) => setNewMappingCategory(e.target.value)}
+                        placeholder="e.g. Electronics"
+                        className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:border-indigo-600 font-medium"
+                      />
+                      <datalist id="category-suggestions">
+                        {categories.map(c => <option key={c} value={c} />)}
+                      </datalist>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Assigned Team</label>
+                      <select
+                        value={newMappingTeam}
+                        onChange={(e) => setNewMappingTeam(e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:border-indigo-600 font-medium"
+                      >
+                        {teamsList.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Order Status</label>
+                      <select
+                        value={newMappingStatus}
+                        onChange={(e) => setNewMappingStatus(e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:border-indigo-600 font-medium"
+                      >
+                        {orderStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Channel</label>
+                      <select
+                        value={newMappingChannel}
+                        onChange={(e) => setNewMappingChannel(e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:border-indigo-600 font-medium"
+                      >
+                        {channelsList.map(ch => <option key={ch} value={ch}>{ch}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Team Leader</label>
+                      <select
+                        value={newMappingTeamLeader}
+                        onChange={(e) => setNewMappingTeamLeader(e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:border-indigo-600 font-medium"
+                      >
+                        {availableTeamLeaders.map(tl => <option key={tl} value={tl}>{tl}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Time Slot</label>
+                      <select
+                        value={newMappingTimeSlot}
+                        onChange={(e) => setNewMappingTimeSlot(e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:border-indigo-600 font-medium"
+                      >
+                        {timeSlotsList.map(slot => <option key={slot} value={slot}>{slot}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="flex items-end">
+                      <button
+                        type="submit"
+                        className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors shadow-xs flex items-center justify-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Save Rule</span>
+                      </button>
+                    </div>
+                  </div>
+                </form>
+
+                {/* Mappings Table */}
+                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead>
+                        <tr className="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-200">
+                          <th className="py-2.5 px-3 w-12 text-center text-[11px] text-slate-500">#</th>
+                          <th className="py-2.5 px-4 font-bold">Category</th>
+                          <th className="py-2.5 px-4 font-bold">Assigned Team</th>
+                          <th className="py-2.5 px-4 font-bold">Order Status</th>
+                          <th className="py-2.5 px-4 font-bold">Channel</th>
+                          <th className="py-2.5 px-4 font-bold">Team Leader</th>
+                          <th className="py-2.5 px-4 font-bold">Time Slot</th>
+                          <th className="py-2.5 px-3 text-right font-bold w-20">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700">
+                        {filteredCategoryMappings.length === 0 ? (
+                          <tr>
+                            <td colSpan={8} className="py-10 text-center text-slate-400">
+                              <p className="font-semibold text-xs">No category mappings found.</p>
+                              <div className="flex items-center justify-center gap-2 mt-2">
+                                <button
+                                  type="button"
+                                  onClick={handleDownloadDemoCsv}
+                                  className="text-xs font-bold text-amber-600 hover:underline cursor-pointer"
+                                >
+                                  Download Demo CSV
+                                </button>
+                                <span>•</span>
+                                <button
+                                  type="button"
+                                  onClick={handleLoadDemoCategoryMappings}
+                                  className="text-xs font-bold text-indigo-600 hover:underline cursor-pointer"
+                                >
+                                  Load Demo Data
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredCategoryMappings.map((m, idx) => (
+                            <tr key={m.id || idx} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="py-2 px-3 text-center text-[11px] text-slate-400 font-semibold">{idx + 1}</td>
+                              <td className="py-2 px-4 font-bold text-slate-900">
+                                <span className="inline-flex items-center gap-1.5">
+                                  <span>🏷️</span>
+                                  <span>{m.category}</span>
+                                </span>
+                              </td>
+                              <td className="py-2 px-4">
+                                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                  {m.team}
+                                </span>
+                              </td>
+                              <td className="py-2 px-4">
+                                <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                                  m.orderStatus === 'Delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                  m.orderStatus === 'Cancelled' ? 'bg-red-50 text-red-700 border-red-200' :
+                                  m.orderStatus === 'Confirmed' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                  m.orderStatus === 'In Progress' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                  'bg-slate-100 text-slate-700 border-slate-200'
+                                }`}>
+                                  {m.orderStatus || (m as any).status || 'Pending'}
+                                </span>
+                              </td>
+                              <td className="py-2 px-4">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                  <span>📢</span>
+                                  <span>{m.channel || 'Facebook'}</span>
+                                </span>
+                              </td>
+                              <td className="py-2 px-4">
+                                <span className="inline-flex items-center gap-1.5 text-slate-700 font-semibold">
+                                  <span>👔</span>
+                                  <span>{m.teamLeader}</span>
+                                </span>
+                              </td>
+                              <td className="py-2 px-4">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                                  <span>⏰</span>
+                                  <span>{m.timeSlot || '10AM to 11AM'}</span>
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteMapping(m.id)}
+                                  title={`Remove mapping for ${m.category}`}
+                                  className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
@@ -6693,6 +7744,24 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <option value="AB+">AB+</option>
                     <option value="AB-">AB-</option>
                   </select>
+                </div>
+
+                <div className="col-span-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                      Residential Address (Manager Only Access)
+                    </label>
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                      🔒 Only Manager Can Edit
+                    </span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={editAddress}
+                    onChange={(e) => setEditAddress(e.target.value)}
+                    placeholder="Enter agent residential home address..."
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:outline-hidden focus:border-indigo-600 bg-white"
+                  />
                 </div>
               </div>
 

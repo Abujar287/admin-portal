@@ -230,7 +230,9 @@ export interface CategoryTeamMapping {
   category: string;
   orderStatus: string;
   team: string;
+  channel?: string;
   teamLeader: string;
+  timeSlot?: string;
 }
 
 export const ORDER_STATUS_LIST = [
@@ -352,11 +354,11 @@ export const removeTeamLeaderItem = (leader: string): string[] => {
 };
 
 export const DEFAULT_CATEGORY_MAPPINGS: CategoryTeamMapping[] = [
-  { id: '1', category: 'Electronics', orderStatus: 'Pending', team: 'Acquisition', teamLeader: 'MD Abujar' },
-  { id: '2', category: 'Room Accessories', orderStatus: 'Pending', team: 'Retention', teamLeader: 'Manager (Admin)' },
-  { id: '3', category: 'Cloths', orderStatus: 'Pending', team: 'Facebook', teamLeader: 'MD Abujar' },
-  { id: '4', category: 'Medicines', orderStatus: 'In Progress', team: 'Call-Center', teamLeader: 'Manager (Admin)' },
-  { id: '5', category: 'Appliance', orderStatus: 'Pending', team: 'KAM', teamLeader: 'MD Abujar' },
+  { id: '1', category: 'Electronics', orderStatus: 'Pending', team: 'Acquisition', channel: 'Facebook', teamLeader: 'MD Abujar', timeSlot: '10AM to 11AM' },
+  { id: '2', category: 'Room Accessories', orderStatus: 'Confirmed', team: 'Retention', channel: 'Retention', teamLeader: 'Manager (Admin)', timeSlot: '11AM to 12PM' },
+  { id: '3', category: 'Cloths & Apparel', orderStatus: 'Pending', team: 'Facebook', channel: 'Call-Center', teamLeader: 'MD Abujar', timeSlot: '12PM to 1PM' },
+  { id: '4', category: 'Medicines & Health', orderStatus: 'In Progress', team: 'Call-Center', channel: 'Acquisition', teamLeader: 'Manager (Admin)', timeSlot: '1PM to 2PM' },
+  { id: '5', category: 'Home Appliances', orderStatus: 'Delivered', team: 'KAM', channel: 'Retention', teamLeader: 'MD Abujar', timeSlot: '2PM to 3PM' },
 ];
 
 export const getCategoryMappings = (): CategoryTeamMapping[] => {
@@ -364,7 +366,19 @@ export const getCategoryMappings = (): CategoryTeamMapping[] => {
     const stored = localStorage.getItem('agent_portal_category_mappings');
     if (stored) {
       const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Deduplicate stored mappings by category to ensure pristine list
+        const seen = new Set<string>();
+        const deduped: CategoryTeamMapping[] = [];
+        for (const m of parsed) {
+          const key = (m.category || '').trim().toLowerCase();
+          if (key && !seen.has(key)) {
+            seen.add(key);
+            deduped.push(m);
+          }
+        }
+        if (deduped.length > 0) return deduped;
+      }
     }
   } catch {
     // fallback

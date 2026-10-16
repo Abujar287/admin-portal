@@ -47,7 +47,8 @@ export const AgentFollowupView: React.FC<AgentFollowupViewProps> = ({
   const [quickUpdateNotes, setQuickUpdateNotes] = useState<string>('');
   const [isSavingStatus, setIsSavingStatus] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string>('');
-  const [followupSearch, setFollowupSearch] = useState<string>('');
+  const [searchType, setSearchType] = useState<string>('order_id');
+  const [searchValue, setSearchValue] = useState<string>('');
 
   // Agent permissions
   const perms = currentAgent.permissions || {
@@ -148,24 +149,34 @@ export const AgentFollowupView: React.FC<AgentFollowupViewProps> = ({
   // Filter history relevant to this agent or agent's orders
   const filteredHistory = useMemo(() => {
     const myOrderIds = new Set(myAgentOrders.map((o) => String(o.id || o.order_id)));
+    const orderMap = new Map<string, OrderItem>();
+    orders.forEach(o => {
+      orderMap.set(String(o.id || o.order_id), o);
+    });
+
     return followupHistory.filter((h) => {
-      const isMyOrder = myOrderIds.has(String(h.orderId || (h as any).order_id));
+      const ordId = String(h.orderId || (h as any).order_id || '');
+      const isMyOrder = myOrderIds.has(ordId);
       const isMyAction = h.updatedBy === currentAgent.user || h.updatedBy === currentAgent.name;
       if (!isMyOrder && !isMyAction) return false;
 
-      if (!followupSearch.trim()) return true;
-      const q = followupSearch.toLowerCase();
-      return (
-        String(h.followupId || '').toLowerCase().includes(q) ||
-        String(h.orderId || (h as any).order_id || '').toLowerCase().includes(q) ||
-        String(h.customerName || (h as any).customer_name || '').toLowerCase().includes(q) ||
-        String(h.previousStatus || '').toLowerCase().includes(q) ||
-        String(h.newStatus || (h as any).new_status || '').toLowerCase().includes(q) ||
-        String(h.notes || '').toLowerCase().includes(q) ||
-        String(h.updatedBy || '').toLowerCase().includes(q)
-      );
+      if (!searchValue.trim()) return true;
+      const q = searchValue.trim().toLowerCase();
+      const ord = orderMap.get(ordId);
+
+      let targetVal = '';
+      if (searchType === 'order_id') {
+        targetVal = ordId;
+      } else if (searchType === 'customer_id') {
+        targetVal = String(ord?.customer_id || ord?.customerId || (h as any).customer_id || '').toLowerCase();
+      } else if (searchType === 'customer_name') {
+        targetVal = String(ord?.customer_name || ord?.customerName || h.customerName || (h as any).customer_name || '').toLowerCase();
+      } else if (searchType === 'customer_mobile') {
+        targetVal = String(ord?.customer_mobile || ord?.customerContact || (h as any).customer_mobile || '').toLowerCase();
+      }
+      return targetVal.includes(q);
     });
-  }, [followupHistory, myAgentOrders, currentAgent.user, currentAgent.name, followupSearch]);
+  }, [followupHistory, myAgentOrders, orders, currentAgent.user, currentAgent.name, searchType, searchValue]);
 
   return (
     <div className="space-y-6">
@@ -396,15 +407,27 @@ export const AgentFollowupView: React.FC<AgentFollowupViewProps> = ({
             </p>
           </div>
 
-          <div className="relative w-full sm:w-64">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-            <input
-              type="text"
-              value={followupSearch}
-              onChange={(e) => setFollowupSearch(e.target.value)}
-              placeholder="Search history..."
-              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white"
-            />
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <select
+              value={searchType}
+              onChange={(e) => setSearchType(e.target.value)}
+              className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-white font-medium"
+            >
+              <option value="order_id">order_id</option>
+              <option value="customer_id">customer_id</option>
+              <option value="customer_mobile">customer_mobile</option>
+              <option value="customer_name">customer_name</option>
+            </select>
+            <div className="relative flex-1 sm:w-64">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+              <input
+                type="text"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                placeholder={`Search by ${searchType}...`}
+                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+              />
+            </div>
           </div>
         </div>
 

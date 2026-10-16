@@ -16,7 +16,7 @@ import { AgentSummaryView } from './components/AgentSummaryView';
 import { ManagerPortal } from './components/ManagerPortal';
 import { CreateOrderModal } from './components/CreateOrderModal';
 import { isOrderAssignedToAgent } from './utils/agentMatching';
-import { Menu, Shield, RefreshCw, CheckCircle2, Plus } from 'lucide-react';
+import { Menu, Shield, RefreshCw, CheckCircle2, Plus, Sun, Moon } from 'lucide-react';
 
 export default function App() {
   const [agents, setAgents] = useState<AgentUser[]>(() => OrderService.getAgents());
@@ -402,24 +402,24 @@ export default function App() {
           {/* Agent Main Content */}
           <div className="flex-1 flex flex-col h-screen overflow-hidden">
             {/* Top Bar */}
-            <header className="h-14 border-b border-slate-200/80 bg-white px-4 flex items-center justify-between shrink-0">
+            <header className="h-14 border-b border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#121212] px-4 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setIsMobileMenuOpen(true)}
-                  className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100 cursor-pointer"
+                  className="md:hidden p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                 >
                   <Menu className="w-5 h-5" />
                 </button>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                     {agentActiveTab === 'profiles' && 'My Profile'}
                     {agentActiveTab === 'orders' && 'My Orders'}
                     {(agentActiveTab === 'dashboard' || agentActiveTab === 'agent-performance') && 'Performance Analytics'}
                     {agentActiveTab === 'followup' && 'Followup Status & History'}
                     {agentActiveTab === 'summary' && 'Analytics & Store Summary'}
                   </span>
-                  <span className="text-slate-300">•</span>
-                  <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 flex items-center gap-1">
+                  <span className="text-slate-300 dark:text-slate-700">•</span>
+                  <span className="text-xs font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/80 px-2 py-0.5 rounded-md border border-blue-100 dark:border-blue-900 flex items-center gap-1">
                     <Shield className="w-3 h-3" />
                     {currentSession.agent.user}
                   </span>
