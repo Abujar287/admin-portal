@@ -155,8 +155,8 @@ export default function App() {
     sessionStorage.setItem('portal_session_role', 'agent');
     sessionStorage.setItem('portal_session_user', agent.user);
     const allowedTabs = agent.permissions?.allowedTabs && Array.isArray(agent.permissions.allowedTabs) && agent.permissions.allowedTabs.length > 0
-      ? agent.permissions.allowedTabs.filter(t => t !== 'followup')
-      : ['summary', 'orders', 'agent-performance', 'profiles'];
+      ? agent.permissions.allowedTabs
+      : ['summary', 'orders', 'followup', 'agent-performance', 'profiles'];
     const defaultTab = (allowedTabs.includes('orders') ? 'orders' : allowedTabs[0]) as AgentNavTab;
     setAgentActiveTab(defaultTab || 'orders');
     showToast(`Welcome, ${agent.name || agent.user}!`);
