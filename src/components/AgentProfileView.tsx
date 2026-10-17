@@ -1,141 +1,154 @@
 import React, { useState } from 'react';
 import { AgentUser } from '../types';
-import { 
-  Shield, 
-  User, 
-  Briefcase, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Heart, 
-  Calendar, 
-  Save, 
-  CheckCircle2, 
-  Lock 
-} from 'lucide-react';
+import { User, Mail, Phone, MapPin, Calendar, Heart, Shield, Check } from 'lucide-react';
 
 interface AgentProfileViewProps {
   currentAgent: AgentUser;
-  onUpdateAgentProfile: (updatedAgent: AgentUser) => void;
+  onUpdateAgentProfile: (updated: AgentUser) => void;
 }
-
-const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 
 export const AgentProfileView: React.FC<AgentProfileViewProps> = ({
   currentAgent,
   onUpdateAgentProfile
 }) => {
-  // Editable fields: all fields
-  const [name, setName] = useState(currentAgent.name || '');
-  const [contact, setContact] = useState(currentAgent.contact || '');
-  const [email, setEmail] = useState(currentAgent.email || '');
-  const [address, setAddress] = useState(currentAgent.address || '');
-  const [bloodGroup, setBloodGroup] = useState(currentAgent.bloodGroup || '');
-  const [gender, setGender] = useState(currentAgent.gender || '');
-  const [birthday, setBirthday] = useState(currentAgent.birthday || '');
+  const [formData, setFormData] = useState<AgentUser>({ ...currentAgent });
+  const [successMsg, setSuccessMsg] = useState('');
 
-  const [savedSuccess, setSavedSuccess] = useState(false);
+  const handleChange = (field: keyof AgentUser, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    const updated: AgentUser = {
-      ...currentAgent,
-      name: name.trim(),
-      contact: contact.trim(),
-      email: email.trim(),
-      address: address.trim(),
-      bloodGroup: bloodGroup,
-      gender: gender,
-      birthday: birthday
-    };
-
-    onUpdateAgentProfile(updated);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2500);
+    onUpdateAgentProfile(formData);
+    setSuccessMsg('Profile updated successfully!');
+    setTimeout(() => setSuccessMsg(''), 3000);
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Edit Profile</h1>
-      </div>
-
-      {savedSuccess && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-xs text-emerald-800 font-semibold animate-fadeIn">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>Profile updated successfully!</span>
+    <div className="max-w-3xl mx-auto space-y-6">
+      {successMsg && (
+        <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-xs">
+          <Check className="w-4 h-4" />
+          {successMsg}
         </div>
       )}
 
-      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs">
-        <form onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* User ID (Read-only) */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">User ID</label>
-              <input type="text" readOnly value={currentAgent.user} className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-200 bg-slate-100 text-slate-500 font-mono cursor-not-allowed" />
-            </div>
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="p-6 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold backdrop-blur-md">
+            {formData.name?.[0] || 'U'}
+          </div>
+          <div>
+            <h2 className="text-xl font-bold">{formData.name}</h2>
+            <p className="text-indigo-100 text-sm">{formData.role || 'Agent'} • {formData.team || 'Acquisition'}</p>
+          </div>
+        </div>
 
-            {/* Name */}
+        <form onSubmit={handleSave} className="p-6 space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Full Name</label>
-              <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-300" />
-            </div>
-
-            {/* Email */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Email</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-300" />
-            </div>
-
-            {/* Phone */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Contact Number</label>
-              <input type="tel" value={contact} onChange={(e) => setContact(e.target.value)} className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-300" />
-            </div>
-
-            {/* Blood Group */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Blood Group</label>
-              <select value={bloodGroup} onChange={(e) => setBloodGroup(e.target.value)} className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-300">
-                <option value="">Select</option>
-                {BLOOD_GROUPS.map(bg => <option key={bg} value={bg}>{bg}</option>)}
-              </select>
-            </div>
-
-            {/* Gender */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Gender</label>
-              <select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-300">
-                <option value="">Select</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            {/* Address */}
-            <div className="sm:col-span-2">
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold text-slate-700">Residential Address</label>
-                <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                  🔒 Editable by Manager Only
-                </span>
-              </div>
-              <textarea
-                rows={2}
-                value={address}
-                disabled={true}
-                readOnly={true}
-                placeholder="Address can only be updated by Manager"
-                className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed select-none"
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-indigo-600" /> Full Name
+              </label>
+              <input
+                type="text"
+                value={formData.name || ''}
+                onChange={e => handleChange('name', e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-indigo-600 focus:outline-hidden"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-indigo-600" /> Email Address
+              </label>
+              <input
+                type="email"
+                value={formData.email || ''}
+                onChange={e => handleChange('email', e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-indigo-600 focus:outline-hidden"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-indigo-600" /> Contact Number
+              </label>
+              <input
+                type="text"
+                value={formData.contact || ''}
+                onChange={e => handleChange('contact', e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-indigo-600 focus:outline-hidden"
+                placeholder="017xxxxxxxx"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5 text-indigo-600" /> Password
+              </label>
+              <input
+                type="text"
+                value={formData.pass || ''}
+                onChange={e => handleChange('pass', e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-indigo-600 focus:outline-hidden"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-indigo-600" /> Birthday
+              </label>
+              <input
+                type="date"
+                value={formData.birthday || ''}
+                onChange={e => handleChange('birthday', e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-indigo-600 focus:outline-hidden"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Heart className="w-3.5 h-3.5 text-indigo-600" /> Blood Group
+              </label>
+              <select
+                value={formData.bloodGroup || ''}
+                onChange={e => handleChange('bloodGroup', e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-indigo-600 focus:outline-hidden bg-white"
+              >
+                <option value="">Select Blood Group</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+              </select>
             </div>
           </div>
 
-          <div className="pt-3 flex justify-end">
-            <button type="submit" className="py-2.5 px-6 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold transition-all">
-              Save Changes
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-indigo-600" /> Address Details
+            </label>
+            <textarea
+              rows={3}
+              value={formData.address || ''}
+              onChange={e => handleChange('address', e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-indigo-600 focus:outline-hidden"
+              placeholder="Enter your address..."
+            />
+          </div>
+
+          <div className="flex justify-end pt-4 border-t border-slate-200">
+            <button
+              type="submit"
+              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-md transition-colors cursor-pointer"
+            >
+              Save Profile Changes
             </button>
           </div>
         </form>

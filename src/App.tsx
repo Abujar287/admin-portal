@@ -1,222 +1,207 @@
-import React, { useState, useEffect } from 'react';
-import { ManagerUser, OrderItem, FollowupHistoryItem, AgentUser } from './types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ManagerUser, AgentUser, OrderItem, FollowupHistoryItem, SystemUser } from './types';
 import { OrderService } from './services/orderService';
 import { AuthScreen } from './components/AuthScreen';
 import { ManagerPortal } from './components/ManagerPortal';
-import { CheckCircle2 } from 'lucide-react';
 
-export default function App() {
-  const [currentSession, setCurrentSession] = useState<{ role: 'manager'; manager: ManagerUser } | null>(null);
-
-  // Orders State (synced from Google Sheet)
-  const [orders, setOrders] = useState<OrderItem[]>([]);
-  const [agents, setAgents] = useState<AgentUser[]>(() => OrderService.getAgents());
-  const [followupHistory, setFollowupHistory] = useState<FollowupHistoryItem[]>(() => OrderService.getFollowupHistory());
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [lastSyncTime, setLastSyncTime] = useState<string>(() => {
-    return localStorage.getItem('portal_last_sync_time') || OrderService.formatSyncTimestamp();
+export function App() {
+  const [currentManager, setCurrentManager] = useState<ManagerUser | null>(() => {
+    try {
+      const saved = localStorage.getItem('agent_portal_current_manager');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch {}
+    // Default to logged-in manager so the user instantly sees the portal and can manage orders/agents
+    return {
+      user: '1',
+      pass: '01410089771',
+      name: 'Manager',
+      role: 'Manager'
+    };
   });
 
-  useEffect(() => {
-    OrderService.getLocalOrders().then(setOrders);
-    OrderService.fetchAgentsFromSheet().then((fetched) => {
-      if (Array.isArray(fetched) && fetched.length > 0) {
-        setAgents(fetched);
-      }
-    }).catch(() => {});
-  }, []);
+  const [agents, setAgents] = useState<AgentUser[]>([]);
+  const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [followupHistory, setFollowupHistory] = useState<FollowupHistoryItem[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string>('');
 
-  // Check saved session on mount
   useEffect(() => {
-    const savedRole = sessionStorage.getItem('portal_session_role');
-    const savedUser = sessionStorage.getItem('portal_session_user');
-    const savedDataStr = sessionStorage.getItem('portal_session_data');
-
-    if (savedRole === 'manager' && savedUser) {
-      let restoredMgr: ManagerUser | null = null;
-      if (savedDataStr) {
-        try {
-          restoredMgr = JSON.parse(savedDataStr);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-      if (!restoredMgr) {
-        const localAgents = OrderService.getAgents();
-        const matched = localAgents.find(a => a.user.toLowerCase() === savedUser.toLowerCase());
-        restoredMgr = {
-          user: savedUser,
-          pass: '',
-          name: matched?.name || (savedUser === '1' ? 'Super Admin' : `User ${savedUser}`),
-          role: matched?.role || (savedUser === '1' ? 'Superadmin' : 'Manager'),
-          permissions: matched?.permissions,
-          team: matched?.team,
-          teamLeaderId: matched?.teamLeaderId,
-          teamLeaders: matched?.teamLeaders
-        };
-      }
-      setCurrentSession({
-        role: 'manager',
-        manager: restoredMgr
-      });
+    if (currentManager) {
+      localStorage.setItem('agent_portal_current_manager', JSON.stringify(currentManager));
+    } else {
+      localStorage.removeItem('agent_portal_current_manager');
     }
-  }, []);
+  }, [currentManager]);
 
-  // Load orders upon session and auto-refresh every 60s
-  useEffect(() => {
-    if (currentSession) {
-      loadOrdersData(false);
-      const interval = setInterval(() => {
-        loadOrdersData(false);
-      }, 60000);
-      return () => clearInterval(interval);
-    }
-  }, [currentSession]);
-
-  const loadOrdersData = async (forceRefresh = false) => {
+  const loadInitialData = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const [res, followupHist] = await Promise.all([
-        OrderService.fetchOrders(forceRefresh),
-        OrderService.fetchFollowupHistory()
-      ]);
+      const initialAgents = OrderService.getAgents();
+      setAgents(initialAgents);
+
+      const res = await OrderService.fetchOrders();
       if (res.orders && res.orders.length > 0) {
         setOrders(res.orders);
       }
-      if (followupHist && followupHist.length > 0) {
-        setFollowupHistory(followupHist);
-      }
-      const nowFormatted = OrderService.formatSyncTimestamp();
-      setLastSyncTime(nowFormatted);
-      localStorage.setItem('portal_last_sync_time', nowFormatted);
 
-      if (forceRefresh) {
-        showToast(`Synced ${res.orders.length} orders & ${followupHist.length} followups!`);
+      const history = await OrderService.fetchFollowupHistory();
+      if (history && history.length > 0) {
+        setFollowupHistory(history);
       }
-    } catch (err: any) {
-      console.error('loadOrdersData error:', err);
+
+      const sheetAgents = await OrderService.fetchAgentsFromSheet();
+      if (sheetAgents && sheetAgents.length > 0) {
+        setAgents(sheetAgents);
+      }
+
+      setLastSyncTime(new Date().toLocaleTimeString());
+    } catch (e) {
+      console.error('Error loading initial data:', e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
+
+  const handleRefreshOrders = async () => {
+    setIsRefreshing(true);
+    try {
+      const res = await OrderService.fetchOrders(true);
+      if (res.orders) {
+        setOrders(res.orders);
+      }
+      const history = await OrderService.fetchFollowupHistory();
+      if (history) {
+        setFollowupHistory(history);
+      }
+      const sheetAgents = await OrderService.fetchAgentsFromSheet();
+      if (sheetAgents && sheetAgents.length > 0) {
+        setAgents(sheetAgents);
+      }
+      setLastSyncTime(new Date().toLocaleTimeString());
+    } catch (e) {
+      console.error('Refresh failed:', e);
     } finally {
       setIsRefreshing(false);
     }
   };
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+  const handleUpdateOrders = (newOrders: OrderItem[]) => {
+    setOrders(newOrders);
+    OrderService.saveLocalOrders(newOrders);
   };
 
-  const handleLogin = (user: any) => {
-    const mgrUser: ManagerUser = {
-      user: user.user || '1',
-      pass: user.pass || '',
-      name: user.name || (user.user === '1' ? 'Super Admin' : `User ${user.user}`),
-      role: user.role || (user.user === '1' ? 'Superadmin' : 'Manager'),
-      permissions: user.permissions,
-      team: user.team,
-      teamLeaderId: user.teamLeaderId,
-      teamLeaders: user.teamLeaders,
-      email: user.email
-    };
-    setCurrentSession({ role: 'manager', manager: mgrUser });
-    sessionStorage.setItem('portal_session_role', 'manager');
-    sessionStorage.setItem('portal_session_user', mgrUser.user);
-    sessionStorage.setItem('portal_session_data', JSON.stringify(mgrUser));
-    showToast(`Welcome, ${mgrUser.name}!`);
+  const handleUpdateAgents = (newAgents: AgentUser[]) => {
+    setAgents(newAgents);
+    OrderService.saveAgents(newAgents);
   };
 
-  const handleUpdateOrderStatus = async (orderId: string, updates: Partial<OrderItem>, updatedBy?: string, notes?: string) => {
+  const handleUpdateFollowupHistory = (newHistory: FollowupHistoryItem[]) => {
+    setFollowupHistory(newHistory);
+    try {
+      localStorage.setItem('agent_portal_followup_history_v3', JSON.stringify(newHistory));
+    } catch {}
+  };
+
+  const handleUpdateOrderStatus = async (orderId: string, updates: Partial<OrderItem>, updatedBy = '1', notes = '') => {
     const updatedOrders = orders.map(o => {
-      if (String(o.order_id || o.id) === String(orderId)) {
+      const oid = String(o.order_id || o.id);
+      if (oid === String(orderId)) {
         return { ...o, ...updates };
       }
       return o;
     });
-    setOrders(updatedOrders);
-    OrderService.saveLocalOrders(updatedOrders);
+    handleUpdateOrders(updatedOrders);
 
+    // Record in followup history if status changed
     const targetOrder = orders.find(o => String(o.order_id || o.id) === String(orderId));
-    const newHistoryItem: FollowupHistoryItem = {
-      id: String(Date.now()),
-      followupId: Date.now(),
-      orderId: orderId,
-      customerName: updates.customer_name || targetOrder?.customer_name || targetOrder?.customerName || '',
-      customerContact: updates.customer_mobile || targetOrder?.customer_mobile || targetOrder?.customerContact || '',
-      previousStatus: targetOrder?.followup_status || targetOrder?.followupStatus || 'Pending',
-      newStatus: updates.followup_status || updates.followupStatus || 'Pending',
-      orderStatus: updates.order_status || updates.orderStatus || targetOrder?.order_status || targetOrder?.orderStatus || 'Pending',
-      orderValue: updates.order_value ?? updates.orderValue ?? targetOrder?.order_value ?? targetOrder?.orderValue ?? 0,
-      scheduleDate: updates.schedule_date || updates.scheduleDate || targetOrder?.schedule_date || targetOrder?.scheduleDate || '',
-      scheduledTime: updates.schedule_time || updates.scheduledTime || targetOrder?.schedule_time || targetOrder?.scheduledTime || '',
-      updatedBy: updatedBy && updatedBy.includes('(@') ? updatedBy.split('(@')[1].replace(')', '').trim() : (updatedBy || currentSession?.manager?.user || 'Manager'),
-      updatedByName: updatedBy && updatedBy.includes('(@') ? updatedBy.split('(@')[0].trim() : (currentSession?.manager?.name || 'Manager'),
-      action: notes || `Followup updated to ${updates.followup_status || updates.followupStatus || 'Pending'}`,
-      timestamp: OrderService.getBdtTimestamp()
-    };
-    const updatedHistory = [newHistoryItem, ...followupHistory];
-    setFollowupHistory(updatedHistory);
-    OrderService.saveFollowupHistory(updatedHistory);
+    if (targetOrder) {
+      const prevStatus = targetOrder.followup_status || targetOrder.followupStatus || 'Pending';
+      const newStatus = updates.followup_status || updates.followupStatus || prevStatus;
+      const orderSt = updates.order_status || updates.orderStatus || targetOrder.order_status || targetOrder.orderStatus || 'Pending';
+      
+      const newHistoryItem: FollowupHistoryItem = {
+        id: String(Date.now()),
+        followupId: OrderService.getMaxFollowupId(followupHistory) + 1,
+        orderId: String(orderId),
+        customerName: targetOrder.customer_name || targetOrder.customerName || '',
+        customerContact: targetOrder.customer_mobile || targetOrder.customerContact || '',
+        previousStatus: prevStatus,
+        newStatus: newStatus,
+        orderStatus: orderSt,
+        orderValue: Number(targetOrder.order_value || targetOrder.orderValue || 0),
+        scheduleDate: updates.schedule_date || updates.scheduleDate || targetOrder.schedule_date || targetOrder.scheduleDate || '',
+        scheduledTime: updates.schedule_time || updates.scheduledTime || targetOrder.schedule_time || targetOrder.scheduledTime || '',
+        updatedBy: updatedBy,
+        updatedByName: currentManager?.name || 'Manager',
+        timestamp: OrderService.getBdtTimestamp(),
+        notes: notes || `Status updated to ${newStatus}`
+      };
 
-    try {
-      await OrderService.updateOrderInSheet(orderId, updates, updatedBy, notes);
-    } catch (e) {
-      console.warn('Sheet sync update failed:', e);
+      const updatedHistory = [newHistoryItem, ...followupHistory];
+      handleUpdateFollowupHistory(updatedHistory);
     }
   };
 
-  const handleLogout = () => {
-    setCurrentSession(null);
-    sessionStorage.removeItem('portal_session_role');
-    sessionStorage.removeItem('portal_session_user');
-    sessionStorage.removeItem('portal_session_data');
+  const handleRevertFollowup = async (historyId: string, orderId: string, previousStatus: string) => {
+    await handleUpdateOrderStatus(orderId, { followup_status: previousStatus }, '1', `Reverted followup history #${historyId}`);
+    const updatedHistory = followupHistory.map(h => {
+      if (String(h.id) === String(historyId) || String(h.followupId) === String(historyId)) {
+        return { ...h, isUndone: true };
+      }
+      return h;
+    });
+    handleUpdateFollowupHistory(updatedHistory);
   };
 
+  if (!currentManager) {
+    return (
+      <AuthScreen
+        agents={agents}
+        onAgentLogin={(agent) => {
+          setCurrentManager({
+            user: agent.user,
+            pass: agent.pass,
+            name: agent.name,
+            role: agent.role || 'Agent',
+            permissions: agent.permissions,
+            team: agent.team,
+            teamLeaderId: agent.teamLeaderId,
+            email: agent.email
+          });
+        }}
+        onManagerLogin={(mgr) => {
+          setCurrentManager(mgr);
+        }}
+        onUpdateAgents={handleUpdateAgents}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased">
-      {toastMessage && (
-        <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xl flex items-center gap-2 border border-slate-700 animate-fadeIn">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
-      {!currentSession && (
-        <AuthScreen
-          agents={agents}
-          onAgentLogin={handleLogin}
-          onManagerLogin={handleLogin}
-          onUpdateAgents={(newAgents) => {
-            setAgents(newAgents);
-            OrderService.saveAgents(newAgents);
-          }}
-        />
-      )}
-
-      {currentSession?.role === 'manager' && (
-        <ManagerPortal
-          currentManager={currentSession.manager}
-          agents={agents}
-          onUpdateAgents={(newAgents) => {
-            setAgents(newAgents);
-            OrderService.saveAgents(newAgents);
-          }}
-          orders={orders}
-          onUpdateOrders={(newOrders) => {
-            setOrders(newOrders);
-            OrderService.saveLocalOrders(newOrders);
-          }}
-          followupHistory={followupHistory}
-          onUpdateFollowupHistory={(newHist) => {
-            setFollowupHistory(newHist);
-            OrderService.saveFollowupHistory(newHist);
-          }}
-          onRefreshOrders={() => loadOrdersData(true)}
-          isRefreshing={isRefreshing}
-          lastSyncTime={lastSyncTime}
-          onLogout={handleLogout}
-          onUpdateOrderStatus={handleUpdateOrderStatus}
-        />
-      )}
-    </div>
+    <ManagerPortal
+      currentManager={currentManager}
+      agents={agents}
+      users={agents as SystemUser[]}
+      onUpdateAgents={handleUpdateAgents}
+      onUpdateUsers={(users) => handleUpdateAgents(users as AgentUser[])}
+      orders={orders}
+      onUpdateOrders={handleUpdateOrders}
+      followupHistory={followupHistory}
+      onUpdateFollowupHistory={handleUpdateFollowupHistory}
+      onRevertFollowup={handleRevertFollowup}
+      onRefreshOrders={handleRefreshOrders}
+      isRefreshing={isRefreshing}
+      lastSyncTime={lastSyncTime}
+      onLogout={() => setCurrentManager(null)}
+      onUpdateOrderStatus={handleUpdateOrderStatus}
+    />
   );
 }
+
+export default App;
