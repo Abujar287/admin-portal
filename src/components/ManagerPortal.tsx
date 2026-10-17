@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { 
   SystemUser, 
@@ -99,6 +99,7 @@ import { AgentProfileView } from './AgentProfileView';
 import { CreateOrderModal } from './CreateOrderModal';
 import { OrderJourneyModal } from './OrderJourneyModal';
 import { SelectionModal } from './SelectionModal';
+import { FollowupHistoryTable } from './FollowupHistoryTable';
 // ...
 // ...
 /*
@@ -286,6 +287,40 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     });
   }, [orders, userOrderScope, currentManager]);
 
+  // Scoped followup history based on role & permissions
+  const scopedFollowupHistory = useMemo(() => {
+    const isSuperOrFullManager = 
+      currentManager.user === '1' ||
+      currentManager.role === 'Superadmin' ||
+      currentManager.role === 'Manager' ||
+      currentManager.permissions?.orderScope === 'all_orders';
+
+    if (isSuperOrFullManager) return followupHistory;
+
+    const curUserId = String(currentManager.user || '').trim().toLowerCase();
+    const curUserName = String(currentManager.name || '').trim().toLowerCase();
+
+    return followupHistory.filter((h) => {
+      const uId = String(h.updatedBy || '').trim().toLowerCase();
+      const uName = String(h.updatedByName || '').trim().toLowerCase();
+
+      const isMyEntry = uId === curUserId || uName === curUserName;
+
+      const isTeamLeaderForEntry = agents.some(
+        (a) =>
+          String(a.user).trim().toLowerCase() === uId &&
+          (String(a.teamLeaderId || '').trim().toLowerCase() === curUserId ||
+            String(a.teamLeaderId || '').trim().toLowerCase().includes(curUserId) ||
+            String(a.teamLeaderId || '').trim().toLowerCase().includes(curUserName) ||
+            (Array.isArray(a.teamLeaders) &&
+              (a.teamLeaders.map(t => String(t).trim().toLowerCase()).includes(curUserId) ||
+                a.teamLeaders.map(t => String(t).trim().toLowerCase()).includes(curUserName))))
+      );
+
+      return isMyEntry || isTeamLeaderForEntry;
+    });
+  }, [followupHistory, currentManager, agents]);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [managerToast, setManagerToast] = useState<string | null>(null);
   const showToast = (msg: string) => {
@@ -301,10 +336,16 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const isDark = false;
   const theme = 'light';
 
+  // Followup History Filter & Search States
+  const [followupDateFilter, setFollowupDateFilter] = useState<DateFilterType>('all');
+  const [followupStartDate, setFollowupStartDate] = useState<string>('');
+  const [followupEndDate, setFollowupEndDate] = useState<string>('');
   const [followupFilterName, setFollowupFilterName] = useState<string>('All');
-  const [followupFilterDate, setFollowupFilterDate] = useState<string>('');
+  const [followupStatusFilter, setFollowupStatusFilter] = useState<string>('all');
   const [followupSearchType, setFollowupSearchType] = useState<string>('order_id');
   const [followupSearchValue, setFollowupSearchValue] = useState<string>('');
+  const [followupPage, setFollowupPage] = useState<number>(1);
+  const [followupPageSize, setFollowupPageSize] = useState<number | 'all'>(50);
 
   // Status & Details Modal State
   const [statusModalOrder, setStatusModalOrder] = useState<OrderItem | null>(null);
@@ -497,6 +538,189 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [openAddAgentPopup, setOpenAddAgentPopup] = useState<'role' | 'team' | 'teamLeader' | 'accessControl' | null>(null);
   const [showTablePasswords, setShowTablePasswords] = useState<Record<string, boolean>>({});
   const [selectedAgentDetails, setSelectedAgentDetails] = useState<SystemUser | null>(null);
+
+  // Button refs for 1-row form popups
+  const roleBtnRef = useRef<HTMLButtonElement | null>(null);
+  const teamBtnRef = useRef<HTMLButtonElement | null>(null);
+  const teamLeaderBtnRef = useRef<HTMLButtonElement | null>(null);
+  const accessControlBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  // Table row quick access control popup state
+  const [tableRowAccessAgent, setTableRowAccessAgent] = useState<SystemUser | null>(null);
+  const [tableRowTriggerEl, setTableRowTriggerEl] = useState<HTMLElement | null>(null);
+  const [tableRowOrderScope, setTableRowOrderScope] = useState<'my_orders' | 'all_orders'>('my_orders');
+  const [tableRowCanCreate, setTableRowCanCreate] = useState(true);
+  const [tableRowCanUpdateStatus, setTableRowCanUpdateStatus] = useState(true);
+  const [tableRowCanChangeSchedule, setTableRowCanChangeSchedule] = useState(true);
+  const [tableRowCanChangeValue, setTableRowCanChangeValue] = useState(true);
+  const [tableRowCanAddProfit, setTableRowCanAddProfit] = useState(true);
+  const [tableRowAllowedStatuses, setTableRowAllowedStatuses] = useState<string[]>([]);
+  const [tableRowAllowedTabs, setTableRowAllowedTabs] = useState<AgentNavTab[]>([]);
+
+  // Smart floating popup positioning state (guarantees bounds, never goes under sidebar, shifts with sidebar)
+  const [popupPos, setPopupPos] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    maxHeight: number;
+  } | null>(null);
+
+  const updateSmartPopupPos = useCallback(() => {
+    let triggerEl: HTMLElement | null = null;
+    let preferredWidth = 480;
+    let preferredHeight = 560;
+
+    if (openAddAgentPopup === 'role') {
+      triggerEl = roleBtnRef.current;
+      preferredWidth = 300;
+      preferredHeight = 360;
+    } else if (openAddAgentPopup === 'team') {
+      triggerEl = teamBtnRef.current;
+      preferredWidth = 380;
+      preferredHeight = 440;
+    } else if (openAddAgentPopup === 'teamLeader') {
+      triggerEl = teamLeaderBtnRef.current;
+      preferredWidth = 420;
+      preferredHeight = 500;
+    } else if (openAddAgentPopup === 'accessControl') {
+      triggerEl = accessControlBtnRef.current;
+      preferredWidth = 520;
+      preferredHeight = 580;
+    } else if (tableRowAccessAgent && tableRowTriggerEl) {
+      triggerEl = tableRowTriggerEl;
+      preferredWidth = 520;
+      preferredHeight = 580;
+    } else {
+      setPopupPos(null);
+      return;
+    }
+
+    const sidebarWidth = isSidebarOpen ? 256 : 80;
+    const padding = 12;
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+
+    // Rule 2 & 3: Never go under left sidebar, and shift when sidebar expands
+    const minLeft = sidebarWidth + padding;
+    // Rule 1: Never go outside display (right boundary)
+    const maxRight = vw - padding;
+
+    const availableWidth = Math.max(280, maxRight - minLeft);
+    const actualWidth = Math.min(preferredWidth, availableWidth);
+
+    // Rule 1: Vertical bounds - never above header (72px) and never below screen
+    const minTop = 72;
+    const maxBottom = vh - padding;
+    const availableHeight = Math.max(240, maxBottom - minTop);
+    const actualMaxHeight = Math.min(preferredHeight, availableHeight);
+
+    if (!triggerEl) {
+      setPopupPos({
+        left: minLeft,
+        top: minTop,
+        width: actualWidth,
+        maxHeight: actualMaxHeight,
+      });
+      return;
+    }
+
+    const rect = triggerEl.getBoundingClientRect();
+
+    // Default left alignment:
+    // Align right edge of popup with right edge of trigger button
+    let left = rect.right - actualWidth;
+
+    // Boundary checks:
+    if (left < minLeft) {
+      left = minLeft;
+    }
+    if (left + actualWidth > maxRight) {
+      left = maxRight - actualWidth;
+    }
+    if (left < minLeft) {
+      left = minLeft;
+    }
+
+    // Default top: below trigger button
+    let top = rect.bottom + 6;
+
+    // If bottom goes off-screen:
+    if (top + actualMaxHeight > maxBottom) {
+      // Check space above
+      const spaceAbove = rect.top - minTop - 6;
+      if (spaceAbove >= actualMaxHeight) {
+        top = rect.top - actualMaxHeight - 6;
+      } else {
+        // Clamp to bottom edge of screen
+        top = Math.max(minTop, maxBottom - actualMaxHeight);
+      }
+    }
+
+    setPopupPos({
+      left: Math.round(left),
+      top: Math.round(top),
+      width: Math.round(actualWidth),
+      maxHeight: Math.round(actualMaxHeight),
+    });
+  }, [openAddAgentPopup, tableRowAccessAgent, tableRowTriggerEl, isSidebarOpen]);
+
+  useEffect(() => {
+    if (openAddAgentPopup || tableRowAccessAgent) {
+      const frame = requestAnimationFrame(() => {
+        updateSmartPopupPos();
+      });
+      const handleResize = () => updateSmartPopupPos();
+      const handleScroll = () => updateSmartPopupPos();
+      window.addEventListener('resize', handleResize);
+      window.addEventListener('scroll', handleScroll, true);
+      return () => {
+        cancelAnimationFrame(frame);
+        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('scroll', handleScroll, true);
+      };
+    } else {
+      setPopupPos(null);
+    }
+  }, [openAddAgentPopup, tableRowAccessAgent, isSidebarOpen, updateSmartPopupPos]);
+
+  const handleSaveTableRowAccess = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!tableRowAccessAgent) return;
+
+    const updatedPerms: AgentPermissions = {
+      orderScope: tableRowOrderScope,
+      canCreate: tableRowCanCreate,
+      canUpdateStatus: tableRowCanUpdateStatus,
+      canChangeSchedule: tableRowCanChangeSchedule,
+      canChangeValue: tableRowCanChangeValue,
+      canAddProfit: tableRowCanAddProfit,
+      allowedOrderStatuses: tableRowCanUpdateStatus ? tableRowAllowedStatuses : [],
+      allowedTabs: tableRowAllowedTabs,
+    };
+
+    const updatedAgents = agents.map((a) =>
+      a.user === tableRowAccessAgent.user
+        ? { ...a, permissions: updatedPerms }
+        : a
+    );
+
+    onUpdateAgents(updatedAgents, true);
+    const targetAg = updatedAgents.find((a) => a.user === tableRowAccessAgent.user);
+    if (targetAg) {
+      OrderService.saveAgentToSheet(targetAg).then((res) => {
+        if (res.success) {
+          showToast(`✓ Permissions synced to Sheet for @${tableRowAccessAgent.user}!`);
+        } else {
+          showToast(`⚠️ Permissions saved locally, Sheet sync warning: ${res.error}`);
+        }
+      }).catch(() => {});
+    } else {
+      showToast(`✓ Access permissions updated for @${tableRowAccessAgent.user}!`);
+    }
+
+    setTableRowAccessAgent(null);
+    setTableRowTriggerEl(null);
+  };
 
   // Orders Tab Filters
   const [orderCreateFilter, setOrderCreateFilter] = useState<DateFilterType>('all');
@@ -1745,6 +1969,244 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     return filteredOrders.slice(start, start + size);
   }, [filteredOrders, orderPage, orderPageSize]);
 
+  // Dedicated helper to match timestamps in Followup History avoiding timezone offsets
+  const matchFollowupDate = (
+    rawDate: string | undefined | null,
+    filterType: DateFilterType,
+    startStr: string,
+    endStr: string
+  ): boolean => {
+    if (!rawDate || filterType === 'all' || !filterType) return true;
+
+    let dStr = String(rawDate).trim();
+    if (dStr.includes('T')) dStr = dStr.split('T')[0];
+    else if (dStr.includes(' ')) dStr = dStr.split(' ')[0];
+
+    const parts = dStr.split(/[-/]/);
+    if (parts.length < 3) return false;
+
+    let year = parseInt(parts[0], 10);
+    let month = parseInt(parts[1], 10) - 1;
+    let day = parseInt(parts[2], 10);
+
+    if (parts[0].length === 2 && parts[2].length === 4) {
+      year = parseInt(parts[2], 10);
+      const p0 = parseInt(parts[0], 10);
+      const p1 = parseInt(parts[1], 10);
+      if (p0 > 12) {
+        day = p0;
+        month = p1 - 1;
+      } else {
+        month = p0 - 1;
+        day = p1;
+      }
+    }
+
+    const itemDate = new Date(year, month, day, 0, 0, 0, 0);
+    if (isNaN(itemDate.getTime())) return false;
+    const itemTime = itemDate.getTime();
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (filterType === 'today') return itemTime === today.getTime();
+    if (filterType === 'yesterday') {
+      const yest = new Date(today);
+      yest.setDate(today.getDate() - 1);
+      return itemTime === yest.getTime();
+    }
+    if (filterType === 'last7') {
+      const limit = new Date(today);
+      limit.setDate(today.getDate() - 6);
+      return itemTime >= limit.getTime() && itemTime <= today.getTime();
+    }
+    if (filterType === 'last30') {
+      const limit = new Date(today);
+      limit.setDate(today.getDate() - 29);
+      return itemTime >= limit.getTime() && itemTime <= today.getTime();
+    }
+    if (filterType === 'thisMonth') {
+      return itemDate.getMonth() === today.getMonth() && itemDate.getFullYear() === today.getFullYear();
+    }
+    if (filterType === 'lastMonth') {
+      const lm = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      return itemDate.getMonth() === lm.getMonth() && itemDate.getFullYear() === lm.getFullYear();
+    }
+    if (filterType === 'lastYear') {
+      return itemDate.getFullYear() === today.getFullYear() - 1;
+    }
+    if (filterType === 'custom') {
+      if (!startStr && !endStr) return true;
+      let sTime = -Infinity;
+      let eTime = Infinity;
+      if (startStr) {
+        const [sy, sm, sd] = startStr.split('-').map(Number);
+        sTime = new Date(sy, sm - 1, sd, 0, 0, 0, 0).getTime();
+      }
+      if (endStr) {
+        const [ey, em, ed] = endStr.split('-').map(Number);
+        eTime = new Date(ey, em - 1, ed, 23, 59, 59, 999).getTime();
+      }
+      return itemTime >= sTime && itemTime <= eTime;
+    }
+    return true;
+  };
+
+  const orderLookupMap = useMemo(() => {
+    const map = new Map<string, OrderItem>();
+    orders.forEach((o) => {
+      const id = String(o.order_id || o.id || '').trim();
+      if (id) map.set(id, o);
+    });
+    return map;
+  }, [orders]);
+
+  const availableUpdatedByNames = useMemo(() => {
+    const names = new Set<string>();
+    scopedFollowupHistory.forEach((h) => {
+      const n = h.updatedByName || h.updatedBy;
+      if (n && n.trim()) names.add(n.trim());
+    });
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [scopedFollowupHistory]);
+
+  const availableFollowupStatuses = useMemo(() => {
+    const statuses = new Set<string>();
+    scopedFollowupHistory.forEach((h) => {
+      if (h.newStatus) statuses.add(h.newStatus);
+      if ((h as any).new_status) statuses.add((h as any).new_status);
+    });
+    ORDER_STATUS_LIST.forEach((s) => statuses.add(s));
+    return Array.from(statuses).sort((a, b) => a.localeCompare(b));
+  }, [scopedFollowupHistory]);
+
+  const filteredFollowupHistory = useMemo(() => {
+    return scopedFollowupHistory.filter((h) => {
+      // 1. Timestamp Date Filter
+      if (!matchFollowupDate(h.timestamp, followupDateFilter, followupStartDate, followupEndDate)) {
+        return false;
+      }
+
+      // 2. Updated By Name Filter
+      if (followupFilterName !== 'All') {
+        const opName = (h.updatedByName || h.updatedBy || '').trim().toLowerCase();
+        const targetOp = followupFilterName.trim().toLowerCase();
+        if (opName !== targetOp && !opName.includes(targetOp)) return false;
+      }
+
+      // 3. Followup Status Filter
+      if (followupStatusFilter !== 'all') {
+        const itemStatus = (h.newStatus || (h as any).new_status || h.previousStatus || '').trim().toLowerCase();
+        if (itemStatus !== followupStatusFilter.toLowerCase()) return false;
+      }
+
+      // 4. Search with dropdown selector (matching orders table behavior)
+      if (followupSearchValue.trim()) {
+        const q = followupSearchValue.trim().toLowerCase();
+        const relOrder = orderLookupMap.get(String(h.orderId || (h as any).order_id || '').trim());
+
+        if (followupSearchType === 'order_id') {
+          const ordId = String(h.orderId || (h as any).order_id || '').toLowerCase();
+          if (!ordId.includes(q)) return false;
+        } else if (followupSearchType === 'followup_id') {
+          const fId = String(h.followupId || h.id || '').toLowerCase();
+          if (!fId.includes(q)) return false;
+        } else if (followupSearchType === 'customer_id') {
+          const cId = String(relOrder?.customer_id || relOrder?.customerId || (h as any).customer_id || (h as any).customerId || '').toLowerCase();
+          if (!cId.includes(q)) return false;
+        } else if (followupSearchType === 'customer_mobile') {
+          const cMob = String(h.customerContact || relOrder?.customer_mobile || relOrder?.customerContact || (h as any).customer_mobile || '').toLowerCase();
+          if (!cMob.includes(q)) return false;
+        } else if (followupSearchType === 'customer_name') {
+          const cNm = String(h.customerName || relOrder?.customer_name || relOrder?.customerName || (h as any).customer_name || '').toLowerCase();
+          if (!cNm.includes(q)) return false;
+        } else if (followupSearchType === 'updated_by_name') {
+          const uNm = String(h.updatedByName || h.updatedBy || '').toLowerCase();
+          if (!uNm.includes(q)) return false;
+        } else if (followupSearchType === 'updated_by') {
+          const uId = String(h.updatedBy || '').toLowerCase();
+          if (!uId.includes(q)) return false;
+        } else if (followupSearchType === 'new_status') {
+          const nSt = String(h.newStatus || (h as any).new_status || '').toLowerCase();
+          if (!nSt.includes(q)) return false;
+        } else if (followupSearchType === 'previous_status') {
+          const pSt = String(h.previousStatus || '').toLowerCase();
+          if (!pSt.includes(q)) return false;
+        } else if (followupSearchType === 'action') {
+          const act = String(h.action || '').toLowerCase();
+          if (!act.includes(q)) return false;
+        } else if (followupSearchType === 'notes') {
+          const nts = String(h.notes || '').toLowerCase();
+          if (!nts.includes(q)) return false;
+        } else {
+          // 'all': match any field
+          const ordId = String(h.orderId || (h as any).order_id || '').toLowerCase();
+          const fId = String(h.followupId || h.id || '').toLowerCase();
+          const cId = String(relOrder?.customer_id || relOrder?.customerId || (h as any).customer_id || '').toLowerCase();
+          const cMob = String(h.customerContact || relOrder?.customer_mobile || relOrder?.customerContact || (h as any).customer_mobile || '').toLowerCase();
+          const cNm = String(h.customerName || relOrder?.customer_name || relOrder?.customerName || (h as any).customer_name || '').toLowerCase();
+          const uNm = String(h.updatedByName || '').toLowerCase();
+          const uId = String(h.updatedBy || '').toLowerCase();
+          const nSt = String(h.newStatus || (h as any).new_status || '').toLowerCase();
+          const pSt = String(h.previousStatus || '').toLowerCase();
+          const act = String(h.action || '').toLowerCase();
+          const nts = String(h.notes || '').toLowerCase();
+
+          const matchesAny =
+            ordId.includes(q) ||
+            fId.includes(q) ||
+            cId.includes(q) ||
+            cMob.includes(q) ||
+            cNm.includes(q) ||
+            uNm.includes(q) ||
+            uId.includes(q) ||
+            nSt.includes(q) ||
+            pSt.includes(q) ||
+            act.includes(q) ||
+            nts.includes(q);
+
+          if (!matchesAny) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [
+    scopedFollowupHistory,
+    orderLookupMap,
+    followupDateFilter,
+    followupStartDate,
+    followupEndDate,
+    followupFilterName,
+    followupStatusFilter,
+    followupSearchType,
+    followupSearchValue
+  ]);
+
+  const totalFollowupPages = useMemo(() => {
+    if (followupPageSize === 'all') return 1;
+    return Math.max(1, Math.ceil(filteredFollowupHistory.length / (followupPageSize as number)));
+  }, [filteredFollowupHistory.length, followupPageSize]);
+
+  const paginatedFollowupHistory = useMemo(() => {
+    if (followupPageSize === 'all') return filteredFollowupHistory;
+    const size = followupPageSize as number;
+    const start = (followupPage - 1) * size;
+    return filteredFollowupHistory.slice(start, start + size);
+  }, [filteredFollowupHistory, followupPage, followupPageSize]);
+
+  useEffect(() => {
+    setFollowupPage(1);
+  }, [
+    followupDateFilter,
+    followupStartDate,
+    followupEndDate,
+    followupFilterName,
+    followupStatusFilter,
+    followupSearchType,
+    followupSearchValue
+  ]);
+
   // Summary Metrics & Aggregations with single date filter
   const orderDeliveredDateMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -2230,6 +2692,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {isTabAllowed('summary') && (
             <button
               onClick={() => setActiveTab('summary')}
+              title={`Summary (${scopedOrders.length} records)`}
               className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
                 activeTab === 'summary'
                   ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
@@ -2242,6 +2705,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   Summary
                 </span>
               )}
+              {isSidebarOpen && (
+                <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'summary' ? 'bg-white text-indigo-900' : 'bg-white/10 text-white'}`}>
+                  {scopedOrders.length}
+                </span>
+              )}
             </button>
           )}
 
@@ -2249,6 +2717,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {isTabAllowed('orders') && (
             <button
               onClick={() => setActiveTab('orders')}
+              title={`Orders (${scopedOrders.length} records)`}
               className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
                 activeTab === 'orders'
                   ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
@@ -2273,6 +2742,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {isTabAllowed('followup') && (
             <button
               onClick={() => setActiveTab('followup')}
+              title={`Followup History (${scopedFollowupHistory.length} logs)`}
               className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
                 activeTab === 'followup'
                   ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
@@ -2287,7 +2757,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               )}
               {isSidebarOpen && (
                 <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'followup' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
-                  {followupHistory.length}
+                  {scopedFollowupHistory.length}
                 </span>
               )}
             </button>
@@ -2297,6 +2767,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {isTabAllowed('agent-performance') && (
             <button
               onClick={() => setActiveTab('agent-performance')}
+              title={`Agent Performance (${summaryStats.agentSummary.length} agents)`}
               className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
                 activeTab === 'agent-performance'
                   ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
@@ -2330,6 +2801,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               {isTabAllowed('users') && (
                 <button
                   onClick={() => setActiveTab('users')}
+                  title={`User Details (${agents.length} users)`}
                   className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
                     activeTab === 'users'
                       ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
@@ -2354,6 +2826,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               {isTabAllowed('category-mapping') && (
                 <button
                   onClick={() => setActiveTab('category-mapping')}
+                  title={`Category Mapping (${categoryMappings.length} mappings)`}
                   className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
                     activeTab === 'category-mapping'
                       ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
@@ -2378,6 +2851,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               {isTabAllowed('sheet-connection') && (
                 <button
                   onClick={() => setActiveTab('sheet-connection')}
+                  title={`Google Sheet & Tabs (${connectedSheetTabs.length > 0 ? connectedSheetTabs.length : (orders.length > 0 ? 1 : 0)} tabs)`}
                   className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
                     activeTab === 'sheet-connection'
                       ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
@@ -2390,9 +2864,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       Google Sheet &amp; Tabs
                     </span>
                   )}
-                  {isSidebarOpen && connectedSheetTabs.length > 0 && (
+                  {isSidebarOpen && (
                     <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'sheet-connection' ? 'bg-white text-indigo-900' : 'bg-emerald-500/30 text-emerald-200'}`}>
-                      {connectedSheetTabs.length}
+                      {connectedSheetTabs.length > 0 ? connectedSheetTabs.length : (orders.length > 0 ? 1 : 0)}
                     </span>
                   )}
                 </button>
@@ -2402,6 +2876,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               {isTabAllowed('profiles') && (
                 <button
                   onClick={() => setActiveTab('profiles')}
+                  title="Profile & Account (1)"
                   className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
                     activeTab === 'profiles'
                       ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
@@ -2412,6 +2887,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   {isSidebarOpen && (
                     <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'profiles' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
                       Profile
+                    </span>
+                  )}
+                  {isSidebarOpen && (
+                    <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'profiles' ? 'bg-white text-indigo-900' : 'bg-white/10 text-white'}`}>
+                      1
                     </span>
                   )}
                 </button>
@@ -2810,10 +3290,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         role
                       </label>
                       <button
+                        ref={roleBtnRef}
                         type="button"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
+                          setTableRowAccessAgent(null);
                           setOpenAddAgentPopup(prev => prev === 'role' ? null : 'role');
                         }}
                         className={`w-full px-2.5 py-2 text-xs rounded-lg border text-left flex items-center justify-between font-semibold transition-all cursor-pointer shadow-2xs ${
@@ -2827,11 +3309,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 ml-0.5 transition-transform duration-150 ${openAddAgentPopup === 'role' ? 'rotate-180 text-indigo-600' : ''}`} />
                       </button>
 
-                      {/* Dropdown: Role Dropdown Menu */}
-                      {/* Dropdown: Role Dropdown Menu - No scrolling needed, all visible */}
-                      {openAddAgentPopup === 'role' && (
+                      {/* Dropdown: Role Dropdown Menu - Viewport clamped, never under sidebar */}
+                      {openAddAgentPopup === 'role' && popupPos && (
                         <div
-                          className="absolute top-full left-0 mt-1.5 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[70] p-4 space-y-3"
+                          style={{
+                            position: 'fixed',
+                            left: `${popupPos.left}px`,
+                            top: `${popupPos.top}px`,
+                            width: `${popupPos.width}px`,
+                            maxHeight: `${popupPos.maxHeight}px`,
+                            zIndex: 90,
+                          }}
+                          className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 space-y-3 overflow-y-auto transition-all duration-200"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -2942,10 +3431,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         team
                       </label>
                       <button
+                        ref={teamBtnRef}
                         type="button"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
+                          setTableRowAccessAgent(null);
                           setOpenAddAgentPopup(prev => prev === 'team' ? null : 'team');
                         }}
                         className={`w-full px-3 py-2 text-xs rounded-lg border text-left flex items-center justify-between font-semibold transition-all cursor-pointer shadow-2xs ${
@@ -2958,10 +3449,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 ml-1 transition-transform duration-150 ${openAddAgentPopup === 'team' ? 'rotate-180 text-indigo-600' : ''}`} />
                       </button>
 
-                      {/* Dropdown 1: Team Dropdown Menu - Clean 2-column grid, no scroll needed */}
-                      {openAddAgentPopup === 'team' && (
+                      {/* Dropdown 1: Team Dropdown Menu - Viewport clamped, never under sidebar */}
+                      {openAddAgentPopup === 'team' && popupPos && (
                         <div
-                          className="absolute top-full left-0 mt-1.5 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[70] p-4 space-y-3"
+                          style={{
+                            position: 'fixed',
+                            left: `${popupPos.left}px`,
+                            top: `${popupPos.top}px`,
+                            width: `${popupPos.width}px`,
+                            maxHeight: `${popupPos.maxHeight}px`,
+                            zIndex: 90,
+                          }}
+                          className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 space-y-3 overflow-y-auto transition-all duration-200"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -3094,10 +3593,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         team leader
                       </label>
                       <button
+                        ref={teamLeaderBtnRef}
                         type="button"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
+                          setTableRowAccessAgent(null);
                           setOpenAddAgentPopup(prev => prev === 'teamLeader' ? null : 'teamLeader');
                         }}
                         className={`w-full px-2 py-2 text-xs rounded-lg border text-left flex items-center justify-between font-semibold transition-all cursor-pointer shadow-2xs ${
@@ -3115,10 +3616,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 ml-1 transition-transform duration-150 ${openAddAgentPopup === 'teamLeader' ? 'rotate-180 text-purple-600' : ''}`} />
                       </button>
 
-                      {/* Dropdown 2: Team Leader Dropdown Menu - Clean 2-column grid, all visible on display */}
-                      {openAddAgentPopup === 'teamLeader' && (
+                      {/* Dropdown 2: Team Leader Dropdown Menu - Viewport clamped, never under sidebar */}
+                      {openAddAgentPopup === 'teamLeader' && popupPos && (
                         <div
-                          className="absolute top-full left-0 sm:-left-24 lg:-left-36 mt-1.5 w-80 sm:w-[420px] bg-white rounded-2xl shadow-2xl border border-slate-200 z-[70] p-4 space-y-3"
+                          style={{
+                            position: 'fixed',
+                            left: `${popupPos.left}px`,
+                            top: `${popupPos.top}px`,
+                            width: `${popupPos.width}px`,
+                            maxHeight: `${popupPos.maxHeight}px`,
+                            zIndex: 90,
+                          }}
+                          className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 space-y-3 overflow-y-auto transition-all duration-200"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -3280,10 +3789,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <span className="whitespace-nowrap">access control</span>
                       </label>
                       <button
+                        ref={accessControlBtnRef}
                         type="button"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
+                          setTableRowAccessAgent(null);
                           setOpenAddAgentPopup(prev => prev === 'accessControl' ? null : 'accessControl');
                         }}
                         className={`w-full px-2 py-2 text-xs rounded-lg border text-left flex items-center justify-between font-bold transition-all cursor-pointer shadow-2xs ${
@@ -3297,10 +3808,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 ml-1 transition-transform duration-150 ${openAddAgentPopup === 'accessControl' ? 'rotate-180 text-indigo-600' : ''}`} />
                       </button>
 
-                      {/* Dropdown: Access Control - 2-column layout, all visible on display without scrolling */}
-                      {openAddAgentPopup === 'accessControl' && (
+                      {/* Dropdown: Access Control - Viewport clamped, never under sidebar */}
+                      {openAddAgentPopup === 'accessControl' && popupPos && (
                         <div
-                          className="absolute top-full left-0 sm:-left-40 lg:-left-64 mt-1.5 w-80 sm:w-[480px] bg-white rounded-2xl shadow-2xl border border-slate-200 z-[70] p-4 space-y-3"
+                          style={{
+                            position: 'fixed',
+                            left: `${popupPos.left}px`,
+                            top: `${popupPos.top}px`,
+                            width: `${popupPos.width}px`,
+                            maxHeight: `${popupPos.maxHeight}px`,
+                            zIndex: 90,
+                          }}
+                          className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 space-y-3 overflow-y-auto transition-all duration-200 flex flex-col"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -3555,11 +4074,15 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   </div>
                 </form>
 
-                {/* Transparent Backdrop to dismiss any open dropdown by clicking anywhere outside */}
-                {openAddAgentPopup && (
+                {/* Backdrop to dismiss any open dropdown by clicking anywhere outside */}
+                {(openAddAgentPopup || tableRowAccessAgent) && (
                   <div
-                    className="fixed inset-0 z-30 bg-transparent cursor-default"
-                    onClick={() => setOpenAddAgentPopup(null)}
+                    className="fixed inset-0 z-[85] bg-black/10 backdrop-blur-[0.5px] cursor-default"
+                    onClick={() => {
+                      setOpenAddAgentPopup(null);
+                      setTableRowAccessAgent(null);
+                      setTableRowTriggerEl(null);
+                    }}
                   />
                 )}
               </div>
@@ -3701,9 +4224,31 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             <td className="py-3 px-3.5">
                               <button
                                 type="button"
-                                onClick={() => handleEditAgent(agent)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenAddAgentPopup(null);
+                                  setTableRowTriggerEl(e.currentTarget);
+                                  setTableRowAccessAgent(agent);
+                                  const p = agent.permissions || {};
+                                  setTableRowOrderScope(p.orderScope || 'my_orders');
+                                  setTableRowCanCreate(p.canCreate ?? true);
+                                  setTableRowCanUpdateStatus(p.canUpdateStatus ?? true);
+                                  setTableRowCanChangeSchedule(p.canChangeSchedule ?? true);
+                                  setTableRowCanChangeValue(p.canChangeValue ?? true);
+                                  setTableRowCanAddProfit(p.canAddProfit ?? true);
+                                  setTableRowAllowedStatuses(
+                                    Array.isArray(p.allowedOrderStatuses)
+                                      ? p.allowedOrderStatuses
+                                      : (p.canUpdateStatus !== false ? [...ORDER_STATUS_LIST] : [])
+                                  );
+                                  setTableRowAllowedTabs(
+                                    p.allowedTabs && p.allowedTabs.length > 0
+                                      ? p.allowedTabs
+                                      : ['summary', 'orders', 'followup', 'agent-performance', 'profiles']
+                                  );
+                                }}
                                 className="flex flex-wrap gap-1 max-w-[280px] text-left cursor-pointer hover:opacity-80 transition-opacity"
-                                title="Click to edit Agent permissions in popup modal"
+                                title="Click to view & edit Access Control for this user"
                               >
                                 {/* Order Scope Badge */}
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
@@ -3794,363 +4339,334 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   </table>
                 </div>
               </div>
+
+              {/* Quick Access Control Floating Modal for specific Agent clicked in Table */}
+              {tableRowAccessAgent && popupPos && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    left: `${popupPos.left}px`,
+                    top: `${popupPos.top}px`,
+                    width: `${popupPos.width}px`,
+                    maxHeight: `${popupPos.maxHeight}px`,
+                    zIndex: 90,
+                  }}
+                  className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 space-y-3 overflow-y-auto transition-all duration-200 flex flex-col"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                      <div>
+                        <h4 className="font-extrabold text-sm text-slate-900">
+                          Access Control: <span className="text-indigo-600">@{tableRowAccessAgent.user}</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-500">
+                          {tableRowAccessAgent.name || `User ${tableRowAccessAgent.user}`} ({tableRowAccessAgent.role || 'Agent'})
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTableRowAccessAgent(null);
+                        setTableRowTriggerEl(null);
+                      }}
+                      className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* 2 Side-by-Side Columns for All Controls without Scrolling */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Left Column: Orders Show & Order Creation & Placed Order Permissions */}
+                    <div className="space-y-2">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Orders Show / Visibility
+                        </span>
+                        <select
+                          value={tableRowOrderScope}
+                          onChange={(e) => setTableRowOrderScope(e.target.value as 'my_orders' | 'all_orders')}
+                          className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs font-bold bg-white text-slate-800 focus:outline-hidden focus:border-indigo-600 shadow-2xs"
+                        >
+                          <option value="my_orders">Only My Orders (Exact User ID)</option>
+                          <option value="all_orders">All Orders (Show All System Orders)</option>
+                        </select>
+                        <span className="text-[10px] text-slate-500 block mt-0.5">
+                          {tableRowOrderScope === 'all_orders'
+                            ? 'Agent can view all orders across all agents'
+                            : 'Agent only views orders matching exact user ID'}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Order Creation
+                        </span>
+                        <label className="flex items-center justify-between px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-800 transition-colors">
+                          <span>Create Order</span>
+                          <input
+                            type="checkbox"
+                            checked={tableRowCanCreate}
+                            onChange={(e) => setTableRowCanCreate(e.target.checked)}
+                            className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                          />
+                        </label>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Order Permissions
+                        </span>
+                        <div className="space-y-1.5">
+                          <label className="flex items-center justify-between px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-800 transition-colors">
+                            <span>Schedule Change</span>
+                            <input
+                              type="checkbox"
+                              checked={tableRowCanChangeSchedule}
+                              onChange={(e) => setTableRowCanChangeSchedule(e.target.checked)}
+                              className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                            />
+                          </label>
+
+                          <label className="flex items-center justify-between px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-800 transition-colors">
+                            <span>Price Change</span>
+                            <input
+                              type="checkbox"
+                              checked={tableRowCanChangeValue}
+                              onChange={(e) => setTableRowCanChangeValue(e.target.checked)}
+                              className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                            />
+                          </label>
+
+                          <label className="flex items-center justify-between px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-800 transition-colors">
+                            <span>Profit</span>
+                            <input
+                              type="checkbox"
+                              checked={tableRowCanAddProfit}
+                              onChange={(e) => setTableRowCanAddProfit(e.target.checked)}
+                              className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Column: Status Update & All Statuses in Clean Grid */}
+                    <div className="space-y-2 border-t sm:border-t-0 sm:border-l border-slate-100 sm:pl-3">
+                      <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-800 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={tableRowCanUpdateStatus}
+                            onChange={(e) => setTableRowCanUpdateStatus(e.target.checked)}
+                            className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                          />
+                          <span>Status Update</span>
+                        </label>
+                        {tableRowCanUpdateStatus && (
+                          <div className="flex items-center gap-1.5 text-[10px]">
+                            <button
+                              type="button"
+                              onClick={() => setTableRowAllowedStatuses([...ORDER_STATUS_LIST])}
+                              className="text-indigo-600 font-semibold hover:underline cursor-pointer"
+                            >
+                              All
+                            </button>
+                            <span className="text-slate-300">|</span>
+                            <button
+                              type="button"
+                              onClick={() => setTableRowAllowedStatuses([])}
+                              className="text-slate-500 font-semibold hover:underline cursor-pointer"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {tableRowCanUpdateStatus && (
+                        <div className="grid grid-cols-2 gap-1 pt-1">
+                          {ORDER_STATUS_LIST.map((st) => {
+                            const isChecked = tableRowAllowedStatuses.includes(st);
+                            return (
+                              <label
+                                key={`tbl-status-chk-${st}`}
+                                className={`flex items-center justify-between px-2 py-1 rounded-lg border text-[11px] cursor-pointer transition-colors ${
+                                  isChecked
+                                    ? 'bg-indigo-50 border-indigo-200 text-indigo-950 font-bold'
+                                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                                }`}
+                              >
+                                <span className="truncate">{st}</span>
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setTableRowAllowedStatuses(prev => [...prev, st]);
+                                    } else {
+                                      setTableRowAllowedStatuses(prev => prev.filter(x => x !== st));
+                                    }
+                                  }}
+                                  className="rounded text-indigo-600 w-3 h-3 cursor-pointer ml-1"
+                                />
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Permitted Navigation Tabs Access Control */}
+                  <div className="space-y-2 pt-3 border-t border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Permitted Left Sidebar Navigation Tabs ({tableRowAllowedTabs.length}/{ALL_SIDEBAR_TABS.length})
+                      </span>
+                      <div className="flex items-center gap-1.5 text-[10px]">
+                        <button
+                          type="button"
+                          onClick={() => setTableRowAllowedTabs(ALL_SIDEBAR_TABS.map(t => t.id as AgentNavTab))}
+                          className="text-indigo-600 font-bold hover:underline cursor-pointer"
+                        >
+                          All
+                        </button>
+                        <span className="text-slate-300">|</span>
+                        <button
+                          type="button"
+                          onClick={() => setTableRowAllowedTabs(['summary', 'orders', 'followup', 'agent-performance', 'profiles'])}
+                          className="text-slate-500 font-bold hover:underline cursor-pointer"
+                        >
+                          Agent Default
+                        </button>
+                        <span className="text-slate-300">|</span>
+                        <button
+                          type="button"
+                          onClick={() => setTableRowAllowedTabs(['orders'])}
+                          className="text-slate-500 font-bold hover:underline cursor-pointer"
+                        >
+                          Only Orders
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      {ALL_SIDEBAR_TABS.map((tab) => {
+                        const isChecked = tableRowAllowedTabs.includes(tab.id as AgentNavTab);
+                        return (
+                          <label
+                            key={`tbl-tab-chk-${tab.id}`}
+                            className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-[11px] cursor-pointer transition-colors ${
+                              isChecked
+                                ? 'bg-indigo-50 border-indigo-200 text-indigo-950 font-bold'
+                                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                            }`}
+                          >
+                            <span className="truncate">{tab.label}</span>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setTableRowAllowedTabs(prev => [...prev, tab.id as AgentNavTab]);
+                                } else {
+                                  setTableRowAllowedTabs(prev => prev.filter(x => x !== tab.id));
+                                }
+                              }}
+                              className="rounded text-indigo-600 w-3.5 h-3.5 cursor-pointer ml-1"
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const ag = tableRowAccessAgent;
+                        setTableRowAccessAgent(null);
+                        setTableRowTriggerEl(null);
+                        handleEditAgent(ag);
+                      }}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
+                    >
+                      Full Profile Edit...
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTableRowAccessAgent(null);
+                          setTableRowTriggerEl(null);
+                        }}
+                        className="px-3 py-1.5 text-slate-500 hover:text-slate-800 text-xs font-semibold cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveTableRowAccess()}
+                        className="px-5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer shadow-xs transition-colors"
+                      >
+                        Save Permissions
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* TAB: FOLLOWUP HISTORY & AUDIT LOGS */}
           {activeTab === 'followup' && (
-            <div className="space-y-4">
-              <div className={`${cardBg} rounded-2xl p-5 border shadow-xs space-y-4`}>
-                <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
-                  <div className="flex items-center gap-2">
-                    <History className={`w-5 h-5 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
-                    <div>
-                      <h3 className={`font-extrabold text-sm ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Followup History &amp; Audit Logs</h3>
-                      <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Filter all customer followups by operator (Update By Name) and date, or export to CSV/XLSX.</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const availableUpdatedByNames = Array.from(new Set(followupHistory.map(h => h.updatedByName || h.updatedBy).filter(Boolean)));
-                        const filtered = followupHistory.filter((h) => {
-                          const isAuthorized = currentManager.role === 'Manager' || 
-                                               h.updatedBy === currentManager.user ||
-                                               agents.some(a => a.user === h.updatedBy && (
-                                                 a.teamLeaderId === currentManager.user ||
-                                                 a.teamLeaderId?.includes(currentManager.user) ||
-                                                 a.teamLeaderId?.includes(currentManager.name) ||
-                                                 (Array.isArray(a.teamLeaders) && (
-                                                   a.teamLeaders.includes(currentManager.user) ||
-                                                   a.teamLeaders.includes(currentManager.name)
-                                                 ))
-                                               ));
-                          if (!isAuthorized) return false;
-                          if (followupFilterName !== 'All') {
-                            const nameMatch = h.updatedByName === followupFilterName || h.updatedBy === followupFilterName;
-                            if (!nameMatch) return false;
-                          }
-                          if (followupFilterDate.trim()) {
-                            const histDateStr = String(h.timestamp || '');
-                            if (!histDateStr.includes(followupFilterDate.trim())) return false;
-                          }
-                          if (followupSearch.trim()) {
-                            const q = followupSearch.toLowerCase();
-                            const matches = (
-                              String(h.followupId || '').toLowerCase().includes(q) ||
-                              String(h.orderId || (h as any).order_id || '').toLowerCase().includes(q) ||
-                              String(h.customerName || (h as any).customer_name || '').toLowerCase().includes(q) ||
-                              String(h.previousStatus || '').toLowerCase().includes(q) ||
-                              String(h.newStatus || (h as any).new_status || '').toLowerCase().includes(q) ||
-                              String(h.action || '').toLowerCase().includes(q) ||
-                              String(h.notes || '').toLowerCase().includes(q) ||
-                              String(h.updatedByName || '').toLowerCase().includes(q)
-                            );
-                            if (!matches) return false;
-                          }
-                          return true;
-                        });
-                        handleExportCsv(filtered, 'followup_audit_logs.csv');
-                      }}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Export CSV / XLSX</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Filters Row */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* Search */}
-                  <div>
-                    <label className={`block text-[11px] font-bold uppercase mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Search Keyword</label>
-                    <div className="relative">
-                      <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-                      <input
-                        type="text"
-                        value={followupSearch}
-                        onChange={(e) => setFollowupSearch(e.target.value)}
-                        placeholder="Search order, customer, status..."
-                        className={`w-full pl-8 pr-3 py-2 text-xs rounded-xl border ${inputBg}`}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Update By Name Filter */}
-                  <div>
-                    <label className={`block text-[11px] font-bold uppercase mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Filter by Update By Name</label>
-                    <select
-                      value={followupFilterName}
-                      onChange={(e) => setFollowupFilterName(e.target.value)}
-                      className={`w-full px-3 py-2 text-xs rounded-xl border font-medium ${inputBg}`}
-                    >
-                      <option value="All" className={isDark ? 'bg-slate-900 text-white' : ''}>All Operators / Managers</option>
-                      {Array.from(new Set(followupHistory.map(h => h.updatedByName || h.updatedBy).filter(Boolean))).map((name) => (
-                        <option key={name} value={name} className={isDark ? 'bg-slate-900 text-white' : ''}>{name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Date Filter */}
-                  <div>
-                    <label className={`block text-[11px] font-bold uppercase mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Filter by Date</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={followupFilterDate}
-                        onChange={(e) => setFollowupFilterDate(e.target.value)}
-                        placeholder="e.g. 2026-10-15 or Oct"
-                        className={`flex-1 px-3 py-2 text-xs rounded-xl border font-mono ${inputBg}`}
-                      />
-                      {followupFilterDate && (
-                        <button
-                          type="button"
-                          onClick={() => setFollowupFilterDate('')}
-                          className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold ${isDark ? 'bg-slate-800 text-slate-200 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Table */}
-              <div className={`${cardBg} rounded-2xl border shadow-xs overflow-hidden`}>
-                <div className={`p-3 border-b flex items-center justify-between ${isDark ? 'bg-slate-800 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-100 text-slate-700'}`}>
-                  <span className="text-xs font-bold">
-                    Showing {followupHistory.filter((h) => {
-                      const isAuthorized = currentManager.role === 'Manager' || 
-                                           h.updatedBy === currentManager.user ||
-                                           agents.some(a => a.user === h.updatedBy && (
-                                             a.teamLeaderId === currentManager.user ||
-                                             a.teamLeaderId?.includes(currentManager.user) ||
-                                             a.teamLeaderId?.includes(currentManager.name) ||
-                                             (Array.isArray(a.teamLeaders) && (
-                                               a.teamLeaders.includes(currentManager.user) ||
-                                               a.teamLeaders.includes(currentManager.name)
-                                             ))
-                                           ));
-                      if (!isAuthorized) return false;
-                      if (followupFilterName !== 'All') {
-                        const nameMatch = h.updatedByName === followupFilterName || h.updatedBy === followupFilterName;
-                        if (!nameMatch) return false;
-                      }
-                      if (followupFilterDate.trim()) {
-                        const histDateStr = String(h.timestamp || '');
-                        if (!histDateStr.includes(followupFilterDate.trim())) return false;
-                      }
-                      if (followupSearch.trim()) {
-                        const q = followupSearch.toLowerCase();
-                        const matches = (
-                          String(h.followupId || '').toLowerCase().includes(q) ||
-                          String(h.orderId || (h as any).order_id || '').toLowerCase().includes(q) ||
-                          String(h.customerName || (h as any).customer_name || '').toLowerCase().includes(q) ||
-                          String(h.previousStatus || '').toLowerCase().includes(q) ||
-                          String(h.newStatus || (h as any).new_status || '').toLowerCase().includes(q) ||
-                          String(h.action || '').toLowerCase().includes(q) ||
-                          String(h.notes || '').toLowerCase().includes(q) ||
-                          String(h.updatedByName || '').toLowerCase().includes(q)
-                        );
-                        if (!matches) return false;
-                      }
-                      return true;
-                    }).length} followup record(s)
-                  </span>
-                </div>
-                <div className="overflow-x-auto max-h-[60vh]">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className={`${tableHeaderBg} font-bold border-b sticky top-0 z-10`}>
-                        <th className={`py-3 px-3.5 whitespace-nowrap ${isDark ? 'text-indigo-300' : 'text-indigo-700'}`}>Followup ID</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Order ID</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Timestamp</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Customer Name</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Contact</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Previous Status</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">New Status</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Order Status</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Order Value</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Schedule</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Updated By</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Updated By Name</th>
-                        <th className={`py-3 px-3.5 whitespace-nowrap ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>Action Name</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Remarks / Notes</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap text-center">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-800">
-                      {followupHistory.filter((h) => {
-                        const isAuthorized = currentManager.role === 'Manager' || 
-                                             h.updatedBy === currentManager.user ||
-                                             agents.some(a => a.user === h.updatedBy && (
-                                               a.teamLeaderId === currentManager.user ||
-                                               a.teamLeaderId?.includes(currentManager.user) ||
-                                               a.teamLeaderId?.includes(currentManager.name) ||
-                                               (Array.isArray(a.teamLeaders) && (
-                                                 a.teamLeaders.includes(currentManager.user) ||
-                                                 a.teamLeaders.includes(currentManager.name)
-                                               ))
-                                             ));
-                        if (!isAuthorized) return false;
-                        if (followupFilterName !== 'All') {
-                          const nameMatch = h.updatedByName === followupFilterName || h.updatedBy === followupFilterName;
-                          if (!nameMatch) return false;
-                        }
-                        if (followupFilterDate.trim()) {
-                          const histDateStr = String(h.timestamp || '');
-                          if (!histDateStr.includes(followupFilterDate.trim())) return false;
-                        }
-                        if (followupSearch.trim()) {
-                          const q = followupSearch.toLowerCase();
-                          const matches = (
-                            String(h.followupId || '').toLowerCase().includes(q) ||
-                            String(h.orderId || (h as any).order_id || '').toLowerCase().includes(q) ||
-                            String(h.customerName || (h as any).customer_name || '').toLowerCase().includes(q) ||
-                            String(h.previousStatus || '').toLowerCase().includes(q) ||
-                            String(h.newStatus || (h as any).new_status || '').toLowerCase().includes(q) ||
-                            String(h.action || '').toLowerCase().includes(q) ||
-                            String(h.notes || '').toLowerCase().includes(q) ||
-                            String(h.updatedByName || '').toLowerCase().includes(q)
-                          );
-                          if (!matches) return false;
-                        }
-                        return true;
-                      }).length === 0 ? (
-                        <tr>
-                          <td colSpan={15} className="text-center py-12 text-slate-400 font-semibold">
-                            No followup history records matching filters.
-                          </td>
-                        </tr>
-                      ) : (
-                        followupHistory.filter((h) => {
-                          const isAuthorized = currentManager.role === 'Manager' || 
-                                               h.updatedBy === currentManager.user ||
-                                               agents.some(a => a.user === h.updatedBy && (
-                                                 a.teamLeaderId === currentManager.user ||
-                                                 a.teamLeaderId?.includes(currentManager.user) ||
-                                                 a.teamLeaderId?.includes(currentManager.name) ||
-                                                 (Array.isArray(a.teamLeaders) && (
-                                                   a.teamLeaders.includes(currentManager.user) ||
-                                                   a.teamLeaders.includes(currentManager.name)
-                                                 ))
-                                               ));
-                          if (!isAuthorized) return false;
-                          if (followupFilterName !== 'All') {
-                            const nameMatch = h.updatedByName === followupFilterName || h.updatedBy === followupFilterName;
-                            if (!nameMatch) return false;
-                          }
-                          if (followupFilterDate.trim()) {
-                            const histDateStr = String(h.timestamp || '');
-                            if (!histDateStr.includes(followupFilterDate.trim())) return false;
-                          }
-                          if (followupSearch.trim()) {
-                            const q = followupSearch.toLowerCase();
-                            const matches = (
-                              String(h.followupId || '').toLowerCase().includes(q) ||
-                              String(h.orderId || (h as any).order_id || '').toLowerCase().includes(q) ||
-                              String(h.customerName || (h as any).customer_name || '').toLowerCase().includes(q) ||
-                              String(h.previousStatus || '').toLowerCase().includes(q) ||
-                              String(h.newStatus || (h as any).new_status || '').toLowerCase().includes(q) ||
-                              String(h.action || '').toLowerCase().includes(q) ||
-                              String(h.notes || '').toLowerCase().includes(q) ||
-                              String(h.updatedByName || '').toLowerCase().includes(q)
-                            );
-                            if (!matches) return false;
-                          }
-                          return true;
-                        }).map((hist, histIdx) => {
-                          const isUndoRecord = !!hist.isUndo;
-                          const isRevertedRecord = !!hist.isUndone;
-
-                          return (
-                            <tr 
-                              key={`followup-tab-hist-${hist.id || hist.followupId || histIdx}-${histIdx}`} 
-                              className={`transition-colors hover:bg-amber-100/90 ${isUndoRecord ? 'bg-amber-50/50 border-l-4 border-l-amber-500' : (isRevertedRecord ? 'opacity-80 bg-slate-50/40' : '')}`}
-                            >
-                              <td className="py-3 px-3.5 font-mono font-bold text-indigo-800 whitespace-nowrap">
-                                #{hist.followupId || hist.id}
-                              </td>
-                              <td className="py-3 px-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const ord = orders.find((o) => String(o.order_id || o.id) === String(hist.orderId));
-                                    if (ord) setViewJourneyOrder(ord);
-                                  }}
-                                  className="font-mono font-bold text-indigo-700 hover:text-indigo-900 hover:underline flex items-center gap-1 cursor-pointer"
-                                >
-                                  <span>#{hist.orderId}</span>
-                                  <ExternalLink className="w-3 h-3 text-indigo-400" />
-                                </button>
-                              </td>
-                              <td className="py-3 px-3.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">
-                                {hist.timestamp}
-                              </td>
-                              <td className="py-3 px-3.5 text-slate-700 whitespace-nowrap font-medium">
-                                {hist.customerName || '-'}
-                              </td>
-                              <td className="py-3 px-3.5 font-mono text-slate-600 whitespace-nowrap">
-                                {hist.customerContact || '-'}
-                              </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap">
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
-                                  {hist.previousStatus || '-'}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap">
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                                  {hist.newStatus || '-'}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap">
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700">
-                                  {hist.orderStatus || '-'}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">
-                                ৳ {(Number(hist.orderValue) || 0).toLocaleString()}
-                              </td>
-                              <td className="py-3 px-3.5 text-[11px] text-slate-600 whitespace-nowrap">
-                                {hist.scheduledTime ? `${hist.scheduleDate || ''} (${hist.scheduledTime})` : (hist.scheduleDate || '-')}
-                              </td>
-                              <td className="py-3 px-3.5 font-mono text-xs text-slate-600 whitespace-nowrap">
-                                {hist.updatedBy || '-'}
-                              </td>
-                              <td className="py-3 px-3.5 font-bold text-slate-900 whitespace-nowrap">
-                                {hist.updatedByName || '-'}
-                              </td>
-                              <td className="py-3 px-3.5 font-bold text-purple-700 whitespace-nowrap">
-                                {hist.action || 'Followup'}
-                              </td>
-                              <td className="py-3 px-3.5 text-slate-600 max-w-xs truncate" title={hist.notes}>
-                                {hist.notes || '-'}
-                              </td>
-                              <td className="py-3 px-3.5 text-center whitespace-nowrap">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const ord = orders.find((o) => String(o.order_id || o.id) === String(hist.orderId));
-                                    if (ord) setViewJourneyOrder(ord);
-                                  }}
-                                  className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold cursor-pointer"
-                                >
-                                  View Order
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+            <FollowupHistoryTable
+              title="Followup History & Audit Logs"
+              subtitle="Filter all customer followups by operator (updated_by_name), date (timestamp), and search fields."
+              recordsCount={filteredFollowupHistory.length}
+              paginatedRecords={paginatedFollowupHistory}
+              orders={orders}
+              dateFilter={followupDateFilter}
+              onDateFilterChange={setFollowupDateFilter}
+              startDate={followupStartDate}
+              onStartDateChange={setFollowupStartDate}
+              endDate={followupEndDate}
+              onEndDateChange={setFollowupEndDate}
+              updatedByNameFilter={followupFilterName}
+              onUpdatedByNameFilterChange={setFollowupFilterName}
+              availableUpdatedByNames={availableUpdatedByNames}
+              statusFilter={followupStatusFilter}
+              onStatusFilterChange={setFollowupStatusFilter}
+              availableStatuses={availableFollowupStatuses}
+              searchType={followupSearchType}
+              onSearchTypeChange={setFollowupSearchType}
+              searchValue={followupSearchValue}
+              onSearchValueChange={setFollowupSearchValue}
+              onSearchEnter={() => {
+                if (filteredFollowupHistory.length > 0) {
+                  const firstOrdId = filteredFollowupHistory[0].orderId;
+                  const ord = orders.find((o) => String(o.order_id || o.id) === String(firstOrdId));
+                  if (ord) setViewJourneyOrder(ord);
+                }
+              }}
+              page={followupPage}
+              onPageChange={setFollowupPage}
+              pageSize={followupPageSize}
+              onPageSizeChange={setFollowupPageSize}
+              totalPages={totalFollowupPages}
+              onRefresh={() => onRefreshOrders()}
+              isRefreshing={isRefreshing}
+              onExportCsv={handleExportCsv}
+              onExportXlsx={handleExportXlsx}
+              allFilteredRecords={filteredFollowupHistory}
+              onViewOrder={(ord) => setViewJourneyOrder(ord)}
+              onUndoFollowup={handleUndoFollowup}
+            />
           )}
 
           {/* TAB: ORDERS (ALL ORDERS TABLE WITH ALL 19 COLUMNS) */}
@@ -4849,37 +5365,149 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
               {/* Followup Historical Audit Trail Table */}
               <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-                <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-                      <History className="w-4 h-4 text-indigo-600" />
-                      <span>Historical Followup Status Audit Trail</span>
-                    </h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Complete log recorded in the 'Followup' sheet for tracking changes over time.
-                    </p>
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                        <History className="w-4 h-4 text-indigo-600" />
+                        <span>Historical Followup Status Audit Trail</span>
+                      </h3>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Complete log recorded in the 'Followup' sheet for tracking changes over time.
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <select
-                      value={followupSearchType}
-                      onChange={(e) => setFollowupSearchType(e.target.value)}
-                      className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-white font-medium"
-                    >
-                      <option value="order_id">order_id</option>
-                      <option value="customer_id">customer_id</option>
-                      <option value="customer_mobile">customer_mobile</option>
-                      <option value="customer_name">customer_name</option>
-                    </select>
-                    <div className="relative flex-1 sm:w-64">
-                      <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-                      <input
-                        type="text"
-                        value={followupSearchValue}
-                        onChange={(e) => setFollowupSearchValue(e.target.value)}
-                        placeholder={`Search by ${followupSearchType}...`}
-                        className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                      />
+                  {/* Filters Row - Same design as Orders Table */}
+                  <div className="flex flex-wrap items-center gap-4 pt-1">
+                    {/* Timestamp Date Filter */}
+                    <div className="flex-1 min-w-[150px]">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                        timestamp
+                      </label>
+                      <select
+                        value={followupDateFilter}
+                        onChange={(e) => setFollowupDateFilter(e.target.value as DateFilterType)}
+                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800"
+                      >
+                        <option value="all">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="last7">Last 7 Days</option>
+                        <option value="last30">Last 30 Days</option>
+                        <option value="thisMonth">This Month</option>
+                        <option value="lastMonth">Last Month</option>
+                        <option value="lastYear">Last Year</option>
+                        <option value="custom">Custom Range</option>
+                      </select>
+                    </div>
+
+                    {/* Custom Date Range Inputs */}
+                    {followupDateFilter === 'custom' && (
+                      <div className="flex items-center gap-1.5 self-end pb-0.5">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">Start</label>
+                          <input
+                            type="date"
+                            value={followupStartDate}
+                            onChange={(e) => setFollowupStartDate(e.target.value)}
+                            className="px-2 py-1.5 text-xs rounded-lg border border-slate-300 bg-white text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">End</label>
+                          <input
+                            type="date"
+                            value={followupEndDate}
+                            onChange={(e) => setFollowupEndDate(e.target.value)}
+                            className="px-2 py-1.5 text-xs rounded-lg border border-slate-300 bg-white text-slate-800"
+                          />
+                        </div>
+                        {(followupStartDate || followupEndDate) && (
+                          <button
+                            type="button"
+                            onClick={() => { setFollowupStartDate(''); setFollowupEndDate(''); }}
+                            className="text-xs text-rose-500 hover:text-rose-700 font-bold px-1 cursor-pointer self-end pb-1.5"
+                            title="Clear range"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Updated By Name Filter */}
+                    <div className="flex-1 min-w-[160px]">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                        updated_by_name
+                      </label>
+                      <select
+                        value={followupFilterName}
+                        onChange={(e) => setFollowupFilterName(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800"
+                      >
+                        <option value="All">All Operators / Managers</option>
+                        {availableUpdatedByNames.map((name) => (
+                          <option key={`orders-fol-name-${name}`} value={name}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Followup Status Filter */}
+                    <div className="min-w-[130px]">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                        followup_status
+                      </label>
+                      <select
+                        value={followupStatusFilter}
+                        onChange={(e) => setFollowupStatusFilter(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800"
+                      >
+                        <option value="all">All Statuses</option>
+                        {availableFollowupStatuses.map((s, idx) => (
+                          <option key={`orders-fol-st-${s}-${idx}`} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Combined Search with Dropdown */}
+                    <div className="flex-2 min-w-[280px]">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                        Search
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={followupSearchType}
+                          onChange={(e) => setFollowupSearchType(e.target.value)}
+                          className="px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 font-medium"
+                        >
+                          <option value="order_id">order_id</option>
+                          <option value="customer_id">customer_id</option>
+                          <option value="customer_mobile">customer_mobile</option>
+                          <option value="customer_name">customer_name</option>
+                          <option value="updated_by_name">updated_by_name</option>
+                          <option value="updated_by">updated_by</option>
+                          <option value="followup_id">followup_id</option>
+                          <option value="new_status">new_status</option>
+                          <option value="all">all_fields</option>
+                        </select>
+                        <input
+                          type="text"
+                          placeholder={`Search ${followupSearchType}... (e.g. 1002)`}
+                          value={followupSearchValue}
+                          onChange={(e) => setFollowupSearchValue(e.target.value)}
+                          className="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-300 focus:border-indigo-600 focus:outline-hidden"
+                        />
+                        {followupSearchValue.trim() && (
+                          <button
+                            type="button"
+                            onClick={() => setFollowupSearchValue('')}
+                            className="px-2.5 py-2 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -4906,46 +5534,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-800">
-                      {followupHistory.length === 0 ? (
+                      {filteredFollowupHistory.length === 0 ? (
                         <tr>
-                          <td colSpan={14} className="text-center py-10 text-slate-400 font-semibold">
-                            No followup history records logged yet. Change any order status above to create the first record!
+                          <td colSpan={15} className="text-center py-10 text-slate-400 font-semibold">
+                            No followup history records matching filters.
                           </td>
                         </tr>
                       ) : (
-                        followupHistory
-                          .filter((h) => {
-                            // Filter by current user or TL's agents
-                            const isAuthorized = currentManager.role === 'Manager' || 
-                                                 h.updatedBy === currentManager.user ||
-                                                 agents.some(a => a.user === h.updatedBy && (
-                                                   a.teamLeaderId === currentManager.user ||
-                                                   a.teamLeaderId?.includes(currentManager.user) ||
-                                                   a.teamLeaderId?.includes(currentManager.name) ||
-                                                   (Array.isArray(a.teamLeaders) && (
-                                                     a.teamLeaders.includes(currentManager.user) ||
-                                                     a.teamLeaders.includes(currentManager.name)
-                                                   ))
-                                                 ));
-                            if (!isAuthorized) return false;
-                            
-                            if (!followupSearchValue.trim()) return true;
-                            const q = followupSearchValue.trim().toLowerCase();
-                            const ordId = String(h.orderId || (h as any).order_id || '');
-                            const ord = orders.find(o => String(o.id || o.order_id) === ordId);
-
-                            let targetVal = '';
-                            if (followupSearchType === 'order_id') {
-                              targetVal = ordId;
-                            } else if (followupSearchType === 'customer_id') {
-                              targetVal = String(ord?.customer_id || ord?.customerId || (h as any).customer_id || '').toLowerCase();
-                            } else if (followupSearchType === 'customer_name') {
-                              targetVal = String(ord?.customer_name || ord?.customerName || h.customerName || (h as any).customer_name || '').toLowerCase();
-                            } else if (followupSearchType === 'customer_mobile') {
-                              targetVal = String(ord?.customer_mobile || ord?.customerContact || (h as any).customer_mobile || '').toLowerCase();
-                            }
-                            return targetVal.includes(q);
-                          })
+                        filteredFollowupHistory
                           .map((hist, histIdx) => {
                             const isUndoRecord = !!hist.isUndo;
                             const isRevertedRecord = !!hist.isUndone;
@@ -7398,8 +7994,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
       {/* Modal: Full Agent Details Card */}
       {selectedAgentDetails && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+        <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs transition-all duration-300 ${
+          isSidebarOpen ? 'pl-4 sm:pl-72' : 'pl-4 sm:pl-24'
+        }`}>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
@@ -7613,8 +8211,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
       {/* Modal: Edit Agent Profile & Permissions Popup */}
       {editingUserModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-100 overflow-hidden animate-fadeIn my-6">
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs overflow-y-auto transition-all duration-300 ${
+          isSidebarOpen ? 'pl-4 sm:pl-72' : 'pl-4 sm:pl-24'
+        }`}>
+          <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-100 overflow-hidden animate-fadeIn my-6 max-h-[92vh] flex flex-col">
             <div className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-white">
