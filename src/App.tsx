@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ManagerUser, OrderItem, FollowupHistoryItem } from './types';
+import { ManagerUser, OrderItem, FollowupHistoryItem, AgentUser } from './types';
 import { OrderService } from './services/orderService';
 import { AuthScreen } from './components/AuthScreen';
 import { ManagerPortal } from './components/ManagerPortal';
@@ -10,13 +10,18 @@ export default function App() {
 
   // Orders State (synced from Google Sheet)
   const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [agents, setAgents] = useState<AgentUser[]>(() => OrderService.getAgents());
   const [followupHistory, setFollowupHistory] = useState<FollowupHistoryItem[]>(() => OrderService.getFollowupHistory());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     OrderService.getLocalOrders().then(setOrders);
-    OrderService.fetchAgentsFromSheet().catch(() => {});
+    OrderService.fetchAgentsFromSheet().then((fetched) => {
+      if (Array.isArray(fetched) && fetched.length > 0) {
+        setAgents(fetched);
+      }
+    }).catch(() => {});
   }, []);
 
   // Check saved session on mount
@@ -165,18 +170,24 @@ export default function App() {
 
       {!currentSession && (
         <AuthScreen
-          agents={OrderService.getAgents()}
+          agents={agents}
           onAgentLogin={handleLogin}
           onManagerLogin={handleLogin}
-          onUpdateAgents={() => {}}
+          onUpdateAgents={(newAgents) => {
+            setAgents(newAgents);
+            OrderService.saveAgents(newAgents);
+          }}
         />
       )}
 
       {currentSession?.role === 'manager' && (
         <ManagerPortal
           currentManager={currentSession.manager}
-          agents={OrderService.getAgents()}
-          onUpdateAgents={(agents) => OrderService.saveAgents(agents)}
+          agents={agents}
+          onUpdateAgents={(newAgents) => {
+            setAgents(newAgents);
+            OrderService.saveAgents(newAgents);
+          }}
           orders={orders}
           onUpdateOrders={(newOrders) => {
             setOrders(newOrders);
