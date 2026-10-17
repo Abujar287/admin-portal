@@ -1,6 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { AgentUser, ManagerUser, OrderItem, DateFilterType, FollowupHistoryItem, AgentPermissions, AgentNavTab } from '../types';
+import { 
+  SystemUser, 
+  AgentUser, 
+  ManagerUser, 
+  OrderItem, 
+  DateFilterType, 
+  FollowupHistoryItem, 
+  AgentPermissions, 
+  AgentNavTab 
+} from '../types';
 import { OrderService } from '../services/orderService';
 import { 
   User, 
@@ -90,13 +99,12 @@ import { AgentProfileView } from './AgentProfileView';
 import { CreateOrderModal } from './CreateOrderModal';
 import { OrderJourneyModal } from './OrderJourneyModal';
 import { SelectionModal } from './SelectionModal';
-// ... (imports)
-import { auth } from '../firebase';
+// ...
 // ...
 /*
 export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   currentManager,
-  agents,
+  users,
   onUpdateAgents,
   // ...
   onLogout,
@@ -146,17 +154,26 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               )}
 */
 
-export const AGENT_MANAGEABLE_TABS: { id: AgentNavTab; label: string; description: string }[] = [
-  { id: 'summary', label: 'Summary', description: 'Analytics, KPI metrics & sales summary' },
-  { id: 'orders', label: 'Orders', description: 'Orders database, search, and order items' },
-  { id: 'agent-performance', label: 'Agent Performance', description: 'Performance analytics & individual rankings' },
-  { id: 'profiles', label: 'Profiles', description: 'Agent profile & personal settings' }
+export const ALL_SIDEBAR_TABS: { id: AgentNavTab; label: string; description: string; section: 'operations' | 'admin' }[] = [
+  { id: 'summary', label: 'Summary', description: 'Analytics, KPI metrics & sales summary', section: 'operations' },
+  { id: 'orders', label: 'Orders', description: 'Orders database, search, and order items', section: 'operations' },
+  { id: 'followup', label: 'Followup History', description: 'Customer followup tracking & audit log', section: 'operations' },
+  { id: 'agent-performance', label: 'Agent Performance', description: 'Individual and team stats', section: 'operations' },
+  { id: 'users', label: 'User Details', description: 'Agent directory & access management', section: 'admin' },
+  { id: 'category-mapping', label: 'Category Mapping', description: 'Category, team & status rules', section: 'admin' },
+  { id: 'sheet-connection', label: 'Google Sheet & Tabs', description: 'Google sheet connection & tabs', section: 'admin' },
+  { id: 'profiles', label: 'Profile', description: 'User profile details', section: 'admin' }
 ];
+
+export const AGENT_MANAGEABLE_TABS = ALL_SIDEBAR_TABS;
+export const MANAGEABLE_TABS = ALL_SIDEBAR_TABS;
 
 interface ManagerPortalProps {
   currentManager: ManagerUser;
-  agents: AgentUser[];
-  onUpdateAgents: (agents: AgentUser[], notify?: boolean) => void;
+  agents?: AgentUser[];
+  users?: SystemUser[];
+  onUpdateAgents?: (agents: AgentUser[], notify?: boolean) => void;
+  onUpdateUsers?: (users: SystemUser[], notify?: boolean) => void;
   orders: OrderItem[];
   onUpdateOrders?: (orders: OrderItem[]) => void;
   followupHistory?: FollowupHistoryItem[];
@@ -170,8 +187,10 @@ interface ManagerPortalProps {
 
 export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   currentManager,
-  agents,
-  onUpdateAgents,
+  agents: agentsProp,
+  users: usersProp,
+  onUpdateAgents: onUpdateAgentsProp,
+  onUpdateUsers: onUpdateUsersProp,
   orders,
   onUpdateOrders,
   followupHistory = [],
@@ -182,32 +201,92 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   onLogout,
   onUpdateOrderStatus
 }) => {
+  const agents: AgentUser[] = agentsProp || (usersProp as any) || [];
+  const users: SystemUser[] = (usersProp as any) || agentsProp || [];
+  const onUpdateAgents = onUpdateAgentsProp || onUpdateUsersProp || ((_u: any) => {});
+  const onUpdateUsers = onUpdateUsersProp || onUpdateAgentsProp || ((_u: any) => {});
   const [managerProfile, setManagerProfile] = useState<ManagerUser>(currentManager);
   const handleUpdateManagerProfile = (updatedProfile: ManagerUser) => {
     setManagerProfile(updatedProfile);
   };
-  const isManager = currentManager.role === 'Manager';
-  const isTeamLeader = !isManager;
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [activeTab, setActiveTabState] = useState<
-    'summary' | 'orders' | 'followup' | 'agent-performance' | 'users' | 'category-mapping' | 'sheet-connection' | 'profiles'
-  >(() => {
-    const saved = sessionStorage.getItem('manager_active_tab') as any;
-    if (saved === 'settings') return 'summary';
-    if (!isManager && (saved === 'sheet-connection' || saved === 'users' || saved === 'category-mapping' || saved === 'profiles')) {
-      return 'summary';
+
+  // Resolve current user permissions and allowed tabs
+  const currentUserPermissions: AgentPermissions | undefined = useMemo(() => {
+    if (currentManager.permissions) return currentManager.permissions;
+    const matched = users.find(u => u.user.toLowerCase() === currentManager.user.toLowerCase());
+    return matched?.permissions;
+  }, [currentManager, users]);
+
+  const isSuperAdminOrFullManager = useMemo(() => {
+    return (
+      currentManager.user === '1' ||
+      currentManager.role === 'Superadmin' ||
+      (currentManager.role === 'Manager' && !currentUserPermissions?.allowedTabs)
+    );
+  }, [currentManager, currentUserPermissions]);
+
+  const isManager = isSuperAdminOrFullManager || currentManager.role === 'Manager';
+  const isTeamLeader = !isManager && currentManager.role === 'Team Leader';
+
+  // Allowed tabs for the active user session
+  const userAllowedTabs: AgentNavTab[] = useMemo(() => {
+    if (isSuperAdminOrFullManager) {
+      return ['summary', 'orders', 'followup', 'agent-performance', 'users', 'category-mapping', 'sheet-connection', 'profiles'];
     }
-    if (saved) return saved;
-    return 'summary';
+    if (currentUserPermissions?.allowedTabs && currentUserPermissions.allowedTabs.length > 0) {
+      return currentUserPermissions.allowedTabs;
+    }
+    // Default fallback
+    return ['summary', 'orders', 'followup', 'agent-performance', 'profiles'];
+  }, [isSuperAdminOrFullManager, currentUserPermissions]);
+
+  const isTabAllowed = (tab: AgentNavTab) => userAllowedTabs.includes(tab);
+
+  // Active Tab state with fallback to first allowed tab
+  const [activeTab, setActiveTabState] = useState<AgentNavTab>(() => {
+    const saved = sessionStorage.getItem('manager_active_tab') as AgentNavTab;
+    if (saved && userAllowedTabs.includes(saved)) {
+      return saved;
+    }
+    return userAllowedTabs[0] || 'orders';
   });
 
-  const setActiveTab = (tab: 'summary' | 'orders' | 'followup' | 'agent-performance' | 'users' | 'category-mapping' | 'sheet-connection' | 'profiles') => {
-    if (!isManager && (tab === 'sheet-connection' || tab === 'users' || tab === 'category-mapping' || tab === 'profiles')) {
-      return;
+  // Ensure active tab stays valid if permissions change
+  useEffect(() => {
+    if (!userAllowedTabs.includes(activeTab)) {
+      const fallback = userAllowedTabs[0] || 'orders';
+      setActiveTabState(fallback);
+      sessionStorage.setItem('manager_active_tab', fallback);
     }
+  }, [userAllowedTabs, activeTab]);
+
+  const setActiveTab = (tab: AgentNavTab) => {
+    if (!isTabAllowed(tab)) return;
     sessionStorage.setItem('manager_active_tab', tab);
     setActiveTabState(tab);
   };
+
+  const userOrderScope: 'my_orders' | 'all_orders' = useMemo(() => {
+    if (currentUserPermissions?.orderScope) {
+      return currentUserPermissions.orderScope;
+    }
+    if (isSuperAdminOrFullManager) return 'all_orders';
+    return 'my_orders';
+  }, [currentUserPermissions, isSuperAdminOrFullManager]);
+
+  // Scoped orders based on userOrderScope
+  const scopedOrders = useMemo(() => {
+    if (userOrderScope !== 'my_orders') return orders;
+    const curUserId = String(currentManager.user || '').trim().toLowerCase();
+    const curUserName = String(currentManager.name || '').trim().toLowerCase();
+    return orders.filter((r) => {
+      const aId = String(r.agent_id || r.agentId || '').trim().toLowerCase();
+      const aNm = String(r.agent_name || r.agentName || '').trim().toLowerCase();
+      return aId === curUserId || aNm === curUserName || aNm === curUserId;
+    });
+  }, [orders, userOrderScope, currentManager]);
+
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [managerToast, setManagerToast] = useState<string | null>(null);
   const showToast = (msg: string) => {
     setManagerToast(msg);
@@ -236,7 +315,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [modalScheduleDate, setModalScheduleDate] = useState<string>('');
   const [modalScheduledTime, setModalScheduledTime] = useState<string>('');
   const [modalNotes, setModalNotes] = useState<string>('');
-  const [editingAgent, setEditingAgent] = useState<AgentUser | null>(null);
+  const [editingAgent, setEditingAgent] = useState<SystemUser | null>(null);
   const [editingField, setEditingField] = useState<'role' | 'team' | null>(null);
   const [isSavingStatus, setIsSavingStatus] = useState<boolean>(false);
   const [showAppsScriptModal, setShowAppsScriptModal] = useState<boolean>(false);
@@ -245,7 +324,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [isSyncingAgents, setIsSyncingAgents] = useState(false);
 
   // User Edit Modal Popup State
-  const [editingAgentModal, setEditingAgentModal] = useState<AgentUser | null>(null);
+  const [editingUserModal, setEditingUserModal] = useState<SystemUser | null>(null);
+  const editingAgentModal = editingUserModal;
+  const setEditingAgentModal = setEditingUserModal;
   const [editModalIndex, setEditModalIndex] = useState<number | null>(null);
   const [editUser, setEditUser] = useState('');
   const [editPass, setEditPass] = useState('');
@@ -392,7 +473,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   }, []);
 
   // Agent Management Form State (with no demo names)
-  const [newAgentUser, setNewAgentUser] = useState('');
+  const [newSystemUser, setNewSystemUser] = useState('');
   const [newAgentEmail, setNewAgentEmail] = useState('');
   const [newAgentPass, setNewAgentPass] = useState('');
   const [newAgentTeam, setNewAgentTeam] = useState('Acquisition');
@@ -415,7 +496,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [newCustomRoleInput, setNewCustomRoleInput] = useState('');
   const [openAddAgentPopup, setOpenAddAgentPopup] = useState<'role' | 'team' | 'teamLeader' | 'accessControl' | null>(null);
   const [showTablePasswords, setShowTablePasswords] = useState<Record<string, boolean>>({});
-  const [selectedAgentDetails, setSelectedAgentDetails] = useState<AgentUser | null>(null);
+  const [selectedAgentDetails, setSelectedAgentDetails] = useState<SystemUser | null>(null);
 
   // Orders Tab Filters
   const [orderCreateFilter, setOrderCreateFilter] = useState<DateFilterType>('all');
@@ -485,9 +566,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setNewTeamLeaderInputName('');
     if (tlName && tlName !== 'Unassigned TL') {
       const tlUsername = teamName.toLowerCase() + '_tl';
-      const existingAgent = agents.find(a => a.user.toLowerCase() === tlUsername.toLowerCase());
+      const existingAgent = users.find(a => a.user.toLowerCase() === tlUsername.toLowerCase());
       if (!existingAgent) {
-        const newAgent: AgentUser = {
+        const newAgent: SystemUser = {
           user: tlUsername,
           pass: '123456',
           name: tlName,
@@ -497,7 +578,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           status: 'active',
           failedAttempts: 0
         };
-        onUpdateAgents([...agents, newAgent], false);
+        onUpdateAgents([...users, newAgent], false);
       }
     }
   };
@@ -562,7 +643,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     (teamLeadersList || []).forEach((tl) => {
       if (tl && tl.trim()) set.add(tl.trim());
     });
-    agents.forEach((a) => {
+    users.forEach((a) => {
       if (a.role === 'Team Leader') {
         if (a.name) set.add(a.name);
         if (a.user) set.add(a.user);
@@ -572,7 +653,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       DEFAULT_TEAM_LEADERS.forEach((tl) => set.add(tl));
     }
     return Array.from(set);
-  }, [teamLeadersList, agents]);
+  }, [teamLeadersList, users]);
 
   // Matrix mappings
   const [categoryMappings, setCategoryMappings] = useState<CategoryTeamMapping[]>(() => getCategoryMappings());
@@ -1011,7 +1092,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     if (!item) return;
     const isAuth = !isTeamLeader || 
                    item.updatedBy === currentManager.user ||
-                   agents.some(a => a.user === item.updatedBy && (
+                   users.some(a => a.user === item.updatedBy && (
                      a.teamLeaderId === currentManager.user ||
                      a.teamLeaderId?.includes(currentManager.user) ||
                      a.teamLeaderId?.includes(currentManager.name) ||
@@ -1284,7 +1365,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   // Add or update agent
   const handleSaveAgent = async (e: React.FormEvent) => {
     e.preventDefault();
-    const u = newAgentUser.trim();
+    const u = newSystemUser.trim();
     const p = newAgentPass.trim();
     const email = newAgentEmail.trim();
     if (!u || !p || !email) return;
@@ -1311,9 +1392,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     const assignedTLs = newAgentTeamLeaders;
     const primaryTL = assignedTLs.length > 0 ? assignedTLs.join(', ') : '';
 
-    let updated: AgentUser[];
-    if (editingIndex !== null && editingIndex >= 0 && editingIndex < agents.length) {
-      updated = agents.map((agent, idx) =>
+    let updated: SystemUser[];
+    if (editingIndex !== null && editingIndex >= 0 && editingIndex < users.length) {
+      updated = users.map((agent, idx) =>
         idx === editingIndex
           ? {
               ...agent,
@@ -1331,9 +1412,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       );
       setEditingIndex(null);
     } else {
-      const existingIdx = agents.findIndex((a) => a.user.toLowerCase() === u.toLowerCase());
+      const existingIdx = users.findIndex((a) => a.user.toLowerCase() === u.toLowerCase());
       if (existingIdx >= 0) {
-        updated = agents.map((agent, idx) =>
+        updated = users.map((agent, idx) =>
           idx === existingIdx
             ? { 
                 ...agent, 
@@ -1351,7 +1432,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         );
       } else {
         updated = [
-          ...agents,
+          ...users,
           {
             user: u,
             pass: p,
@@ -1371,7 +1452,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
     onUpdateAgents(updated, true);
     setOpenAddAgentPopup(null);
-    setNewAgentUser('');
+    setNewSystemUser('');
     setNewAgentEmail('');
     setNewAgentPass('');
     setNewAgentName('');
@@ -1402,11 +1483,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     }
   };
 
-  const handleEditAgent = (agentOrIndex: AgentUser | number) => {
+  const handleEditAgent = (agentOrIndex: SystemUser | number) => {
     setOpenAddAgentPopup(null);
-    const ag = typeof agentOrIndex === 'number' ? agents[agentOrIndex] : agentOrIndex;
+    const ag = typeof agentOrIndex === 'number' ? users[agentOrIndex] : agentOrIndex;
     if (!ag) return;
-    const realIdx = typeof agentOrIndex === 'number' ? agentOrIndex : agents.findIndex(a => a.user === ag.user);
+    const realIdx = typeof agentOrIndex === 'number' ? agentOrIndex : users.findIndex(a => a.user === ag.user);
     setEditModalIndex(realIdx >= 0 ? realIdx : 0);
     setEditingAgentModal(ag);
     setEditUser(ag.user);
@@ -1441,7 +1522,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   const handleSaveEditedAgentModal = (e: React.FormEvent) => {
     e.preventDefault();
-    if (editModalIndex === null || !editingAgentModal) return;
+    if (editModalIndex === null || !editingUserModal) return;
 
     const u = editUser.trim();
     const p = editPass.trim();
@@ -1460,9 +1541,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
     const assignedTLs = editTeamLeaders;
     const primaryTL = assignedTLs.length > 0 ? assignedTLs.join(', ') : '';
-    const targetUserId = editingAgentModal.user;
+    const targetUserId = editingUserModal.user;
 
-    const updated = agents.map((agent, idx) =>
+    const updated = users.map((agent, idx) =>
       (agent.user === targetUserId || idx === editModalIndex)
         ? {
             ...agent,
@@ -1506,8 +1587,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   };
 
   const handleDeleteAgent = (index: number) => {
-    const agentToDelete = agents[index];
-    const updated = agents.filter((_, idx) => idx !== index);
+    const agentToDelete = users[index];
+    const updated = users.filter((_, idx) => idx !== index);
     onUpdateAgents(updated, true);
     showToast('Agent removed locally.');
     if (agentToDelete) {
@@ -1521,11 +1602,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   // Reactivate / Deactivate Agent
   const handleToggleAgentStatus = (index: number) => {
-    const agent = agents[index];
+    const agent = users[index];
     const isCurrentlyDeactive = agent.status === 'deactivated';
     const newStatus = isCurrentlyDeactive ? 'active' : 'deactivated';
 
-    const updated = agents.map((a, idx) =>
+    const updated = users.map((a, idx) =>
       idx === index
         ? {
             ...a,
@@ -1543,7 +1624,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   // Filtered Orders for Orders Tab
   const filteredOrders = useMemo(() => {
-    return orders.filter((r) => {
+    return scopedOrders.filter((r) => {
       // DEBUG: console.log('Checking order:', r.id, 'CustID:', r.customerId, 'Search:', searchValue);
       if (!matchDate(r.create_date, orderCreateFilter, orderCreateStart, orderCreateEnd)) {
         return false;
@@ -1625,7 +1706,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       return true;
     });
   }, [
-    orders,
+    scopedOrders,
     orderCreateFilter,
     orderCreateStart,
     orderCreateEnd,
@@ -1733,7 +1814,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     });
 
     const agentMap: Record<string, ReturnType<typeof buildAgentMapItem>> = {};
-    agents.forEach((a) => {
+    users.forEach((a) => {
       const key = a.user.trim();
       agentMap[key] = buildAgentMapItem(
         a.user,
@@ -1872,7 +1953,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       }
     });
 
-    // Also count follow-ups logged by agents
+    // Also count follow-ups logged by users
     followupHistory.forEach((h) => {
       if (!h.isUndo && h.updatedBy && matchDate(h.timestamp, summaryDateFilter, summaryStartDate, summaryEndDate)) {
         const ag = getOrInitAgent(h.updatedBy);
@@ -1938,7 +2019,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       };
     });
 
-    // Filter out agents who have no data
+    // Filter out users who have no data
     const agentSummary = Object.values(agentMap)
       .filter((item) => (item.createOrders + item.servedOrders + item.cancelledOrders + item.pendingOrders + item.followupCount) > 0)
       .map((item) => {
@@ -2139,97 +2220,105 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
         <nav className="flex-1 min-h-0 space-y-1.5 overflow-y-auto overflow-x-hidden pr-1 -mr-1 sidebar-scroll">
           {/* Operations Section */}
-          {isSidebarOpen && (
+          {isSidebarOpen && (isTabAllowed('summary') || isTabAllowed('orders') || isTabAllowed('followup') || isTabAllowed('agent-performance')) && (
             <div className="px-3 pt-1 pb-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
               Operations
             </div>
           )}
 
           {/* 1. Summary */}
-          <button
-            onClick={() => setActiveTab('summary')}
-            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
-              activeTab === 'summary'
-                ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
-            }`}
-          >
-            <BarChart2 className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'summary' ? 'text-sky-300 scale-110' : 'text-slate-400'}`} />
-            {isSidebarOpen && (
-              <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'summary' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
-                Summary
-              </span>
-            )}
-          </button>
+          {isTabAllowed('summary') && (
+            <button
+              onClick={() => setActiveTab('summary')}
+              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
+                activeTab === 'summary'
+                  ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+              }`}
+            >
+              <BarChart2 className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'summary' ? 'text-sky-300 scale-110' : 'text-slate-400'}`} />
+              {isSidebarOpen && (
+                <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'summary' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                  Summary
+                </span>
+              )}
+            </button>
+          )}
 
           {/* 2. Orders */}
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
-              activeTab === 'orders'
-                ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
-            }`}
-          >
-            <FileText className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'orders' ? 'text-amber-300 scale-110' : 'text-slate-400'}`} />
-            {isSidebarOpen && (
-              <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'orders' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
-                Orders
-              </span>
-            )}
-            {isSidebarOpen && (
-              <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'orders' ? 'bg-white text-indigo-900' : 'bg-white/10 text-white'}`}>
-                {orders.length}
-              </span>
-            )}
-          </button>
+          {isTabAllowed('orders') && (
+            <button
+              onClick={() => setActiveTab('orders')}
+              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
+                activeTab === 'orders'
+                  ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+              }`}
+            >
+              <FileText className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'orders' ? 'text-amber-300 scale-110' : 'text-slate-400'}`} />
+              {isSidebarOpen && (
+                <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'orders' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                  Orders
+                </span>
+              )}
+              {isSidebarOpen && (
+                <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'orders' ? 'bg-white text-indigo-900' : 'bg-white/10 text-white'}`}>
+                  {scopedOrders.length}
+                </span>
+              )}
+            </button>
+          )}
 
           {/* 3. Followup History */}
-          <button
-            onClick={() => setActiveTab('followup')}
-            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
-              activeTab === 'followup'
-                ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
-            }`}
-          >
-            <History className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'followup' ? 'text-indigo-300 scale-110' : 'text-slate-400'}`} />
-            {isSidebarOpen && (
-              <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'followup' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
-                Followup History
-              </span>
-            )}
-            {isSidebarOpen && (
-              <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'followup' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
-                {followupHistory.length}
-              </span>
-            )}
-          </button>
+          {isTabAllowed('followup') && (
+            <button
+              onClick={() => setActiveTab('followup')}
+              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
+                activeTab === 'followup'
+                  ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+              }`}
+            >
+              <History className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'followup' ? 'text-indigo-300 scale-110' : 'text-slate-400'}`} />
+              {isSidebarOpen && (
+                <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'followup' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                  Followup History
+                </span>
+              )}
+              {isSidebarOpen && (
+                <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'followup' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
+                  {followupHistory.length}
+                </span>
+              )}
+            </button>
+          )}
 
           {/* 4. Agent Performance */}
-          <button
-            onClick={() => setActiveTab('agent-performance')}
-            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
-              activeTab === 'agent-performance'
-                ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
-            }`}
-          >
-            <TrendingUp className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'agent-performance' ? 'text-amber-300 scale-110' : 'text-amber-400'}`} />
-            {isSidebarOpen && (
-              <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'agent-performance' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
-                Agent Performance
-              </span>
-            )}
-            {isSidebarOpen && (
-              <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'agent-performance' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
-                {summaryStats.agentSummary.length}
-              </span>
-            )}
-          </button>
+          {isTabAllowed('agent-performance') && (
+            <button
+              onClick={() => setActiveTab('agent-performance')}
+              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
+                activeTab === 'agent-performance'
+                  ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+              }`}
+            >
+              <TrendingUp className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'agent-performance' ? 'text-amber-300 scale-110' : 'text-amber-400'}`} />
+              {isSidebarOpen && (
+                <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'agent-performance' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                  Agent Performance
+                </span>
+              )}
+              {isSidebarOpen && (
+                <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'agent-performance' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
+                  {summaryStats.agentSummary.length}
+                </span>
+              )}
+            </button>
+          )}
 
-          {/* Administration Section (Manager Only) */}
-          {!isTeamLeader && (
+          {/* Administration Section */}
+          {(isTabAllowed('users') || isTabAllowed('category-mapping') || isTabAllowed('sheet-connection') || isTabAllowed('profiles')) && (
             <>
               {isSidebarOpen && (
                 <div className="px-3 pt-3 pb-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase border-t border-white/10 mt-2">
@@ -2238,87 +2327,95 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               )}
 
               {/* 5. User Details */}
-              <button
-                onClick={() => setActiveTab('users')}
-                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
-                  activeTab === 'users'
-                    ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                    : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
-                }`}
-              >
-                <Users className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'users' ? 'text-purple-300 scale-110' : 'text-slate-400'}`} />
-                {isSidebarOpen && (
-                  <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'users' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
-                    User Details
-                  </span>
-                )}
-                {isSidebarOpen && (
-                  <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'users' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
-                    {agents.length}
-                  </span>
-                )}
-              </button>
+              {isTabAllowed('users') && (
+                <button
+                  onClick={() => setActiveTab('users')}
+                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
+                    activeTab === 'users'
+                      ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                      : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+                  }`}
+                >
+                  <Users className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'users' ? 'text-purple-300 scale-110' : 'text-slate-400'}`} />
+                  {isSidebarOpen && (
+                    <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'users' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                      User Details
+                    </span>
+                  )}
+                  {isSidebarOpen && (
+                    <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'users' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
+                      {agents.length}
+                    </span>
+                  )}
+                </button>
+              )}
 
               {/* 6. Category Mapping */}
-              <button
-                onClick={() => setActiveTab('category-mapping')}
-                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
-                  activeTab === 'category-mapping'
-                    ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                    : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
-                }`}
-              >
-                <Layers className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'category-mapping' ? 'text-purple-300 scale-110' : 'text-purple-400'}`} />
-                {isSidebarOpen && (
-                  <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'category-mapping' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
-                    Category Mapping
-                  </span>
-                )}
-                {isSidebarOpen && (
-                  <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'category-mapping' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
-                    {categoryMappings.length}
-                  </span>
-                )}
-              </button>
+              {isTabAllowed('category-mapping') && (
+                <button
+                  onClick={() => setActiveTab('category-mapping')}
+                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
+                    activeTab === 'category-mapping'
+                      ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                      : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+                  }`}
+                >
+                  <Layers className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'category-mapping' ? 'text-purple-300 scale-110' : 'text-purple-400'}`} />
+                  {isSidebarOpen && (
+                    <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'category-mapping' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                      Category Mapping
+                    </span>
+                  )}
+                  {isSidebarOpen && (
+                    <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'category-mapping' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
+                      {categoryMappings.length}
+                    </span>
+                  )}
+                </button>
+              )}
 
               {/* 7. Google Sheet & Tabs */}
-              <button
-                onClick={() => setActiveTab('sheet-connection')}
-                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
-                  activeTab === 'sheet-connection'
-                    ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                    : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
-                }`}
-              >
-                <FileSpreadsheet className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'sheet-connection' ? 'text-emerald-300 scale-110' : 'text-emerald-400'}`} />
-                {isSidebarOpen && (
-                  <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'sheet-connection' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
-                    Google Sheet &amp; Tabs
-                  </span>
-                )}
-                {isSidebarOpen && connectedSheetTabs.length > 0 && (
-                  <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'sheet-connection' ? 'bg-white text-indigo-900' : 'bg-emerald-500/30 text-emerald-200'}`}>
-                    {connectedSheetTabs.length}
-                  </span>
-                )}
-              </button>
+              {isTabAllowed('sheet-connection') && (
+                <button
+                  onClick={() => setActiveTab('sheet-connection')}
+                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
+                    activeTab === 'sheet-connection'
+                      ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                      : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+                  }`}
+                >
+                  <FileSpreadsheet className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'sheet-connection' ? 'text-emerald-300 scale-110' : 'text-emerald-400'}`} />
+                  {isSidebarOpen && (
+                    <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'sheet-connection' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                      Google Sheet &amp; Tabs
+                    </span>
+                  )}
+                  {isSidebarOpen && connectedSheetTabs.length > 0 && (
+                    <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'sheet-connection' ? 'bg-white text-indigo-900' : 'bg-emerald-500/30 text-emerald-200'}`}>
+                      {connectedSheetTabs.length}
+                    </span>
+                  )}
+                </button>
+              )}
 
               {/* 8. Manager Profile */}
-              <button
-                onClick={() => setActiveTab('profiles')}
-                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
-                  activeTab === 'profiles'
-                    ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                    : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
-                }`}
-              >
-                <User className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'profiles' ? 'text-sky-300 scale-110' : 'text-slate-400'}`} />
-                {isSidebarOpen && (
-                  <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'profiles' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
-                    Profile
-                  </span>
-                )}
-              </button>
+              {isTabAllowed('profiles') && (
+                <button
+                  onClick={() => setActiveTab('profiles')}
+                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
+                    activeTab === 'profiles'
+                      ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
+                      : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+                  }`}
+                >
+                  <User className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'profiles' ? 'text-sky-300 scale-110' : 'text-slate-400'}`} />
+                  {isSidebarOpen && (
+                    <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'profiles' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                      Profile
+                    </span>
+                  )}
+                </button>
+              )}
             </>
           )}
         </nav>
@@ -2346,13 +2443,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             <span className="text-slate-300 dark:text-slate-700">•</span>
             <h1 className="text-lg font-extrabold text-slate-900 dark:text-white capitalize">
               {activeTab === 'summary' && 'Analytics & Summary'}
-              {activeTab === 'orders' && 'All Orders Database'}
+              {activeTab === 'orders' && (userOrderScope === 'my_orders' ? `My Orders Database (@${currentManager.user})` : 'All Orders Database')}
               {activeTab === 'followup' && 'All Followup History & Audit Logs'}
               {activeTab === 'agent-performance' && 'Agent Performance Report'}
               {activeTab === 'users' && 'User Details (Agent Directory)'}
               {activeTab === 'category-mapping' && 'Category, Team & Status Mapping'}
-              {isManager && activeTab === 'sheet-connection' && 'Google Sheet & Dynamic Tabs Hub'}
-              {activeTab === 'profiles' && 'Manager Profile & Account'}
+              {activeTab === 'sheet-connection' && 'Google Sheet & Dynamic Tabs Hub'}
+              {activeTab === 'profiles' && 'Profile & Account'}
             </h1>
           </div>
 
@@ -2379,7 +2476,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         {/* Scrollable Workspace */}
         <main className="flex-1 overflow-y-auto p-6 space-y-6 relative z-50">
           {/* TAB: GOOGLE SHEET & DYNAMIC TABS */}
-          {isManager && activeTab === 'sheet-connection' && (
+          {activeTab === 'sheet-connection' && (
             <div className="space-y-6 max-w-5xl mx-auto">
               <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
                 <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -2565,7 +2662,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     </div>
                     <div>
                       <h3 className="font-extrabold text-slate-900 text-sm">
-                        {editingIndex !== null ? `Edit Agent (@${newAgentUser})` : 'Add New Agent'}
+                        {editingIndex !== null ? `Edit Agent (@${newSystemUser})` : 'Add New Agent'}
                       </h3>
                       <p className="text-[11px] text-slate-500">
                         All in 1 Row — Click Team, Team Leader, and Access Control to open configuration popups.
@@ -2624,7 +2721,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         type="button"
                         onClick={() => {
                           setEditingIndex(null);
-                          setNewAgentUser('');
+                          setNewSystemUser('');
                           setNewAgentPass('');
                           setNewAgentName('');
                           setNewAgentRole('Agent');
@@ -2657,8 +2754,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         type="text"
                         required
                         placeholder="e.g. 1"
-                        value={newAgentUser}
-                        onChange={(e) => setNewAgentUser(e.target.value)}
+                        value={newSystemUser}
+                        onChange={(e) => setNewSystemUser(e.target.value)}
                         className="w-full px-3 py-2 text-xs font-mono font-bold rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100"
                       />
                     </div>
@@ -3368,17 +3465,38 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
                           {/* Permitted Navigation Tabs Access Control */}
                           <div className="space-y-2 pt-3 border-t border-slate-100">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                              Permitted Navigation Tabs
-                            </span>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                              {[
-                                { id: 'summary', label: 'Summary' },
-                                { id: 'orders', label: 'Orders' },
-                                { id: 'followup', label: 'Followup History' },
-                                { id: 'agent-performance', label: 'Performance' },
-                                { id: 'profiles', label: 'Profiles' }
-                              ].map((tab) => {
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                                Permitted Left Sidebar Navigation Tabs ({newAllowedTabs.length}/{ALL_SIDEBAR_TABS.length})
+                              </span>
+                              <div className="flex items-center gap-1.5 text-[10px]">
+                                <button
+                                  type="button"
+                                  onClick={() => setNewAllowedTabs(ALL_SIDEBAR_TABS.map(t => t.id))}
+                                  className="text-indigo-600 font-bold hover:underline cursor-pointer"
+                                >
+                                  All
+                                </button>
+                                <span className="text-slate-300">|</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setNewAllowedTabs(['summary', 'orders', 'followup', 'agent-performance', 'profiles'])}
+                                  className="text-slate-500 font-bold hover:underline cursor-pointer"
+                                >
+                                  Agent Default
+                                </button>
+                                <span className="text-slate-300">|</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setNewAllowedTabs(['orders'])}
+                                  className="text-slate-500 font-bold hover:underline cursor-pointer"
+                                >
+                                  Only Orders
+                                </button>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                              {ALL_SIDEBAR_TABS.map((tab) => {
                                 const isChecked = newAllowedTabs.includes(tab.id as AgentNavTab);
                                 return (
                                   <label
@@ -3587,6 +3705,20 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                 className="flex flex-wrap gap-1 max-w-[280px] text-left cursor-pointer hover:opacity-80 transition-opacity"
                                 title="Click to edit Agent permissions in popup modal"
                               >
+                                {/* Order Scope Badge */}
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                  perms.orderScope === 'all_orders'
+                                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                    : 'bg-indigo-50 text-indigo-800 border border-indigo-200'
+                                }`} title={perms.orderScope === 'all_orders' ? 'Can view all orders' : 'Can only view own created orders'}>
+                                  {perms.orderScope === 'all_orders' ? 'All Orders' : 'My Orders'}
+                                </span>
+
+                                {/* Allowed Tabs Badge */}
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200" title={`Allowed Tabs: ${(perms.allowedTabs || ['summary', 'orders', 'followup', 'agent-performance', 'profiles']).join(', ')}`}>
+                                  Tabs ({(perms.allowedTabs || ['summary', 'orders', 'followup', 'agent-performance', 'profiles']).length})
+                                </span>
+
                                 {perms.canCreate && (
                                   <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Order Creation: Full data input permitted">
                                     ✓ Create
@@ -4162,7 +4294,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     </span>
                     <span className="text-slate-300">•</span>
                     <span className="text-slate-500 font-mono text-[11px] bg-indigo-50 text-indigo-700 font-bold px-2.5 py-0.5 rounded-full border border-indigo-200">
-                      Sheet Total: {orders.length}
+                      {userOrderScope === 'my_orders'
+                        ? `My Orders (@${currentManager.user}): ${scopedOrders.length}`
+                        : `Sheet Total: ${orders.length}`}
                     </span>
                   </div>
 
@@ -7478,8 +7612,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       )}
 
       {/* Modal: Edit Agent Profile & Permissions Popup */}
-      {editingAgentModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs overflow-y-auto">
+      {editingUserModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-100 overflow-hidden animate-fadeIn my-6">
             <div className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -7491,7 +7625,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     Edit Agent Profile &amp; Permissions
                   </h3>
                   <p className="text-xs text-indigo-200">
-                    Modifying configuration for <span className="font-bold text-white">@{editingAgentModal.user}</span>
+                    Modifying configuration for <span className="font-bold text-white">@{editingUserModal.user}</span>
                   </p>
                 </div>
               </div>
@@ -7929,18 +8063,36 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Allowed Navigation Tabs
+                      Allowed Left Sidebar Navigation Tabs ({editAllowedTabs.length}/{ALL_SIDEBAR_TABS.length})
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setEditAllowedTabs(['summary', 'orders', 'followup', 'agent-performance', 'profiles'])}
-                      className="text-[11px] text-indigo-600 font-semibold hover:underline cursor-pointer"
-                    >
-                      Select All
-                    </button>
+                    <div className="flex items-center gap-1.5 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => setEditAllowedTabs(ALL_SIDEBAR_TABS.map(t => t.id))}
+                        className="text-indigo-600 font-bold hover:underline cursor-pointer"
+                      >
+                        All
+                      </button>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setEditAllowedTabs(['summary', 'orders', 'followup', 'agent-performance', 'profiles'])}
+                        className="text-slate-500 font-bold hover:underline cursor-pointer"
+                      >
+                        Agent Default
+                      </button>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setEditAllowedTabs(['orders'])}
+                        className="text-slate-500 font-bold hover:underline cursor-pointer"
+                      >
+                        Only Orders
+                      </button>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                    {AGENT_MANAGEABLE_TABS.map((tab) => {
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    {ALL_SIDEBAR_TABS.map((tab) => {
                       const isSelected = editAllowedTabs.includes(tab.id);
                       return (
                         <label

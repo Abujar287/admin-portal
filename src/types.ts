@@ -1,11 +1,20 @@
-export type AgentNavTab = 'summary' | 'orders' | 'followup' | 'agent-performance' | 'profiles' | 'dashboard';
+export type AgentNavTab = 
+  | 'summary' 
+  | 'orders' 
+  | 'followup' 
+  | 'agent-performance' 
+  | 'users' 
+  | 'category-mapping' 
+  | 'sheet-connection' 
+  | 'profiles' 
+  | 'dashboard';
 
 export interface AgentPermissions {
-  canCreate: boolean;
-  canUpdateStatus: boolean;
+  canCreate?: boolean;
+  canUpdateStatus?: boolean;
   canChangeSchedule?: boolean;
-  canChangeValue: boolean;
-  canAddProfit: boolean;
+  canChangeValue?: boolean;
+  canAddProfit?: boolean;
   canCancel?: boolean;
   allowedOrderStatuses?: string[];
   allowedTabs?: AgentNavTab[];
@@ -27,9 +36,11 @@ export interface AgentUser {
   gender?: string;
   status?: 'active' | 'deactivated';
   failedAttempts?: number;
-  role?: string; // 'Agent' | 'Team Leader' | 'Sr Agent'
+  role?: string; // 'Manager' | 'Superadmin' | 'Agent' | 'Team Leader' | 'Sr Agent'
   permissions?: AgentPermissions;
 }
+
+export type SystemUser = AgentUser;
 
 export interface ManagerUser {
   user: string;
@@ -42,6 +53,10 @@ export interface ManagerUser {
   bloodGroup?: string;
   gender?: string;
   birthday?: string;
+  permissions?: AgentPermissions;
+  team?: string;
+  teamLeaderId?: string;
+  teamLeaders?: string[];
 }
 
 export interface OrderItem {
