@@ -1511,9 +1511,12 @@ export class OrderService {
 
     // If order is already Delivered or Cancelled, it CANNOT be edited from ANY access!
     const currentOrderFollowup = (existingOrder?.followup_status || existingOrder?.followupStatus || '').toLowerCase();
-    const isCurrentlyLocked = currentOrderFollowup === 'delivered' || currentOrderFollowup === 'cancelled';
+    const currentOrderStatus = (existingOrder?.order_status || existingOrder?.orderStatus || '').toLowerCase();
+    const isCurrentlyLocked = 
+      currentOrderFollowup === 'delivered' || currentOrderFollowup === 'cancelled' ||
+      currentOrderStatus === 'delivered' || currentOrderStatus === 'cancelled';
     if (isCurrentlyLocked) {
-      console.warn(`Order #${orderId} is ${currentOrderFollowup} and locked from all access editing.`);
+      console.warn(`Order #${orderId} is locked (Delivered/Cancelled) from all access editing.`);
       return { updatedOrders: orders, historyItem: undefined, remoteSynced: false };
     }
 
@@ -2615,5 +2618,19 @@ function doOptions(e) {
       return `${yyyy}-${mm}-${dd}`;
     }
     return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+  }
+
+  static formatSyncTimestamp(dateInput?: Date | string | number): string {
+    const d = dateInput ? new Date(dateInput) : new Date();
+    const day = d.getDate();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[d.getMonth()] || 'Oct';
+    const year = d.getFullYear();
+    let hours = d.getHours();
+    const minutes = d.getMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    return `${day} ${month} ${year}, ${hours}:${minutes}${ampm}`;
   }
 }

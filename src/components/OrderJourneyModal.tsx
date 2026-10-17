@@ -107,6 +107,13 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
   const actorUserName = actorUserId === '1' ? 'Manager' : (currentUser.name || currentUser.user || 'Agent');
   const userDisplayName = actorUserId === '1' ? 'Manager (1)' : `${actorUserName} (${actorUserId})`;
 
+  const currentFStatus = (order.followup_status || order.followupStatus || '').toLowerCase();
+  const currentOStatus = (order.order_status || order.orderStatus || '').toLowerCase();
+  const isDelivered = currentFStatus === 'delivered' || currentOStatus === 'delivered';
+  const isCancelled = currentFStatus === 'cancelled' || currentOStatus === 'cancelled';
+  const isLocked = isDelivered || isCancelled;
+  const canEditEffective = Boolean(canEdit && isManagerRole && !isLocked);
+
   const handleProfitChange = (valStr: string) => {
     setSingleProfit(valStr);
     const pVal = parseFloat(valStr);
@@ -138,7 +145,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
   };
 
   const handleUpdateProfitOnly = async () => {
-    if (!onUpdateOrderStatus || singleProfit === '') return;
+    if (!canEditEffective || !onUpdateOrderStatus || singleProfit === '') return;
     setIsUpdatingProfit(true);
     setProfitMsg(null);
     try {
@@ -171,7 +178,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
   };
 
   const handleUpdateStatusOnly = async () => {
-    if (!onUpdateOrderStatus) return;
+    if (!canEditEffective || !onUpdateOrderStatus) return;
     setIsUpdatingStatus(true);
     setStatusMsg(null);
     try {
@@ -236,7 +243,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
   };
 
   const handleUpdateValueOnly = async () => {
-    if (!onUpdateOrderStatus || singleValue === '') return;
+    if (!canEditEffective || !onUpdateOrderStatus || singleValue === '') return;
     setIsUpdatingValue(true);
     setValueMsg(null);
     try {
@@ -274,7 +281,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
   };
 
   const handleUpdateScheduleDateOnly = async () => {
-    if (!onUpdateOrderStatus) return;
+    if (!canEditEffective || !onUpdateOrderStatus) return;
     setIsUpdatingScheduleDate(true);
     setScheduleDateMsg(null);
     try {
@@ -298,7 +305,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
   };
 
   const handleUpdateScheduleTimeOnly = async () => {
-    if (!onUpdateOrderStatus) return;
+    if (!canEditEffective || !onUpdateOrderStatus) return;
     setIsUpdatingScheduleTime(true);
     setScheduleTimeMsg(null);
     try {
@@ -322,7 +329,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
   };
 
   const handleUpdateAddressOnly = async () => {
-    if (!onUpdateOrderStatus || isUpdatingAddress || !isManagerRole) return;
+    if (!canEditEffective || !onUpdateOrderStatus || isUpdatingAddress) return;
     setIsUpdatingAddress(true);
     setAddressMsg(null);
     try {
@@ -346,10 +353,6 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
       setIsUpdatingAddress(false);
     }
   };
-
-  const isDelivered = (order.followup_status || order.followupStatus || '').toLowerCase() === 'delivered';
-  const isCancelled = (order.followup_status || order.followupStatus || '').toLowerCase() === 'cancelled';
-  const isLocked = isDelivered || isCancelled;
 
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-3 sm:p-5 backdrop-blur-xs overflow-y-auto animate-fadeIn" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -412,8 +415,15 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
             </div>
           )}
 
+          {!isLocked && !canEditEffective && (
+            <div className="bg-slate-100 border border-slate-200 text-slate-700 px-4 py-2.5 rounded-2xl text-xs font-semibold flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-slate-500 shrink-0" />
+              <span>View-only mode • Order editing is restricted to Manager access.</span>
+            </div>
+          )}
+
           {/* COMPACT INDIVIDUAL UPDATE ACTIONS (SIDE-BY-SIDE WITH SMALL FONT & UPDATE BUTTONS UNDERNEATH) */}
-          {canEdit && !isLocked && (
+          {canEditEffective && (
             <div className="bg-white rounded-2xl p-4 border border-indigo-100 shadow-2xs space-y-3">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-800 flex items-center gap-1.5">

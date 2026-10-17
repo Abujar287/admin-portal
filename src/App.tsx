@@ -14,6 +14,9 @@ export default function App() {
   const [followupHistory, setFollowupHistory] = useState<FollowupHistoryItem[]>(() => OrderService.getFollowupHistory());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [lastSyncTime, setLastSyncTime] = useState<string>(() => {
+    return localStorage.getItem('portal_last_sync_time') || OrderService.formatSyncTimestamp();
+  });
 
   useEffect(() => {
     OrderService.getLocalOrders().then(setOrders);
@@ -60,9 +63,14 @@ export default function App() {
     }
   }, []);
 
+  // Load orders upon session and auto-refresh every 60s
   useEffect(() => {
     if (currentSession) {
       loadOrdersData(false);
+      const interval = setInterval(() => {
+        loadOrdersData(false);
+      }, 60000);
+      return () => clearInterval(interval);
     }
   }, [currentSession]);
 
@@ -79,6 +87,10 @@ export default function App() {
       if (followupHist && followupHist.length > 0) {
         setFollowupHistory(followupHist);
       }
+      const nowFormatted = OrderService.formatSyncTimestamp();
+      setLastSyncTime(nowFormatted);
+      localStorage.setItem('portal_last_sync_time', nowFormatted);
+
       if (forceRefresh) {
         showToast(`Synced ${res.orders.length} orders & ${followupHist.length} followups!`);
       }
@@ -200,6 +212,7 @@ export default function App() {
           }}
           onRefreshOrders={() => loadOrdersData(true)}
           isRefreshing={isRefreshing}
+          lastSyncTime={lastSyncTime}
           onLogout={handleLogout}
           onUpdateOrderStatus={handleUpdateOrderStatus}
         />

@@ -182,6 +182,7 @@ interface ManagerPortalProps {
   onRevertFollowup?: (historyId: string, orderId: string, previousStatus: string, undoneBy?: string) => Promise<void>;
   onRefreshOrders: () => Promise<void>;
   isRefreshing: boolean;
+  lastSyncTime?: string;
   onLogout: () => void;
   onUpdateOrderStatus?: (orderId: string, updates: Partial<OrderItem>, updatedBy?: string, notes?: string) => Promise<void>;
 }
@@ -199,9 +200,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   onRevertFollowup,
   onRefreshOrders,
   isRefreshing,
+  lastSyncTime: lastSyncTimeProp,
   onLogout,
   onUpdateOrderStatus
 }) => {
+  const lastSyncTime = lastSyncTimeProp || OrderService.formatSyncTimestamp();
   const agents: AgentUser[] = agentsProp || (usersProp as any) || [];
   const users: SystemUser[] = (usersProp as any) || agentsProp || [];
   const onUpdateAgents = onUpdateAgentsProp || onUpdateUsersProp || ((_u: any) => {});
@@ -3033,6 +3036,21 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Last Sync Indicator */}
+            <div 
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs shadow-2xs"
+              title="Automatically updates when Google Sheet refreshes"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isRefreshing ? 'bg-amber-400 opacity-75' : 'bg-emerald-400 opacity-75'}`}></span>
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${isRefreshing ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
+              </span>
+              <span className="text-slate-500 dark:text-slate-400 text-[11px] font-semibold whitespace-nowrap">Last Sync:</span>
+              <span className="font-mono font-bold text-slate-800 dark:text-slate-100 text-xs whitespace-nowrap">
+                {lastSyncTime}
+              </span>
+            </div>
+
             <button
               onClick={() => setIsManagerCreateOrderOpen(true)}
               className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
@@ -3106,19 +3124,19 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         </span>
                       </button>
 
-                      {/* 2. Copy Complete Apps Script Button */}
+                      {/* 2. Apps Script Button */}
                       <button
                         type="button"
                         onClick={() => {
                           const code = OrderService.getUpdatedAppsScriptCode();
                           navigator.clipboard.writeText(code);
-                          showToast('Complete Apps Script copied to clipboard!');
+                          showToast('Apps Script copied to clipboard!');
                         }}
                         className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
-                        title="Copy complete Google Apps Script code to clipboard"
+                        title="Copy Apps Script code to clipboard"
                       >
                         <Copy className="w-4 h-4" />
-                        <span>Copy Complete Apps Script</span>
+                        <span>Apps Script</span>
                       </button>
                     </div>
                   </form>
@@ -7075,21 +7093,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {/* TAB: CATEGORY & TEAM MAPPING */}
           {activeTab === 'category-mapping' && (
             <div className="max-w-6xl space-y-6">
-              {/* Header with ONLY Demo CSV, Update CSV, Export CSV */}
-              <div className="bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 shadow-md border border-indigo-800/40">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold text-xl border border-indigo-400/30">
-                      🏷️
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-base text-white">Master Configuration Lists</h3>
-                      <p className="text-xs text-indigo-200 mt-0.5">
-                        Manage master categories, order statuses, teams, channels, team leaders, and time slots.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2.5">
+              {/* MASTER CATEGORY LIST WITH 3 BUTTONS (Demo CSV, Export CSV, Update CSV) */}
+              <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3.5">
+                  <h3 className="font-extrabold text-base text-slate-900">
+                    Master Category List
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-2">
                     {/* 1. Demo CSV */}
                     <button
                       type="button"
@@ -7101,7 +7111,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       <span>Demo CSV</span>
                     </button>
 
-                    {/* 2. Update CSV */}
+                    {/* 2. Export CSV */}
+                    <button
+                      type="button"
+                      onClick={handleExportCategoryMappingsCsv}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                      title="Export category mappings as CSV"
+                    >
+                      <FileSpreadsheet className="w-4 h-4" />
+                      <span>Export CSV</span>
+                    </button>
+
+                    {/* 3. Update CSV */}
                     <label
                       className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
                       title="Import and update mappings via CSV"
@@ -7115,30 +7136,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         className="hidden"
                       />
                     </label>
-
-                    {/* 3. Export CSV */}
-                    <button
-                      type="button"
-                      onClick={handleExportCategoryMappingsCsv}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
-                      title="Export category mappings as CSV"
-                    >
-                      <FileSpreadsheet className="w-4 h-4" />
-                      <span>Export CSV</span>
-                    </button>
                   </div>
-                </div>
-              </div>
-
-              {/* MASTER CONFIGURATION LISTS (QUOTED & COMMA SEPARATED WITH EDIT BUTTON) */}
-              <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
-                <div className="border-b border-slate-100 pb-3">
-                  <h4 className="font-extrabold text-sm text-slate-900">
-                    Master Configuration Lists
-                  </h4>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Items formatted as comma-separated quoted values. Click Edit to add or modify items.
-                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
