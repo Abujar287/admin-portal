@@ -415,10 +415,19 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                         {hist.scheduledTime ? `${hist.scheduleDate || ''} (${hist.scheduledTime})` : (hist.scheduleDate || '-')}
                       </td>
                       <td className="py-3 px-3.5 font-mono text-xs text-slate-600 whitespace-nowrap">
-                        {hist.updatedBy || '-'}
+                        {(() => {
+                          const val = String(hist.updatedBy || '').replace(/\s*\([^)]*\)/g, '').trim();
+                          if (val === '1' || val.toLowerCase() === 'manager') return 'Manager';
+                          return val || '-';
+                        })()}
                       </td>
                       <td className="py-3 px-3.5 font-bold text-slate-900 whitespace-nowrap">
-                        {hist.updatedByName || '-'}
+                        {(() => {
+                          const name = hist.updatedByName || hist.updatedBy || '';
+                          const clean = String(name).replace(/\s*\([^)]*\)/g, '').trim();
+                          if (clean === '1' || clean.toLowerCase() === 'manager') return 'Manager';
+                          return clean || '-';
+                        })()}
                       </td>
                       <td className="py-3 px-3.5 font-bold text-purple-700 whitespace-nowrap">
                         {hist.action || 'Followup'}
