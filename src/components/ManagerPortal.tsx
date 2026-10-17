@@ -2206,7 +2206,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           const cNm = String(h.customerName || relOrder?.customer_name || relOrder?.customerName || (h as any).customer_name || '').toLowerCase();
           if (!cNm.includes(q)) return false;
         } else if (followupSearchType === 'user_name') {
-          const uNm = String(h.updatedByName || h.updated_by_name || relOrder?.agent_name || '').toLowerCase();
+          const uNm = String(h.updatedByName || (h as any).updated_by_name || relOrder?.agent_name || '').toLowerCase();
           if (!uNm.includes(q)) return false;
         } else if (followupSearchType === 'updated_by_name') {
           const uNm = String(h.updatedByName || h.updatedBy || '').toLowerCase();
@@ -3186,28 +3186,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   </div>
                   <button
                     onClick={() => {
-                      const code = `function doGet(e) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheets = ss.getSheets();
-  var allData = {};
-  sheets.forEach(function(sh) {
-    var name = sh.getName();
-    var values = sh.getDataRange().getValues();
-    allData[name] = values;
-  });
-  return ContentService.createTextOutput(JSON.stringify({
-    success: true,
-    tabs: sheets.map(function(s){ return s.getName(); }),
-    data: allData
-  })).setMimeType(ContentService.MimeType.JSON);
-}`;
+                      const code = OrderService.getUpdatedAppsScriptCode();
                       navigator.clipboard.writeText(code);
-                      showToast('Apps Script code copied to clipboard!');
+                      showToast('Complete Apps Script copied to clipboard!');
                     }}
                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
                   >
                     <Copy className="w-3.5 h-3.5" />
-                    <span>Copy Apps Script Code</span>
+                    <span>Copy Complete Apps Script</span>
                   </button>
                 </div>
 

@@ -120,18 +120,20 @@ export default function App() {
     const targetOrder = orders.find(o => String(o.order_id || o.id) === String(orderId));
     const newHistoryItem: FollowupHistoryItem = {
       id: String(Date.now()),
+      followupId: Date.now(),
       orderId: orderId,
       customerName: updates.customer_name || targetOrder?.customer_name || targetOrder?.customerName || '',
       customerContact: updates.customer_mobile || targetOrder?.customer_mobile || targetOrder?.customerContact || '',
       previousStatus: targetOrder?.followup_status || targetOrder?.followupStatus || 'Pending',
       newStatus: updates.followup_status || updates.followupStatus || 'Pending',
+      orderStatus: updates.order_status || updates.orderStatus || targetOrder?.order_status || targetOrder?.orderStatus || 'Pending',
       orderValue: updates.order_value ?? updates.orderValue ?? targetOrder?.order_value ?? targetOrder?.orderValue ?? 0,
       scheduleDate: updates.schedule_date || updates.scheduleDate || targetOrder?.schedule_date || targetOrder?.scheduleDate || '',
-      scheduledTime: updates.schedule_time || updates.scheduleTime || targetOrder?.schedule_time || targetOrder?.scheduleTime || '',
+      scheduledTime: updates.schedule_time || updates.scheduledTime || targetOrder?.schedule_time || targetOrder?.scheduledTime || '',
       updatedBy: updatedBy || currentSession?.manager?.user || 'Manager',
       updatedByName: currentSession?.manager?.name || 'Manager',
       action: notes || `Followup updated to ${updates.followup_status || updates.followupStatus || 'Pending'}`,
-      date: OrderService.getBdtTimestamp()
+      timestamp: OrderService.getBdtTimestamp()
     };
     const updatedHistory = [newHistoryItem, ...followupHistory];
     setFollowupHistory(updatedHistory);

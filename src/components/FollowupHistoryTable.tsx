@@ -52,6 +52,7 @@ export interface FollowupHistoryTableProps {
   onExportXlsx?: (data: FollowupHistoryItem[], filename: string) => void;
   allFilteredRecords?: FollowupHistoryItem[];
   onViewOrder: (order: OrderItem) => void;
+  onUndoFollowup?: (historyId: string, orderId: string, previousStatus: string, updatedBy?: string) => void;
 }
 
 export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
@@ -87,7 +88,8 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
   onExportCsv,
   onExportXlsx,
   allFilteredRecords = [],
-  onViewOrder
+  onViewOrder,
+  onUndoFollowup
 }) => {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
@@ -436,7 +438,7 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                         {hist.notes || '-'}
                       </td>
                       <td className="py-3 px-3.5 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center">
+                        <div className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => {
@@ -447,6 +449,20 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                           >
                             View Order
                           </button>
+                          {onUndoFollowup && !hist.isUndo && !hist.isUndone && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm(`Are you sure you want to undo status change for Order #${hist.orderId}?`)) {
+                                  onUndoFollowup(hist.id, hist.orderId, hist.previousStatus, hist.updatedBy);
+                                }
+                              }}
+                              className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs font-bold cursor-pointer transition-colors border border-amber-200"
+                              title="Undo this status change"
+                            >
+                              Undo
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

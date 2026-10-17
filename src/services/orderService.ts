@@ -1857,6 +1857,15 @@ export class OrderService {
     return { updatedOrders: updated, historyItem, remoteSynced };
   }
 
+  static async updateOrderInSheet(
+    orderId: string,
+    updates: Partial<OrderItem>,
+    updatedBy: string = 'manager',
+    notes: string = ''
+  ): Promise<{ updatedOrders: OrderItem[]; historyItem?: FollowupHistoryItem; remoteSynced: boolean }> {
+    return this.updateOrderStatus(orderId, updates, updatedBy, notes);
+  }
+
   /**
    * Reverts an order's followup status back to its previous status in Sheet1 (Orders),
    * clears profit & dates if applicable, and records a dedicated "Undo" audit log in history.
@@ -1998,8 +2007,8 @@ export class OrderService {
 // 3. Updating Followup Status, Order Status, Order Value,
 //    Schedule Date & Time in Sheet1 (action: 'updateFollowup')
 // 4. Reverting followups: restores previous status, clears profit & dates (action: 'revertFollowup')
-// 5. Storing complete audit trail in 'Followup' historical sheet with exact 14 columns:
-//    Log Timestamp | followup_id | order_id | customer_name | customer_mobile | previous_followup_status | new_followup_status | order_status | order_value | schedule_date | schedule_time | updated_by | status_change | action
+// 5. Storing complete audit trail in 'Followup' historical sheet with exact 15 columns:
+//    Log Timestamp | followup_id | order_id | customer_name | customer_mobile | previous_followup_status | new_followup_status | order_status | order_value | schedule_date | schedule_time | updated_by | updated_by_name | status_change | action
 // ==========================================
 
 function doGet(e) {
@@ -2042,10 +2051,10 @@ function doPost(e) {
         "team",
         "role",
         "team_leader",
-        "status",
         "permission",
         "birthday",
-        "blood group"
+        "blood group",
+        "status"
       ]);
       usersSheet.getRange(1, 1, 1, 11).setFontWeight("bold").setBackground("#e2e8f0");
     }
@@ -2093,10 +2102,10 @@ function doPost(e) {
       usersSheet.getRange(targetRow, 5).setValue(uTeam);
       usersSheet.getRange(targetRow, 6).setValue(uRole);
       usersSheet.getRange(targetRow, 7).setValue(uLeader);
-      usersSheet.getRange(targetRow, 8).setValue(uStatus);
-      usersSheet.getRange(targetRow, 9).setValue(uPerm);
-      usersSheet.getRange(targetRow, 10).setValue(uBday);
-      usersSheet.getRange(targetRow, 11).setValue(uBlood);
+      usersSheet.getRange(targetRow, 8).setValue(uPerm);
+      usersSheet.getRange(targetRow, 9).setValue(uBday);
+      usersSheet.getRange(targetRow, 10).setValue(uBlood);
+      usersSheet.getRange(targetRow, 11).setValue(uStatus);
     } else {
       usersSheet.appendRow([
         uId,
@@ -2106,10 +2115,10 @@ function doPost(e) {
         uTeam,
         uRole,
         uLeader,
-        uStatus,
         uPerm,
         uBday,
-        uBlood
+        uBlood,
+        uStatus
       ]);
     }
 
@@ -2190,9 +2199,9 @@ function doPost(e) {
         var uByVal = String(data.updatedBy || data.updated_by || data.updateBy || data.update_by || '1').trim();
         var uByNameVal = String(data.updatedByName || data.updated_by_name || data.updateByName || data.update_by_name || '').trim();
         if (!uByNameVal && uByVal.indexOf('(@') !== -1) {
-          var m = uByVal.match(/\(@(.*)\)/);
+          var m = uByVal.match(/(@(.*))/);
           if (m) {
-            uByNameVal = uByVal.replace(/\s*\(@.*\)/, '').replace('@', '').trim();
+            uByNameVal = uByVal.replace(/s*(@.*)/, '').replace('@', '').trim();
             uByVal = m[1].trim();
           }
         }
@@ -2213,7 +2222,7 @@ function doPost(e) {
           uByVal = '1';
           if (!uByNameVal || uByNameVal.indexOf('@') !== -1) uByNameVal = 'Manager';
         }
-        var actName = data.actionName || data.action_name || ("Undo (" + currStat + " -> " + prevStatus + ")");
+        var actName = data.actionName || data.action_name || ("Undo");
 
         followupSheet.appendRow([
           new Date(),
@@ -2221,7 +2230,7 @@ function doPost(e) {
           orderIdToFind,
           custName,
           custMob,
-          currStat,
+          '',
           prevStatus,
           stat,
           ordVal,
@@ -2229,7 +2238,7 @@ function doPost(e) {
           scTime,
           uByVal,
           uByNameVal,
-          currStat + " -> " + prevStatus + " (Undone)",
+          "Reverted to " + prevStatus,
           actName
         ]);
       }
@@ -2244,7 +2253,7 @@ function doPost(e) {
 
   // 2. UPDATE FOLLOWUP
   if (action === 'updateFollowup' || action === 'updateStatus' || action === 'updateOrder' || action === 'update') {
-      var orderIdToFind = String(data.orderId || data.order_id || '').trim();
+    var orderIdToFind = String(data.orderId || data.order_id || '').trim();
     var newFollowupStatus = data.followupStatus || data.followup_status || data.new_followup_status || data.newFollowupStatus || data.status || '';
     // order_status must always stay 'Pending' as required
     var newOrderStatus = 'Pending';
