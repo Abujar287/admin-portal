@@ -160,10 +160,10 @@ export const ALL_SIDEBAR_TABS: { id: AgentNavTab; label: string; description: st
   { id: 'orders', label: 'Orders', description: 'Orders database, search, and order items', section: 'operations' },
   { id: 'followup', label: 'Followup History', description: 'Customer followup tracking & audit log', section: 'operations' },
   { id: 'agent-performance', label: 'Agent Performance', description: 'Individual and team stats', section: 'operations' },
+  { id: 'profiles', label: 'Profile', description: 'User profile details', section: 'admin' },
   { id: 'users', label: 'User Details', description: 'Agent directory & access management', section: 'admin' },
   { id: 'category-mapping', label: 'Category Mapping', description: 'Category, team & status rules', section: 'admin' },
-  { id: 'sheet-connection', label: 'Google Sheet & Tabs', description: 'Google sheet connection & tabs', section: 'admin' },
-  { id: 'profiles', label: 'Profile', description: 'User profile details', section: 'admin' }
+  { id: 'sheet-connection', label: 'Google Sheet & Tabs', description: 'Google sheet connection & tabs', section: 'admin' }
 ];
 
 export const AGENT_MANAGEABLE_TABS = ALL_SIDEBAR_TABS;
@@ -2914,7 +2914,27 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 </div>
               )}
 
-              {/* 5. User Details */}
+              {/* 5. Manager Profile */}
+              {isTabAllowed('profiles') && (
+                <button
+                  onClick={() => setActiveTab('profiles')}
+                  title="Profile"
+                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
+                    activeTab === 'profiles'
+                      ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
+                      : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
+                  }`}
+                >
+                  <User className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'profiles' ? 'text-sky-300 scale-110' : 'text-slate-400'}`} />
+                  {isSidebarOpen && (
+                    <span className="truncate text-left font-semibold">
+                      Profile
+                    </span>
+                  )}
+                </button>
+              )}
+
+              {/* 6. User Details */}
               {isTabAllowed('users') && (
                 <button
                   onClick={() => setActiveTab('users')}
@@ -2939,7 +2959,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 </button>
               )}
 
-              {/* 6. Category Mapping */}
+              {/* 7. Category Mapping */}
               {isTabAllowed('category-mapping') && (
                 <button
                   onClick={() => setActiveTab('category-mapping')}
@@ -2959,7 +2979,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 </button>
               )}
 
-              {/* 7. Google Sheet & Tabs */}
+              {/* 8. Google Sheet & Tabs */}
               {isTabAllowed('sheet-connection') && (
                 <button
                   onClick={() => setActiveTab('sheet-connection')}
@@ -2974,26 +2994,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   {isSidebarOpen && (
                     <span className="truncate text-left font-semibold">
                       Google Sheet &amp; Tabs
-                    </span>
-                  )}
-                </button>
-              )}
-
-              {/* 8. Manager Profile */}
-              {isTabAllowed('profiles') && (
-                <button
-                  onClick={() => setActiveTab('profiles')}
-                  title="Profile"
-                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
-                    activeTab === 'profiles'
-                      ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
-                      : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
-                  }`}
-                >
-                  <User className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'profiles' ? 'text-sky-300 scale-110' : 'text-slate-400'}`} />
-                  {isSidebarOpen && (
-                    <span className="truncate text-left font-semibold">
-                      Profile
                     </span>
                   )}
                 </button>
