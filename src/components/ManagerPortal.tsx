@@ -3036,7 +3036,16 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Last Sync Indicator */}
+            {/* 1. Add Order */}
+            <button
+              onClick={() => setIsManagerCreateOrderOpen(true)}
+              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Order</span>
+            </button>
+
+            {/* 2. Last Sync Indicator */}
             <div 
               className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs shadow-2xs"
               title="Automatically updates when Google Sheet refreshes"
@@ -3051,18 +3060,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               </span>
             </div>
 
-            <button
-              onClick={() => setIsManagerCreateOrderOpen(true)}
-              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Order</span>
-            </button>
-
+            {/* 3. Refresh Sheet */}
             <button
               onClick={() => onRefreshOrders()}
               disabled={isRefreshing}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition-colors cursor-pointer"
+              className="min-w-[120px] px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-200 transition-colors cursor-pointer"
             >
               <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-indigo-600' : ''}`} />
               <span>{isRefreshing ? 'Refreshing...' : 'Refresh Sheet'}</span>
@@ -3142,73 +3144,29 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   </form>
 
                   {connectedSheetStatus === 'connected' && (
-                    <div className="flex items-center gap-2 pt-2 text-xs text-emerald-300 font-medium">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      <span>Connected &amp; Live • Total Orders Synced: <strong className="text-white font-extrabold">{orders.length}</strong></span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* SHEET TABS (JUST LIST FORMAT) */}
-              <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">
-                      📋
-                    </span>
-                    <div>
-                      <h3 className="font-extrabold text-slate-900 text-base">
-                        Sheet Tabs ({connectedSheetTabs.length})
-                      </h3>
-                      <p className="text-xs text-slate-500">
-                        Available tabs synced from your connected Google Sheet.
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-bold px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg">
-                    Live Active
-                  </span>
-                </div>
-
-                <div className="divide-y divide-slate-100 border border-slate-100 rounded-2xl overflow-hidden bg-slate-50/30">
-                  {connectedSheetTabs.map((tabName, idx) => {
-                    const normalized = tabName.toLowerCase();
-                    let targetTabKey: any = 'orders';
-                    if (normalized.includes('summary')) targetTabKey = 'summary';
-                    else if (normalized.includes('performance') || normalized.includes('agent')) targetTabKey = 'agent-performance';
-                    else if (normalized.includes('profile') || normalized.includes('setting')) targetTabKey = 'profiles';
-                    else if (normalized.includes('mapping')) targetTabKey = 'category-mapping';
-                    else targetTabKey = 'orders';
-
-                    return (
-                      <div
-                        key={idx}
-                        onClick={() => setActiveTab(targetTabKey)}
-                        className="py-3 px-4 flex items-center justify-between hover:bg-white transition-colors cursor-pointer group"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="w-7 h-7 rounded-lg bg-white group-hover:bg-indigo-50 border border-slate-200 group-hover:border-indigo-200 text-slate-600 group-hover:text-indigo-600 flex items-center justify-center text-xs font-bold font-mono shadow-2xs">
-                            {idx + 1}
-                          </span>
-                          <div>
-                            <span className="font-bold text-sm text-slate-800 group-hover:text-indigo-600 transition-colors">
-                              {tabName}
-                            </span>
-                            {tabName.toLowerCase() === 'delivered' && (
-                              <span className="ml-2 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                Delivered Orders Tab
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 text-slate-400 group-hover:text-indigo-600 text-xs font-semibold">
-                          <span className="text-xs">Open Workspace</span>
-                          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                    <div className="pt-2 space-y-2">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-emerald-300 font-medium">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>Connected &amp; Live • Total Orders Synced: <strong className="text-white font-extrabold">{orders.length}</strong></span>
                         </div>
                       </div>
-                    );
-                  })}
+                      {connectedSheetTabs.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          <span className="text-[11px] text-indigo-300/80 font-bold uppercase tracking-wider mr-1">Tabs:</span>
+                          {connectedSheetTabs.map((tName, tIdx) => (
+                            <span 
+                              key={tIdx} 
+                              className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 border border-white/20 text-white font-mono text-[11px] transition-colors"
+                              title={tName}
+                            >
+                              {tName}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -5053,7 +5011,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                 {ord.schedule_time}
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-bold text-slate-900">
-                                ৳ {(ord.order_value || 0).toLocaleString()}
+                                 {(ord.order_value || 0).toLocaleString()}
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap">
                                 <span
@@ -5080,7 +5038,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                 </span>
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-bold text-emerald-600">
-                                {ord.profit && ord.profit > 0 ? `৳ ${(ord.profit || 0).toLocaleString()}` : '-'}
+                                {ord.profit && ord.profit > 0 ? ` ${(ord.profit || 0).toLocaleString()}` : '-'}
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-emerald-700 font-medium">
                                 {ord.delivered_date ? OrderService.formatDateTime(ord.delivered_date) : '-'}
@@ -5267,7 +5225,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           const fStatus = ord.followup_status || ord.followupStatus || 'Pending';
                           return (
                             <option key={`opt-quick-ord-${oId}-${idx}`} value={oId}>
-                              #{oId} - {cName} (৳{val.toLocaleString()}) [{fStatus}]
+                              #{oId} - {cName} ({val.toLocaleString()}) [{fStatus}]
                             </option>
                           );
                         })}
@@ -5289,7 +5247,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
                     <div>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1">
-                        Order Value (৳)
+                        Order Value ()
                       </label>
                       <input
                         type="number"
@@ -5304,7 +5262,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
                     <div>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1">
-                        Profit Amount (৳)
+                        Profit Amount ()
                       </label>
                       <input
                         type="number"
@@ -5644,7 +5602,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                   {hist.orderStatus || '-'}
                                 </td>
                                 <td className="py-3 px-3.5 text-slate-700 font-medium whitespace-nowrap">
-                                  ৳ {hist.orderValue != null ? Number(hist.orderValue).toLocaleString() : '-'}
+                                   {hist.orderValue != null ? Number(hist.orderValue).toLocaleString() : '-'}
                                 </td>
                                 <td className="py-3 px-3.5 text-slate-600 text-[10px] whitespace-nowrap">
                                   {hist.scheduleDate}<br/>{hist.scheduledTime}
@@ -5759,24 +5717,24 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 </div>
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Open Value</span>
-                  <p className="text-lg font-extrabold text-amber-700 mt-1">৳ {(summaryStats.openOrdersValue || 0).toLocaleString()}</p>
+                  <p className="text-lg font-extrabold text-amber-700 mt-1"> {(summaryStats.openOrdersValue || 0).toLocaleString()}</p>
                 </div>
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Order Value</span>
-                  <p className="text-lg font-extrabold text-slate-900 mt-1">৳ {(summaryStats.totalOrderValue || 0).toLocaleString()}</p>
+                  <p className="text-lg font-extrabold text-slate-900 mt-1"> {(summaryStats.totalOrderValue || 0).toLocaleString()}</p>
                 </div>
 
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Delivered Value</span>
-                  <p className="text-lg font-extrabold text-indigo-700 mt-1">৳ {(summaryStats.deliveredOrderValue || 0).toLocaleString()}</p>
+                  <p className="text-lg font-extrabold text-indigo-700 mt-1"> {(summaryStats.deliveredOrderValue || 0).toLocaleString()}</p>
                 </div>
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Profit</span>
-                  <p className="text-lg font-extrabold text-emerald-700 mt-1">৳ {(summaryStats.totalProfit || 0).toLocaleString()}</p>
+                  <p className="text-lg font-extrabold text-emerald-700 mt-1"> {(summaryStats.totalProfit || 0).toLocaleString()}</p>
                 </div>
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Bucket Size</span>
-                  <p className="text-lg font-extrabold text-blue-700 mt-1">৳ {(summaryStats.bucketSize || 0).toLocaleString()}</p>
+                  <p className="text-lg font-extrabold text-blue-700 mt-1"> {(summaryStats.bucketSize || 0).toLocaleString()}</p>
                 </div>
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">NR Ratio</span>
@@ -6048,10 +6006,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               <td className="py-3 px-3.5 text-right font-bold text-indigo-700">{row.createOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledOrders}</td>
-                              <td className="py-3 px-3.5 text-right font-medium">৳ {(row.orderValue || 0).toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">৳ {(row.deliveredOrderValue || 0).toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">৳ {(row.profit || 0).toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-medium text-blue-700">৳ {(row.bucketSize || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium"> {(row.orderValue || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700"> {(row.deliveredOrderValue || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600"> {(row.profit || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium text-blue-700"> {(row.bucketSize || 0).toLocaleString()}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-600">{row.deliveredRatio}%</td>
                               <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledRatio}%</td>
                               <td className="py-3 px-3.5 text-right font-bold text-purple-700">{row.nrRatio}%</td>
@@ -6066,10 +6024,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             <td className="py-3.5 px-3.5 text-right font-black text-indigo-700">{summaryStats.channelGrandTotal.createOrders}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.channelGrandTotal.servedOrders}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.channelGrandTotal.cancelledOrders}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black">৳ {(summaryStats.channelGrandTotal.orderValue || 0).toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {(summaryStats.channelGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {(summaryStats.channelGrandTotal.profit || 0).toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {(summaryStats.channelGrandTotal.bucketSize || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black"> {(summaryStats.channelGrandTotal.orderValue || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700"> {(summaryStats.channelGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600"> {(summaryStats.channelGrandTotal.profit || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700"> {(summaryStats.channelGrandTotal.bucketSize || 0).toLocaleString()}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.channelGrandTotal.deliveredRatio}%</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.channelGrandTotal.cancelledRatio}%</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-purple-700">{summaryStats.channelGrandTotal.nrRatio}%</td>
@@ -6270,10 +6228,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               <td className="py-3 px-3.5 text-right font-bold text-indigo-700">{row.createOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledOrders}</td>
-                              <td className="py-3 px-3.5 text-right font-medium">৳ {(row.orderValue || 0).toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">৳ {(row.deliveredOrderValue || 0).toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">৳ {(row.profit || 0).toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-medium text-blue-700">৳ {(row.bucketSize || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium"> {(row.orderValue || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700"> {(row.deliveredOrderValue || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600"> {(row.profit || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium text-blue-700"> {(row.bucketSize || 0).toLocaleString()}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-600">{row.deliveredRatio}%</td>
                               <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledRatio}%</td>
                               <td className="py-3 px-3.5 text-right font-bold text-purple-700">{row.nrRatio}%</td>
@@ -6288,10 +6246,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             <td className="py-3.5 px-3.5 text-right font-black text-indigo-700">{summaryStats.categoryGrandTotal.createOrders}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.categoryGrandTotal.servedOrders}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.categoryGrandTotal.cancelledOrders}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black">৳ {(summaryStats.categoryGrandTotal.orderValue || 0).toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {(summaryStats.categoryGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {(summaryStats.categoryGrandTotal.profit || 0).toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {(summaryStats.categoryGrandTotal.bucketSize || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black"> {(summaryStats.categoryGrandTotal.orderValue || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700"> {(summaryStats.categoryGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600"> {(summaryStats.categoryGrandTotal.profit || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700"> {(summaryStats.categoryGrandTotal.bucketSize || 0).toLocaleString()}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.categoryGrandTotal.deliveredRatio}%</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.categoryGrandTotal.cancelledRatio}%</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-purple-700">{summaryStats.categoryGrandTotal.nrRatio}%</td>
@@ -6492,10 +6450,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               <td className="py-3 px-3.5 text-right font-bold text-indigo-700">{row.createOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledOrders}</td>
-                              <td className="py-3 px-3.5 text-right font-medium">৳ {(row.orderValue || 0).toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">৳ {(row.deliveredOrderValue || 0).toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">৳ {(row.profit || 0).toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-medium text-blue-700">৳ {(row.bucketSize || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium"> {(row.orderValue || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700"> {(row.deliveredOrderValue || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600"> {(row.profit || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium text-blue-700"> {(row.bucketSize || 0).toLocaleString()}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-600">{row.deliveredRatio}%</td>
                               <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledRatio}%</td>
                               <td className="py-3 px-3.5 text-right font-bold text-purple-700">{row.nrRatio}%</td>
@@ -6510,10 +6468,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             <td className="py-3.5 px-3.5 text-right font-black text-indigo-700">{summaryStats.cityGrandTotal.createOrders}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.cityGrandTotal.servedOrders}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.cityGrandTotal.cancelledOrders}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black">৳ {(summaryStats.cityGrandTotal.orderValue || 0).toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {(summaryStats.cityGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {(summaryStats.cityGrandTotal.profit || 0).toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {(summaryStats.cityGrandTotal.bucketSize || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black"> {(summaryStats.cityGrandTotal.orderValue || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700"> {(summaryStats.cityGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600"> {(summaryStats.cityGrandTotal.profit || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700"> {(summaryStats.cityGrandTotal.bucketSize || 0).toLocaleString()}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.cityGrandTotal.deliveredRatio}%</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.cityGrandTotal.cancelledRatio}%</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-purple-700">{summaryStats.cityGrandTotal.nrRatio}%</td>
@@ -6747,10 +6705,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-amber-600">{row.pendingOrders}</td>
-                              <td className="py-3 px-3.5 text-right font-medium">৳ {(row.orderValue || 0).toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700">৳ {(row.deliveredOrderValue || 0).toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600">৳ {(row.profit || 0).toLocaleString()}</td>
-                              <td className="py-3 px-3.5 text-right font-medium text-blue-700">৳ {(row.bucketSize || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium"> {(row.orderValue || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-700"> {(row.deliveredOrderValue || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-bold text-emerald-600"> {(row.profit || 0).toLocaleString()}</td>
+                              <td className="py-3 px-3.5 text-right font-medium text-blue-700"> {(row.bucketSize || 0).toLocaleString()}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-600">{row.deliveredRatio}%</td>
                               <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledRatio}%</td>
                               <td className="py-3 px-3.5 text-right font-bold text-purple-700">{row.nrRatio}%</td>
@@ -6766,10 +6724,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.dateGrandTotal.servedOrders}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.dateGrandTotal.cancelledOrders}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-amber-700">{summaryStats.dateGrandTotal.pendingOrders}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black">৳ {(summaryStats.dateGrandTotal.orderValue || 0).toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {(summaryStats.dateGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {(summaryStats.dateGrandTotal.profit || 0).toLocaleString()}</td>
-                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {(summaryStats.dateGrandTotal.bucketSize || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black"> {(summaryStats.dateGrandTotal.orderValue || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-700"> {(summaryStats.dateGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-emerald-600"> {(summaryStats.dateGrandTotal.profit || 0).toLocaleString()}</td>
+                            <td className="py-3.5 px-3.5 text-right font-black text-blue-700"> {(summaryStats.dateGrandTotal.bucketSize || 0).toLocaleString()}</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{summaryStats.dateGrandTotal.deliveredRatio}%</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-red-700">{summaryStats.dateGrandTotal.cancelledRatio}%</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-purple-700">{summaryStats.dateGrandTotal.nrRatio}%</td>
@@ -6881,16 +6839,16 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Created / Assigned</span>
                   <p className="text-2xl font-black text-indigo-700 mt-1">{filteredAgentGrandTotal.createOrders}</p>
-                  <span className="text-[10px] text-indigo-600 font-medium">৳ {(filteredAgentGrandTotal.orderValue || 0).toLocaleString()} value</span>
+                  <span className="text-[10px] text-indigo-600 font-medium"> {(filteredAgentGrandTotal.orderValue || 0).toLocaleString()} value</span>
                 </div>
                 <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Delivered Orders</span>
                   <p className="text-2xl font-black text-emerald-700 mt-1">{filteredAgentGrandTotal.servedOrders}</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">৳ {(filteredAgentGrandTotal.deliveredOrderValue || 0).toLocaleString()} delivered</span>
+                  <span className="text-[10px] text-emerald-600 font-medium"> {(filteredAgentGrandTotal.deliveredOrderValue || 0).toLocaleString()} delivered</span>
                 </div>
                 <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Profit</span>
-                  <p className="text-2xl font-black text-emerald-600 mt-1">৳ {(filteredAgentGrandTotal.profit || 0).toLocaleString()}</p>
+                  <p className="text-2xl font-black text-emerald-600 mt-1"> {(filteredAgentGrandTotal.profit || 0).toLocaleString()}</p>
                   <span className="text-[10px] text-emerald-600 font-medium">NR Ratio: {filteredAgentGrandTotal.nrRatio}%</span>
                 </div>
                 <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs col-span-2 lg:col-span-1">
@@ -7007,10 +6965,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
                             <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledOrders}</td>
                             <td className="py-3 px-3.5 text-right font-medium text-amber-600">{row.pendingOrders}</td>
-                            <td className="py-3 px-3.5 text-right font-medium">৳ {(row.orderValue || 0).toLocaleString()}</td>
-                            <td className="py-3 px-3.5 text-right font-bold text-emerald-700">৳ {(row.deliveredOrderValue || 0).toLocaleString()}</td>
-                            <td className="py-3 px-3.5 text-right font-bold text-emerald-600">৳ {(row.profit || 0).toLocaleString()}</td>
-                            <td className="py-3 px-3.5 text-right font-medium text-blue-700">৳ {(row.bucketSize || 0).toLocaleString()}</td>
+                            <td className="py-3 px-3.5 text-right font-medium"> {(row.orderValue || 0).toLocaleString()}</td>
+                            <td className="py-3 px-3.5 text-right font-bold text-emerald-700"> {(row.deliveredOrderValue || 0).toLocaleString()}</td>
+                            <td className="py-3 px-3.5 text-right font-bold text-emerald-600"> {(row.profit || 0).toLocaleString()}</td>
+                            <td className="py-3 px-3.5 text-right font-medium text-blue-700"> {(row.bucketSize || 0).toLocaleString()}</td>
                             <td className="py-3 px-3.5 text-right font-bold text-emerald-600">{row.deliveredRatio}%</td>
                             <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledRatio}%</td>
                             <td className="py-3 px-3.5 text-right font-bold text-purple-700">{row.nrRatio}%</td>
@@ -7035,10 +6993,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{filteredAgentGrandTotal.servedOrders}</td>
                           <td className="py-3.5 px-3.5 text-right font-black text-red-700">{filteredAgentGrandTotal.cancelledOrders}</td>
                           <td className="py-3.5 px-3.5 text-right font-black text-amber-700">{filteredAgentGrandTotal.pendingOrders}</td>
-                          <td className="py-3.5 px-3.5 text-right font-black">৳ {(filteredAgentGrandTotal.orderValue || 0).toLocaleString()}</td>
-                          <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">৳ {(filteredAgentGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
-                          <td className="py-3.5 px-3.5 text-right font-black text-emerald-600">৳ {(filteredAgentGrandTotal.profit || 0).toLocaleString()}</td>
-                          <td className="py-3.5 px-3.5 text-right font-black text-blue-700">৳ {(filteredAgentGrandTotal.bucketSize || 0).toLocaleString()}</td>
+                          <td className="py-3.5 px-3.5 text-right font-black"> {(filteredAgentGrandTotal.orderValue || 0).toLocaleString()}</td>
+                          <td className="py-3.5 px-3.5 text-right font-black text-emerald-700"> {(filteredAgentGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
+                          <td className="py-3.5 px-3.5 text-right font-black text-emerald-600"> {(filteredAgentGrandTotal.profit || 0).toLocaleString()}</td>
+                          <td className="py-3.5 px-3.5 text-right font-black text-blue-700"> {(filteredAgentGrandTotal.bucketSize || 0).toLocaleString()}</td>
                           <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{filteredAgentGrandTotal.deliveredRatio}%</td>
                           <td className="py-3.5 px-3.5 text-right font-black text-red-700">{filteredAgentGrandTotal.cancelledRatio}%</td>
                           <td className="py-3.5 px-3.5 text-right font-black text-purple-700">{filteredAgentGrandTotal.nrRatio}%</td>

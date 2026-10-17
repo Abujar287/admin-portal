@@ -2626,11 +2626,9 @@ function doOptions(e) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const month = months[d.getMonth()] || 'Oct';
     const year = d.getFullYear();
-    let hours = d.getHours();
+    const hours = d.getHours().toString().padStart(2, '0');
     const minutes = d.getMinutes().toString().padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    hours = hours ? hours : 12;
-    return `${day} ${month} ${year}, ${hours}:${minutes}${ampm}`;
+    const seconds = d.getSeconds().toString().padStart(2, '0');
+    return `${day} ${month} ${year}, ${hours}:${minutes}:${seconds}`;
   }
 }

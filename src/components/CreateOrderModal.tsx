@@ -110,6 +110,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     setCustomProfit('');
     setScheduledTime('');
     setStatusMessage(null);
+    setAutofilledCustomerInfo(null);
 
     setCreateDate(OrderService.getBdtTimestamp());
 
@@ -118,6 +119,94 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     const tomM = String(today.getMonth() + 1).padStart(2, '0');
     const tomD = String(today.getDate()).padStart(2, '0');
     setScheduleDate(`${tomY}-${tomM}-${tomD}`);
+  };
+
+  const [autofilledCustomerInfo, setAutofilledCustomerInfo] = useState<{ orderId: string; customerName?: string } | null>(null);
+
+  const handleContactChange = (val: string) => {
+    setCustomerContact(val);
+    const cleanInput = val.replace(/\D/g, '');
+    if (cleanInput.length >= 10) {
+      const last10 = cleanInput.slice(-10);
+      const matchingOrder = [...ordersList].reverse().find((o) => {
+        const oPhone = String(o.customer_mobile || o.customerContact || '').replace(/\D/g, '');
+        if (oPhone.length < 10) return false;
+        return oPhone.endsWith(last10) || cleanInput.endsWith(oPhone.slice(-10));
+      });
+
+      if (matchingOrder) {
+        // 1. Customer Name
+        if (matchingOrder.customer_name || matchingOrder.customerName) {
+          setCustomerName(matchingOrder.customer_name || matchingOrder.customerName || '');
+        }
+
+        // 2. Gender
+        if (matchingOrder.gender) {
+          const g = matchingOrder.gender;
+          if (g === 'Male' || g === 'Female' || g === 'Other') {
+            setGender(g);
+          }
+        }
+
+        // 3. City & Area
+        if (matchingOrder.city) {
+          const c = matchingOrder.city;
+          if (CITY_AREA_MAP[c]) {
+            setCity(c);
+            setCustomCity('');
+            if (matchingOrder.delivery_area || matchingOrder.deliveryArea) {
+              const a = matchingOrder.delivery_area || matchingOrder.deliveryArea || '';
+              if (CITY_AREA_MAP[c]?.includes(a)) {
+                setDeliveryArea(a);
+                setCustomArea('');
+              } else {
+                setDeliveryArea('Others');
+                setCustomArea(a);
+              }
+            }
+          } else {
+            setCity('Others');
+            setCustomCity(c);
+            if (matchingOrder.delivery_area || matchingOrder.deliveryArea) {
+              setDeliveryArea('Others');
+              setCustomArea(matchingOrder.delivery_area || matchingOrder.deliveryArea || '');
+            }
+          }
+        }
+
+        // 4. Address: Flat, House, Road, Block
+        const rawAddr = String(matchingOrder.address_details || matchingOrder.addressDetails || '').trim();
+        if (rawAddr && rawAddr.toLowerCase() !== 'not specified') {
+          const flatMatch = rawAddr.match(/(?:Flat|flat|Apt|apt)[:\s#-]*([^,;]+)/i);
+          const houseMatch = rawAddr.match(/(?:House|house|H)[:\s#-]*([^,;]+)/i);
+          const roadMatch = rawAddr.match(/(?:Road|road|R)[:\s#-]*([^,;]+)/i);
+          const blockMatch = rawAddr.match(/(?:Block|block|Sec|Sector)[:\s#-]*([^,;]+)/i);
+
+          if (flatMatch) setFlat(flatMatch[1].trim());
+          if (houseMatch) setHouse(houseMatch[1].trim());
+          if (roadMatch) setRoad(roadMatch[1].trim());
+          if (blockMatch) setBlock(blockMatch[1].trim());
+
+          if (!flatMatch && !houseMatch && !roadMatch && !blockMatch) {
+            setHouse(rawAddr);
+          }
+        }
+
+        if ((matchingOrder as any).flat) setFlat((matchingOrder as any).flat);
+        if ((matchingOrder as any).house) setHouse((matchingOrder as any).house);
+        if ((matchingOrder as any).road) setRoad((matchingOrder as any).road);
+        if ((matchingOrder as any).block) setBlock((matchingOrder as any).block);
+
+        setAutofilledCustomerInfo({
+          orderId: String(matchingOrder.order_id || matchingOrder.id || ''),
+          customerName: matchingOrder.customer_name || matchingOrder.customerName || ''
+        });
+      } else {
+        setAutofilledCustomerInfo(null);
+      }
+    } else {
+      setAutofilledCustomerInfo(null);
+    }
   };
 
   useEffect(() => {
@@ -304,7 +393,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   type="tel"
                   required
                   value={customer_mobile}
-                  onChange={(e) => setCustomerMobile(e.target.value)}
+                  onChange={(e) => handleContactChange(e.target.value)}
                   placeholder="e.g. 01711223344"
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white"
                 />
@@ -512,7 +601,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Order Value (৳) *
+                  Order Value () *
                 </label>
                 <input
                   type="number"

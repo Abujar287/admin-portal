@@ -157,7 +157,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
           profit: parsedProfit
         },
         userDisplayName,
-        `Profit updated to ৳${parsedProfit.toLocaleString()}`
+        `Profit updated to ${parsedProfit.toLocaleString()}`
       );
       setProfitMsg('Updated!');
       if (onRefreshOrders) await onRefreshOrders();
@@ -268,7 +268,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
           profit: calculatedProfit
         },
         userDisplayName,
-        `Price updated to ৳${parsedVal.toLocaleString()}`
+        `Price updated to ${parsedVal.toLocaleString()}`
       );
       setValueMsg('Updated!');
       if (onRefreshOrders) await onRefreshOrders();
@@ -468,9 +468,9 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                       </select>
                     </div>
 
-                    {/* 2. Profit (৳) */}
+                    {/* 2. Profit () */}
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Profit (৳) *Required*</label>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Profit () *Required*</label>
                       <input
                         type="number"
                         min="0"
@@ -483,9 +483,9 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                       />
                     </div>
 
-                    {/* 3. Value (৳) */}
+                    {/* 3. Value () */}
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Value (৳)</label>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Value ()</label>
                       <input
                         type="number"
                         min="0"
@@ -578,7 +578,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                   <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-2">
                     <div>
                       <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                        Value (৳)
+                        Value ()
                       </label>
                       <input
                         type="number"
@@ -734,8 +734,8 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                 { label: 'Schedule Time', value: order.schedule_time || order.scheduledTime },
                 { label: 'Agent ID', value: order.agent_id || order.agentId },
                 { label: 'Agent Name', value: order.agent_name || order.agentName },
-                { label: 'Order Value', value: `৳ ${((order.order_value ?? order.orderValue) || 0).toLocaleString()}` },
-                { label: 'Profit', value: `৳ ${((order.profit ?? 0) || 0).toLocaleString()}` },
+                { label: 'Order Value', value: ` ${((order.order_value ?? order.orderValue) || 0).toLocaleString()}` },
+                { label: 'Profit', value: ` ${((order.profit ?? 0) || 0).toLocaleString()}` },
                 { label: 'Order Status', value: order.order_status || order.orderStatus },
                 { label: 'Followup Status', value: order.followup_status || order.followupStatus },
                 { label: 'Delivered Date', value: order.delivered_date ? OrderService.formatDateTime(order.delivered_date) : '-' },

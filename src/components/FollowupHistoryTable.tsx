@@ -409,7 +409,7 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                         </span>
                       </td>
                       <td className="py-3 px-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">
-                        ৳ {(Number(hist.orderValue) || 0).toLocaleString()}
+                         {(Number(hist.orderValue) || 0).toLocaleString()}
                       </td>
                       <td className="py-3 px-3.5 text-[11px] text-slate-600 whitespace-nowrap">
                         {hist.scheduledTime ? `${hist.scheduleDate || ''} (${hist.scheduledTime})` : (hist.scheduleDate || '-')}
