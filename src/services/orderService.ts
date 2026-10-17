@@ -2035,10 +2035,10 @@ function doPost(e) {
         "team",
         "role",
         "team_leader",
+        "status",
         "permission",
         "birthday",
-        "blood group",
-        "status"
+        "blood group"
       ]);
       usersSheet.getRange(1, 1, 1, 11).setFontWeight("bold").setBackground("#e2e8f0");
     }
@@ -2086,10 +2086,10 @@ function doPost(e) {
       usersSheet.getRange(targetRow, 5).setValue(uTeam);
       usersSheet.getRange(targetRow, 6).setValue(uRole);
       usersSheet.getRange(targetRow, 7).setValue(uLeader);
-      usersSheet.getRange(targetRow, 8).setValue(uPerm);
-      usersSheet.getRange(targetRow, 9).setValue(uBday);
-      usersSheet.getRange(targetRow, 10).setValue(uBlood);
-      usersSheet.getRange(targetRow, 11).setValue(uStatus);
+      usersSheet.getRange(targetRow, 8).setValue(uStatus);
+      usersSheet.getRange(targetRow, 9).setValue(uPerm);
+      usersSheet.getRange(targetRow, 10).setValue(uBday);
+      usersSheet.getRange(targetRow, 11).setValue(uBlood);
     } else {
       usersSheet.appendRow([
         uId,
@@ -2099,10 +2099,10 @@ function doPost(e) {
         uTeam,
         uRole,
         uLeader,
+        uStatus,
         uPerm,
         uBday,
-        uBlood,
-        uStatus
+        uBlood
       ]);
     }
 

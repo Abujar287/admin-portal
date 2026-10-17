@@ -2756,12 +2756,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 <h2 className="font-extrabold text-sm tracking-tight text-white truncate max-w-[130px]" title={currentManager.name || currentManager.user}>
                   {currentManager.name || currentManager.user}
                 </h2>
-                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
-                    ID: {currentManager.user}
-                  </span>
-                  <span className="text-[10px] text-slate-300 font-semibold truncate" title={`Username: @${currentManager.user}`}>
-                    @{currentManager.user}
+                <div className="mt-0.5">
+                  <span className="text-[11px] font-bold text-indigo-200 font-mono">
+                    user_id: {currentManager.user}
                   </span>
                 </div>
               </div>
