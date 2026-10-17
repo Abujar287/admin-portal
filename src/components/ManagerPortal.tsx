@@ -1356,7 +1356,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
     // Case 1: Agent Performance item
     if ('agentId' in first || ('user' in first && 'role' in first && 'servedOrders' in first) || ('createOrders' in first && 'team' in first)) {
-      return data.map(item => ({
+      const mapped = data.map(item => ({
         agent_id: item.agentId || item.user || '',
         agent_name: item.name || '',
         team: item.team || '',
@@ -1375,11 +1375,44 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         nr_ratio: `${item.nrRatio ?? 0}%`,
         followup_count: item.followupCount ?? 0
       }));
+      const gtCreate = data.reduce((acc, cur) => acc + (cur.createOrders ?? 0), 0);
+      const gtServed = data.reduce((acc, cur) => acc + (cur.servedOrders ?? 0), 0);
+      const gtCancel = data.reduce((acc, cur) => acc + (cur.cancelledOrders ?? 0), 0);
+      const gtPend = data.reduce((acc, cur) => acc + (cur.pendingOrders ?? 0), 0);
+      const gtVal = data.reduce((acc, cur) => acc + (cur.orderValue ?? 0), 0);
+      const gtDelVal = data.reduce((acc, cur) => acc + (cur.deliveredOrderValue ?? 0), 0);
+      const gtProfit = data.reduce((acc, cur) => acc + (cur.profit ?? 0), 0);
+      const gtBucket = data.reduce((acc, cur) => acc + (cur.bucketSize ?? 0), 0);
+      const gtFollowup = data.reduce((acc, cur) => acc + (cur.followupCount ?? 0), 0);
+      const gtDelRatio = gtCreate > 0 ? ((gtServed / gtCreate) * 100).toFixed(1) : '0';
+      const gtCancRatio = gtCreate > 0 ? ((gtCancel / gtCreate) * 100).toFixed(1) : '0';
+      const gtNrRatio = gtCreate > 0 ? (((gtCreate - gtServed - gtCancel) / gtCreate) * 100).toFixed(1) : '0';
+
+      mapped.push({
+        agent_id: 'GRAND TOTAL',
+        agent_name: '',
+        team: '',
+        role: '',
+        status: '',
+        create_orders: gtCreate,
+        served_orders: gtServed,
+        cancelled_orders: gtCancel,
+        pending_orders: gtPend,
+        order_value: gtVal,
+        delivered_order_value: gtDelVal,
+        profit: gtProfit,
+        bucket_size: gtBucket,
+        delivered_ratio: `${gtDelRatio}%`,
+        cancelled_ratio: `${gtCancRatio}%`,
+        nr_ratio: `${gtNrRatio}%`,
+        followup_count: gtFollowup
+      });
+      return mapped;
     }
 
     // Case 2: Date Wise Summary item
     if ('date' in first || ('name' in first && /^\d{4}-\d{2}-\d{2}/.test(String(first.name)))) {
-      return data.map(item => ({
+      const mapped = data.map(item => ({
         date: item.date || item.name,
         create_orders: item.createOrders ?? 0,
         served_orders: item.servedOrders ?? 0,
@@ -1393,11 +1426,38 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         cancelled_ratio: `${item.cancelledRatio ?? 0}%`,
         nr_ratio: `${item.nrRatio ?? 0}%`
       }));
+      const gtCreate = data.reduce((acc, cur) => acc + (cur.createOrders ?? 0), 0);
+      const gtServed = data.reduce((acc, cur) => acc + (cur.servedOrders ?? 0), 0);
+      const gtCancel = data.reduce((acc, cur) => acc + (cur.cancelledOrders ?? 0), 0);
+      const gtPend = data.reduce((acc, cur) => acc + (cur.pendingOrders ?? 0), 0);
+      const gtVal = data.reduce((acc, cur) => acc + (cur.orderValue ?? 0), 0);
+      const gtDelVal = data.reduce((acc, cur) => acc + (cur.deliveredOrderValue ?? 0), 0);
+      const gtProfit = data.reduce((acc, cur) => acc + (cur.profit ?? 0), 0);
+      const gtBucket = data.reduce((acc, cur) => acc + (cur.bucketSize ?? 0), 0);
+      const gtDelRatio = gtCreate > 0 ? ((gtServed / gtCreate) * 100).toFixed(1) : '0';
+      const gtCancRatio = gtCreate > 0 ? ((gtCancel / gtCreate) * 100).toFixed(1) : '0';
+      const gtNrRatio = gtCreate > 0 ? (((gtCreate - gtServed - gtCancel) / gtCreate) * 100).toFixed(1) : '0';
+
+      mapped.push({
+        date: 'GRAND TOTAL',
+        create_orders: gtCreate,
+        served_orders: gtServed,
+        cancelled_orders: gtCancel,
+        pending_orders: gtPend,
+        order_value: gtVal,
+        delivered_order_value: gtDelVal,
+        profit: gtProfit,
+        bucket_size: gtBucket,
+        delivered_ratio: `${gtDelRatio}%`,
+        cancelled_ratio: `${gtCancRatio}%`,
+        nr_ratio: `${gtNrRatio}%`
+      });
+      return mapped;
     }
 
     // Case 3: Channel / Category / City Summary item
     if ('createOrders' in first && 'servedOrders' in first && 'name' in first) {
-      return data.map(item => ({
+      const mapped = data.map(item => ({
         name: item.name,
         create_orders: item.createOrders ?? 0,
         served_orders: item.servedOrders ?? 0,
@@ -1410,6 +1470,31 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         cancelled_ratio: `${item.cancelledRatio ?? 0}%`,
         nr_ratio: `${item.nrRatio ?? 0}%`
       }));
+      const gtCreate = data.reduce((acc, cur) => acc + (cur.createOrders ?? 0), 0);
+      const gtServed = data.reduce((acc, cur) => acc + (cur.servedOrders ?? 0), 0);
+      const gtCancel = data.reduce((acc, cur) => acc + (cur.cancelledOrders ?? 0), 0);
+      const gtVal = data.reduce((acc, cur) => acc + (cur.orderValue ?? 0), 0);
+      const gtDelVal = data.reduce((acc, cur) => acc + (cur.deliveredOrderValue ?? 0), 0);
+      const gtProfit = data.reduce((acc, cur) => acc + (cur.profit ?? 0), 0);
+      const gtBucket = data.reduce((acc, cur) => acc + (cur.bucketSize ?? 0), 0);
+      const gtDelRatio = gtCreate > 0 ? ((gtServed / gtCreate) * 100).toFixed(1) : '0';
+      const gtCancRatio = gtCreate > 0 ? ((gtCancel / gtCreate) * 100).toFixed(1) : '0';
+      const gtNrRatio = gtCreate > 0 ? (((gtCreate - gtServed - gtCancel) / gtCreate) * 100).toFixed(1) : '0';
+
+      mapped.push({
+        name: 'GRAND TOTAL',
+        create_orders: gtCreate,
+        served_orders: gtServed,
+        cancelled_orders: gtCancel,
+        order_value: gtVal,
+        delivered_order_value: gtDelVal,
+        profit: gtProfit,
+        bucket_size: gtBucket,
+        delivered_ratio: `${gtDelRatio}%`,
+        cancelled_ratio: `${gtCancRatio}%`,
+        nr_ratio: `${gtNrRatio}%`
+      });
+      return mapped;
     }
 
     // Case 4: Followup History item
@@ -2668,10 +2753,17 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             </div>
             {isSidebarOpen && (
               <div className="min-w-0">
-                <h2 className="font-extrabold text-sm tracking-tight text-white truncate max-w-[130px]">{currentManager.name || currentManager.user}</h2>
-                <span className="inline-block px-2 py-0.5 mt-0.5 rounded-full text-[10px] font-bold bg-indigo-500/25 text-indigo-200 border border-indigo-400/30">
-                  ID: @{currentManager.user}
-                </span>
+                <h2 className="font-extrabold text-sm tracking-tight text-white truncate max-w-[130px]" title={currentManager.name || currentManager.user}>
+                  {currentManager.name || currentManager.user}
+                </h2>
+                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+                    ID: {currentManager.user}
+                  </span>
+                  <span className="text-[10px] text-slate-300 font-semibold truncate" title={`Username: @${currentManager.user}`}>
+                    @{currentManager.user}
+                  </span>
+                </div>
               </div>
             )}
           </div>
