@@ -16,6 +16,7 @@ export default function App() {
 
   useEffect(() => {
     OrderService.getLocalOrders().then(setOrders);
+    OrderService.fetchAgentsFromSheet().catch(() => {});
   }, []);
 
   // Check saved session on mount

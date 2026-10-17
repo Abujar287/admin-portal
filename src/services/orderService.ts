@@ -518,25 +518,39 @@ export class OrderService {
   }
 
   static getAgents(): AgentUser[] {
+    let storedAgents: AgentUser[] = [];
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.AGENTS);
       if (stored !== null) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+        if (Array.isArray(parsed)) {
+          storedAgents = parsed;
         }
       }
-    } catch {
-      // fallback
-    }
-    const defaultAgents: AgentUser[] = [
-      { user: '1', pass: '1', name: 'Manager', role: 'Manager', team: 'Acquisition', status: 'active', email: 'manager@portal.com' },
-      { user: 'Rahim Ahmed', pass: '123456', name: 'Rahim Ahmed', role: 'Agent', team: 'Acquisition', status: 'active', email: 'rahim@portal.com' }
-    ];
-    try {
-      localStorage.setItem(STORAGE_KEYS.AGENTS, JSON.stringify(defaultAgents));
     } catch {}
-    return defaultAgents;
+
+    const map = new Map<string, AgentUser>();
+    // Pre-populate with INITIAL_AGENTS
+    if (Array.isArray(INITIAL_AGENTS)) {
+      INITIAL_AGENTS.forEach(a => {
+        const k = String(a.user || '').trim().toLowerCase();
+        if (k) map.set(k, a);
+      });
+    }
+
+    // Merge stored agents (stored agents take precedence)
+    storedAgents.forEach(a => {
+      const k = String(a.user || '').trim().toLowerCase();
+      if (k) {
+        map.set(k, { ...(map.get(k) || {}), ...a });
+      }
+    });
+
+    const merged = Array.from(map.values());
+    try {
+      localStorage.setItem(STORAGE_KEYS.AGENTS, JSON.stringify(merged));
+    } catch {}
+    return merged;
   }
 
   static saveAgents(agents: AgentUser[]): void {
