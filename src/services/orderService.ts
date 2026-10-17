@@ -1509,52 +1509,47 @@ export class OrderService {
     const orders = (await this.getLocalOrders()) || [];
     const existingOrder = orders.find((ord) => String(ord.order_id || ord.id) === String(orderId));
 
-    // Resolve manager / agent user ID and name cleanly
+    // If order is already Delivered or Cancelled, it CANNOT be edited from ANY access!
+    const currentOrderFollowup = (existingOrder?.followup_status || existingOrder?.followupStatus || '').toLowerCase();
+    const isCurrentlyLocked = currentOrderFollowup === 'delivered' || currentOrderFollowup === 'cancelled';
+    if (isCurrentlyLocked) {
+      console.warn(`Order #${orderId} is ${currentOrderFollowup} and locked from all access editing.`);
+      return { updatedOrders: orders, historyItem: undefined, remoteSynced: false };
+    }
+
+    // Resolve manager / agent user ID and name cleanly (strip '@')
     let uById = '1';
     let uByName = 'Manager';
 
     if (updatedBy) {
       const trimmed = String(updatedBy).trim();
-      if (trimmed.includes('(@')) {
-        const m = trimmed.match(/^(.*?)\s*\(@(.*)\)$/);
+      if (trimmed.includes('(')) {
+        const m = trimmed.match(/^(.*?)\s*\((?:@)?(.*)\)$/);
         if (m && m[1] && m[2]) {
           uByName = m[1].trim();
-          uById = m[2].trim();
+          uById = m[2].trim().replace(/^@/, '');
         } else {
-          uById = trimmed;
-          uByName = trimmed;
+          uById = trimmed.replace(/^@/, '');
+          uByName = trimmed.replace(/^@/, '');
         }
       } else if (trimmed.startsWith('@')) {
         uById = trimmed.substring(1);
         uByName = trimmed.substring(1);
       } else {
-        const lower = trimmed.toLowerCase();
-        if ((lower.includes('manager') || lower === 'admin' || lower.includes('superadmin')) && !lower.includes('@')) {
-          uById = '1';
-          uByName = trimmed;
-        } else {
-          uById = trimmed;
-          uByName = trimmed;
-        }
+        uById = trimmed;
+        uByName = trimmed;
       }
     }
 
-    // Manager access: if updated by manager or contains manager/email or session is manager, uById must strictly be '1', NOT email
-    const sessionRole = typeof window !== 'undefined' ? sessionStorage.getItem('portal_session_role') : null;
     const lowerId = uById.toLowerCase();
     const lowerName = uByName.toLowerCase();
     if (
-      sessionRole === 'manager' ||
       lowerId === 'manager' ||
       lowerId === 'admin' ||
       lowerId === 'superadmin' ||
       lowerId === '1' ||
-      lowerId.includes('abujar') ||
-      lowerId.includes('@') ||
       lowerName === 'manager' ||
-      lowerName === 'manager (admin)' ||
-      lowerName.includes('manager') ||
-      lowerName.includes('admin')
+      lowerName === 'manager (admin)'
     ) {
       uById = '1';
       uByName = 'Manager';

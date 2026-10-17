@@ -13,6 +13,10 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+  // Health check endpoints for instant pre-warming response
+  app.get('/health', (req, res) => res.status(200).send('OK'));
+  app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+
   // API Proxy for fetching Google Sheet orders & tabs (avoids browser CORS)
   app.get('/api/fetch-orders', async (req, res) => {
     try {
@@ -177,23 +181,27 @@ async function startServer() {
     }
   });
 
+  const PORT = 3000;
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  });
+
   if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.join(__dirname, 'dist')));
     app.get('*', (req, res) => {
       res.sendFile(path.join(__dirname, 'dist', 'index.html'));
     });
   } else {
-    const vite = await createViteServer({
+    createViteServer({
       server: { middlewareMode: true, hmr: { port: 0 } },
       appType: 'spa'
+    }).then(vite => {
+      app.use(vite.middlewares);
+      console.log('Vite middleware attached successfully');
+    }).catch(err => {
+      console.error('Failed to create Vite server:', err);
     });
-    app.use(vite.middlewares);
   }
-
-  const PORT = 3000;
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
-  });
 }
 
 startServer();

@@ -466,7 +466,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   // Google Sheet Connection & Dynamic Tabs State
   const [sheetUrlInput, setSheetUrlInput] = useState<string>(() => OrderService.getScriptUrl());
   const [isConnectingSheet, setIsConnectingSheet] = useState<boolean>(false);
-  const [connectedSheetTabs, setConnectedSheetTabs] = useState<string[]>(['Orders', 'Followup', 'Summary', 'Agent Performance', 'Profiles', 'History']);
+  const [connectedSheetTabs, setConnectedSheetTabs] = useState<string[]>(['Orders', 'Delivered', 'Followup', 'Summary', 'Agent Performance', 'Profiles', 'History']);
   const [connectedSheetStatus, setConnectedSheetStatus] = useState<'idle' | 'connected' | 'error'>('connected');
   const [connectedSheetError, setConnectedSheetError] = useState<string | null>(null);
 
@@ -708,13 +708,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     if (targetAg) {
       OrderService.saveAgentToSheet(targetAg).then((res) => {
         if (res.success) {
-          showToast(`✓ Permissions synced to Sheet for @${tableRowAccessAgent.user}!`);
+          showToast(`✓ Permissions synced to Sheet for ${tableRowAccessAgent.user}!`);
         } else {
           showToast(`⚠️ Permissions saved locally, Sheet sync warning: ${res.error}`);
         }
       }).catch(() => {});
     } else {
-      showToast(`✓ Access permissions updated for @${tableRowAccessAgent.user}!`);
+      showToast(`✓ Access permissions updated for ${tableRowAccessAgent.user}!`);
     }
 
     setTableRowAccessAgent(null);
@@ -1127,6 +1127,38 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [newMappingTeamLeader, setNewMappingTeamLeader] = useState('MD Abujar');
   const [newMappingTimeSlot, setNewMappingTimeSlot] = useState('10AM to 11AM');
 
+  const [editingMasterKey, setEditingMasterKey] = useState<string | null>(null);
+  const [masterEditText, setMasterEditText] = useState('');
+
+  const handleSaveMasterList = (key: string) => {
+    const items = masterEditText
+      .split(',')
+      .map(s => s.trim().replace(/^["']+|["']+$/g, '').trim())
+      .filter(Boolean);
+    if (key === 'categories') {
+      localStorage.setItem('agent_portal_product_categories', JSON.stringify(items));
+      setCategories(items);
+    } else if (key === 'orderStatuses') {
+      localStorage.setItem('agent_portal_order_statuses', JSON.stringify(items));
+      setOrderStatuses(items);
+    } else if (key === 'teamsList') {
+      localStorage.setItem('agent_portal_teams_list', JSON.stringify(items));
+      setTeamsList(items);
+    } else if (key === 'channelsList') {
+      localStorage.setItem('agent_portal_order_channels', JSON.stringify(items));
+      setChannelsList(items);
+      setAvailableChannels(items);
+    } else if (key === 'teamLeadersList') {
+      localStorage.setItem('agent_portal_team_leaders', JSON.stringify(items));
+      setTeamLeadersList(items);
+    } else if (key === 'timeSlotsList') {
+      localStorage.setItem('agent_portal_time_slots', JSON.stringify(items));
+      setTimeSlotsList(items);
+    }
+    setEditingMasterKey(null);
+    showToast('Master list updated successfully!');
+  };
+
   // 1. Category Handlers
   const handleAddNewCategory = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1356,11 +1388,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     // Case 1: Agent Performance item
     if ('agentId' in first || ('user' in first && 'role' in first && 'servedOrders' in first) || ('createOrders' in first && 'team' in first)) {
       const mapped = data.map(item => ({
-        agent_id: item.agentId || item.user || '',
-        agent_name: item.name || '',
+        agent_id: String(item.agentId || item.id || item.user || '').replace(/^@/, ''),
+        agent_name: item.agentName || item.name || '',
         team: item.team || '',
         role: item.role || '',
-        status: item.status || 'active',
         create_orders: item.createOrders ?? 0,
         served_orders: item.servedOrders ?? 0,
         cancelled_orders: item.cancelledOrders ?? 0,
@@ -1372,7 +1403,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         delivered_ratio: `${item.deliveredRatio ?? 0}%`,
         cancelled_ratio: `${item.cancelledRatio ?? 0}%`,
         nr_ratio: `${item.nrRatio ?? 0}%`,
-        followup_count: item.followupCount ?? 0
+        followup_count: item.followupCount ?? 0,
+        status: item.status || 'active'
       }));
       const gtCreate = data.reduce((acc, cur) => acc + (cur.createOrders ?? 0), 0);
       const gtServed = data.reduce((acc, cur) => acc + (cur.servedOrders ?? 0), 0);
@@ -1392,7 +1424,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         agent_name: '',
         team: '',
         role: '',
-        status: '',
         create_orders: gtCreate,
         served_orders: gtServed,
         cancelled_orders: gtCancel,
@@ -1404,7 +1435,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         delivered_ratio: `${gtDelRatio}%`,
         cancelled_ratio: `${gtCancRatio}%`,
         nr_ratio: `${gtNrRatio}%`,
-        followup_count: gtFollowup
+        followup_count: gtFollowup,
+        status: ''
       });
       return mapped;
     }
@@ -1782,7 +1814,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     if (savedAgent) {
       OrderService.saveAgentToSheet(savedAgent).then((sheetRes) => {
         if (sheetRes.success) {
-          showToast(`✓ Agent @${u} synced to Google Sheet ('users' tab)!`);
+          showToast(`✓ Agent ${u} synced to Google Sheet ('users' tab)!`);
         } else {
           showToast(`⚠️ Saved locally, but Sheet sync failed: ${sheetRes.error}`);
         }
@@ -1884,7 +1916,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     if (updatedAgent) {
       OrderService.saveAgentToSheet(updatedAgent).then((sheetRes) => {
         if (sheetRes.success) {
-          showToast(`✓ Agent @${u} updated in Google Sheet ('users' tab)!`);
+          showToast(`✓ Agent ${u} updated in Google Sheet ('users' tab)!`);
         } else {
           showToast(`⚠️ Updated locally, but Sheet sync failed: ${sheetRes.error}`);
         }
@@ -1900,7 +1932,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     if (agentToDelete) {
       OrderService.deleteAgentFromSheet(agentToDelete.user).then((res) => {
         if (res.success) {
-          showToast(`Agent @${agentToDelete.user} removed from Google Sheet.`);
+          showToast(`Agent ${agentToDelete.user} removed from Google Sheet.`);
         }
       }).catch(() => {});
     }
@@ -2784,22 +2816,17 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {isTabAllowed('summary') && (
             <button
               onClick={() => setActiveTab('summary')}
-              title={`Summary (${scopedOrders.length} records)`}
-              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
+              title="Summary"
+              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
                 activeTab === 'summary'
-                  ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                  : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+                  ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
+                  : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
               }`}
             >
-              <BarChart2 className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'summary' ? 'text-sky-300 scale-110' : 'text-slate-400'}`} />
+              <BarChart2 className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'summary' ? 'text-sky-300 scale-110' : 'text-slate-400'}`} />
               {isSidebarOpen && (
-                <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'summary' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                <span className="truncate text-left font-semibold">
                   Summary
-                </span>
-              )}
-              {isSidebarOpen && (
-                <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'summary' ? 'bg-white text-indigo-900' : 'bg-white/10 text-white'}`}>
-                  {scopedOrders.length}
                 </span>
               )}
             </button>
@@ -2810,20 +2837,20 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             <button
               onClick={() => setActiveTab('orders')}
               title={`Orders (${scopedOrders.length} records)`}
-              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
+              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
                 activeTab === 'orders'
-                  ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                  : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+                  ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
+                  : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
               }`}
             >
-              <FileText className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'orders' ? 'text-amber-300 scale-110' : 'text-slate-400'}`} />
+              <FileText className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'orders' ? 'text-amber-300 scale-110' : 'text-slate-400'}`} />
               {isSidebarOpen && (
-                <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'orders' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                <span className="truncate text-left font-semibold">
                   Orders
                 </span>
               )}
               {isSidebarOpen && (
-                <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'orders' ? 'bg-white text-indigo-900' : 'bg-white/10 text-white'}`}>
+                <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-150 ${activeTab === 'orders' ? 'bg-white text-indigo-900' : 'bg-white/10 text-white'}`}>
                   {scopedOrders.length}
                 </span>
               )}
@@ -2835,20 +2862,20 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             <button
               onClick={() => setActiveTab('followup')}
               title={`Followup History (${scopedFollowupHistory.length} logs)`}
-              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
+              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
                 activeTab === 'followup'
-                  ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                  : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+                  ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
+                  : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
               }`}
             >
-              <History className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'followup' ? 'text-indigo-300 scale-110' : 'text-slate-400'}`} />
+              <History className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'followup' ? 'text-indigo-300 scale-110' : 'text-slate-400'}`} />
               {isSidebarOpen && (
-                <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'followup' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                <span className="truncate text-left font-semibold">
                   Followup History
                 </span>
               )}
               {isSidebarOpen && (
-                <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'followup' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
+                <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-150 ${activeTab === 'followup' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
                   {scopedFollowupHistory.length}
                 </span>
               )}
@@ -2859,22 +2886,17 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {isTabAllowed('agent-performance') && (
             <button
               onClick={() => setActiveTab('agent-performance')}
-              title={`Agent Performance (${summaryStats.agentSummary.length} agents)`}
-              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
+              title="Agent Performance"
+              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
                 activeTab === 'agent-performance'
-                  ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                  : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+                  ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
+                  : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
               }`}
             >
-              <TrendingUp className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'agent-performance' ? 'text-amber-300 scale-110' : 'text-amber-400'}`} />
+              <TrendingUp className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'agent-performance' ? 'text-amber-300 scale-110' : 'text-amber-400'}`} />
               {isSidebarOpen && (
-                <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'agent-performance' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                <span className="truncate text-left font-semibold">
                   Agent Performance
-                </span>
-              )}
-              {isSidebarOpen && (
-                <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'agent-performance' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
-                  {summaryStats.agentSummary.length}
                 </span>
               )}
             </button>
@@ -2894,20 +2916,20 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 <button
                   onClick={() => setActiveTab('users')}
                   title={`User Details (${agents.length} users)`}
-                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
+                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
                     activeTab === 'users'
-                      ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                      : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+                      ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
+                      : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
                   }`}
                 >
-                  <Users className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'users' ? 'text-purple-300 scale-110' : 'text-slate-400'}`} />
+                  <Users className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'users' ? 'text-purple-300 scale-110' : 'text-slate-400'}`} />
                   {isSidebarOpen && (
-                    <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'users' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                    <span className="truncate text-left font-semibold">
                       User Details
                     </span>
                   )}
                   {isSidebarOpen && (
-                    <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'users' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
+                    <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-150 ${activeTab === 'users' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
                       {agents.length}
                     </span>
                   )}
@@ -2918,22 +2940,17 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               {isTabAllowed('category-mapping') && (
                 <button
                   onClick={() => setActiveTab('category-mapping')}
-                  title={`Category Mapping (${categoryMappings.length} mappings)`}
-                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
+                  title="Category Mapping"
+                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
                     activeTab === 'category-mapping'
-                      ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                      : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+                      ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
+                      : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
                   }`}
                 >
-                  <Layers className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'category-mapping' ? 'text-purple-300 scale-110' : 'text-purple-400'}`} />
+                  <Layers className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'category-mapping' ? 'text-purple-300 scale-110' : 'text-purple-400'}`} />
                   {isSidebarOpen && (
-                    <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'category-mapping' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                    <span className="truncate text-left font-semibold">
                       Category Mapping
-                    </span>
-                  )}
-                  {isSidebarOpen && (
-                    <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'category-mapping' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
-                      {categoryMappings.length}
                     </span>
                   )}
                 </button>
@@ -2943,22 +2960,17 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               {isTabAllowed('sheet-connection') && (
                 <button
                   onClick={() => setActiveTab('sheet-connection')}
-                  title={`Google Sheet & Tabs (${connectedSheetTabs.length > 0 ? connectedSheetTabs.length : (orders.length > 0 ? 1 : 0)} tabs)`}
-                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer whitespace-nowrap ${
+                  title="Google Sheet & Tabs"
+                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
                     activeTab === 'sheet-connection'
-                      ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                      : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+                      ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
+                      : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
                   }`}
                 >
-                  <FileSpreadsheet className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'sheet-connection' ? 'text-emerald-300 scale-110' : 'text-emerald-400'}`} />
+                  <FileSpreadsheet className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'sheet-connection' ? 'text-emerald-300 scale-110' : 'text-emerald-400'}`} />
                   {isSidebarOpen && (
-                    <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'sheet-connection' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                    <span className="truncate text-left font-semibold">
                       Google Sheet &amp; Tabs
-                    </span>
-                  )}
-                  {isSidebarOpen && (
-                    <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'sheet-connection' ? 'bg-white text-indigo-900' : 'bg-emerald-500/30 text-emerald-200'}`}>
-                      {connectedSheetTabs.length > 0 ? connectedSheetTabs.length : (orders.length > 0 ? 1 : 0)}
                     </span>
                   )}
                 </button>
@@ -2968,22 +2980,17 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               {isTabAllowed('profiles') && (
                 <button
                   onClick={() => setActiveTab('profiles')}
-                  title="Profile & Account (1)"
-                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-300 ease-in-out transform cursor-pointer ${
+                  title="Profile"
+                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
                     activeTab === 'profiles'
-                      ? 'translate-x-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-xl shadow-indigo-950/60 font-extrabold border-l-4 border-l-indigo-300 justify-center scale-[1.03]'
-                      : 'text-slate-300 hover:text-white hover:bg-white/10 hover:translate-x-1 justify-start font-semibold'
+                      ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
+                      : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
                   }`}
                 >
-                  <User className={`w-4 h-4 shrink-0 transition-transform duration-300 ${activeTab === 'profiles' ? 'text-sky-300 scale-110' : 'text-slate-400'}`} />
+                  <User className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'profiles' ? 'text-sky-300 scale-110' : 'text-slate-400'}`} />
                   {isSidebarOpen && (
-                    <span className={`transition-all duration-300 ease-in-out truncate ${activeTab === 'profiles' ? 'text-center font-extrabold tracking-wide text-white scale-[1.03] flex-none w-full' : 'text-left'}`}>
+                    <span className="truncate text-left font-semibold">
                       Profile
-                    </span>
-                  )}
-                  {isSidebarOpen && (
-                    <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-300 ${activeTab === 'profiles' ? 'bg-white text-indigo-900' : 'bg-white/10 text-white'}`}>
-                      1
                     </span>
                   )}
                 </button>
@@ -3015,7 +3022,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             <span className="text-slate-300 dark:text-slate-700">•</span>
             <h1 className="text-lg font-extrabold text-slate-900 dark:text-white capitalize">
               {activeTab === 'summary' && 'Analytics & Summary'}
-              {activeTab === 'orders' && (userOrderScope === 'my_orders' ? `My Orders Database (@${currentManager.user})` : 'All Orders Database')}
+              {activeTab === 'orders' && (userOrderScope === 'my_orders' ? 'My Orders Database' : 'All Orders Database')}
               {activeTab === 'followup' && 'All Followup History & Audit Logs'}
               {activeTab === 'agent-performance' && 'Agent Performance Report'}
               {activeTab === 'users' && 'User Details (Agent Directory)'}
@@ -3050,85 +3057,103 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {/* TAB: GOOGLE SHEET & DYNAMIC TABS */}
           {activeTab === 'sheet-connection' && (
             <div className="space-y-6 max-w-5xl mx-auto">
-              <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
+              <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
                 <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-                <div className="relative z-10 space-y-6">
+                <div className="relative z-10 space-y-5">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold border border-emerald-500/30 shadow-inner">
                       <FileSpreadsheet className="w-6 h-6" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-extrabold tracking-tight">Google Sheet Connection &amp; Dynamic Tabs Hub</h2>
+                      <h2 className="text-xl font-extrabold tracking-tight">Google Sheet &amp; Tabs</h2>
                       <p className="text-xs text-indigo-200 mt-0.5">
-                        Connect any Google Sheet or Apps Script link to instantly sync orders and discover all available tabs.
+                        Connect Google Sheet or Apps Script Web App URL and manage sheet tabs.
                       </p>
                     </div>
                   </div>
 
-                  <form onSubmit={handleConnectSheet} className="space-y-4 pt-2">
-                    <div>
-                      <label className="block text-xs font-bold text-indigo-200 uppercase tracking-wider mb-2">
-                        Google Sheet Link / Apps Script Web App URL
-                      </label>
-                      <div className="flex gap-3">
-                        <input
-                          type="url"
-                          required
-                          placeholder="https://script.google.com/macros/s/.../exec or Google Sheet URL"
-                          value={sheetUrlInput}
-                          onChange={(e) => setSheetUrlInput(e.target.value)}
-                          className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-xs font-mono text-white placeholder-indigo-300/50 focus:outline-hidden focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all"
-                        />
-                        <button
-                          type="submit"
-                          disabled={isConnectingSheet}
-                          className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer shrink-0 disabled:opacity-50"
-                        >
-                          <RotateCw className={`w-4 h-4 ${isConnectingSheet ? 'animate-spin' : ''}`} />
-                          <span>{isConnectingSheet ? 'Connecting...' : 'Connect Sheet'}</span>
-                        </button>
-                      </div>
+                  <form onSubmit={handleConnectSheet} className="pt-2">
+                    <label className="block text-xs font-bold text-indigo-200 uppercase tracking-wider mb-2">
+                      Google Sheet Link / Apps Script Web App URL
+                    </label>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                      <input
+                        type="url"
+                        required
+                        placeholder="https://script.google.com/macros/s/.../exec or Google Sheet URL"
+                        value={sheetUrlInput}
+                        onChange={(e) => setSheetUrlInput(e.target.value)}
+                        className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-xs font-mono text-white placeholder-indigo-300/50 focus:outline-hidden focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all"
+                      />
+
+                      {/* 1. Connected / Connect Sheet Button */}
+                      <button
+                        type="submit"
+                        disabled={isConnectingSheet}
+                        className={`px-5 py-3 ${
+                          connectedSheetStatus === 'connected'
+                            ? 'bg-emerald-600 hover:bg-emerald-500'
+                            : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500'
+                        } text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 disabled:opacity-50`}
+                      >
+                        <RotateCw className={`w-4 h-4 ${isConnectingSheet ? 'animate-spin' : ''}`} />
+                        <span>
+                          {isConnectingSheet
+                            ? 'Connecting...'
+                            : connectedSheetStatus === 'connected'
+                            ? 'Connected Sheet'
+                            : 'Connect Sheet'}
+                        </span>
+                      </button>
+
+                      {/* 2. Copy Complete Apps Script Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const code = OrderService.getUpdatedAppsScriptCode();
+                          navigator.clipboard.writeText(code);
+                          showToast('Complete Apps Script copied to clipboard!');
+                        }}
+                        className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
+                        title="Copy complete Google Apps Script code to clipboard"
+                      >
+                        <Copy className="w-4 h-4" />
+                        <span>Copy Complete Apps Script</span>
+                      </button>
                     </div>
                   </form>
 
                   {connectedSheetStatus === 'connected' && (
-                    <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-white/10">
-                      <div className="flex items-center gap-2.5">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Connected &amp; Live</span>
-                        </span>
-                        <span className="text-xs text-slate-300">
-                          Total Orders Synced: <strong className="text-white font-extrabold">{orders.length}</strong>
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => onRefreshOrders()}
-                        className="text-xs font-semibold text-indigo-300 hover:text-white underline cursor-pointer"
-                      >
-                        Force Resync Data
-                      </button>
+                    <div className="flex items-center gap-2 pt-2 text-xs text-emerald-300 font-medium">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <span>Connected &amp; Live • Total Orders Synced: <strong className="text-white font-extrabold">{orders.length}</strong></span>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* DISCOVERED TABS GRID */}
+              {/* SHEET TABS (JUST LIST FORMAT) */}
               <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <div>
-                    <h3 className="font-extrabold text-slate-900 text-base">Discovered Sheet Tabs ({connectedSheetTabs.length})</h3>
-                    <p className="text-xs text-slate-500">
-                      Click any tab below to instantly switch to that workspace view.
-                    </p>
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">
+                      📋
+                    </span>
+                    <div>
+                      <h3 className="font-extrabold text-slate-900 text-base">
+                        Sheet Tabs ({connectedSheetTabs.length})
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Available tabs synced from your connected Google Sheet.
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-xs font-bold px-3 py-1 bg-indigo-50 text-indigo-700 rounded-lg">
-                    Live Sync Active
+                  <span className="text-xs font-bold px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg">
+                    Live Active
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                <div className="divide-y divide-slate-100 border border-slate-100 rounded-2xl overflow-hidden bg-slate-50/30">
                   {connectedSheetTabs.map((tabName, idx) => {
                     const normalized = tabName.toLowerCase();
                     let targetTabKey: any = 'orders';
@@ -3142,68 +3167,31 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       <div
                         key={idx}
                         onClick={() => setActiveTab(targetTabKey)}
-                        className="p-5 rounded-2xl border border-slate-200 hover:border-indigo-500 bg-slate-50/50 hover:bg-indigo-50/30 transition-all cursor-pointer group shadow-xs hover:shadow-md flex flex-col justify-between"
+                        className="py-3 px-4 flex items-center justify-between hover:bg-white transition-colors cursor-pointer group"
                       >
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-xs">
-                            📋
-                          </div>
-                          <span className="text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 bg-white text-slate-600 rounded-lg border border-slate-200">
-                            Sheet Tab
+                        <div className="flex items-center gap-3">
+                          <span className="w-7 h-7 rounded-lg bg-white group-hover:bg-indigo-50 border border-slate-200 group-hover:border-indigo-200 text-slate-600 group-hover:text-indigo-600 flex items-center justify-center text-xs font-bold font-mono shadow-2xs">
+                            {idx + 1}
                           </span>
+                          <div>
+                            <span className="font-bold text-sm text-slate-800 group-hover:text-indigo-600 transition-colors">
+                              {tabName}
+                            </span>
+                            {tabName.toLowerCase() === 'delivered' && (
+                              <span className="ml-2 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                Delivered Orders Tab
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-extrabold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
-                            {tabName}
-                          </h4>
-                          <p className="text-xs text-slate-500 mt-1">
-                            Click to open {targetTabKey === 'orders' ? 'Orders Database' : targetTabKey} workspace.
-                          </p>
-                        </div>
-                        <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between text-xs font-bold text-indigo-600">
-                          <span>Open Workspace</span>
-                          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                        <div className="flex items-center gap-2 text-slate-400 group-hover:text-indigo-600 text-xs font-semibold">
+                          <span className="text-xs">Open Workspace</span>
+                          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              </div>
-
-              {/* APPS SCRIPT SETUP GUIDE FOR FULL SYNC */}
-              <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                      ⚡
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-slate-900 text-sm">How to Sync All Data &amp; Multi-Tabs Properly</h3>
-                      <p className="text-xs text-slate-500">
-                        Direct Google Sheet links only export the first tab. To sync all tabs (Orders, Followup, etc.), deploy our Apps Script web app URL.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      const code = OrderService.getUpdatedAppsScriptCode();
-                      navigator.clipboard.writeText(code);
-                      showToast('Complete Apps Script copied to clipboard!');
-                    }}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>Copy Complete Apps Script</span>
-                  </button>
-                </div>
-
-                <ol className="list-decimal list-inside text-xs text-slate-600 space-y-2 pl-1">
-                  <li>Open your Google Sheet, click <strong>Extensions &gt; Apps Script</strong>.</li>
-                  <li>Paste the copied code above into the script editor and save (<code className="bg-slate-100 px-1.5 py-0.5 rounded">Ctrl + S</code>).</li>
-                  <li>Click <strong>Deploy &gt; New deployment</strong>, select type <strong>Web app</strong>.</li>
-                  <li>Set <em>Execute as: Me</em> and <em>Who has access: Anyone</em>, then click Deploy.</li>
-                  <li>Paste the resulting Web App URL (<code className="bg-slate-100 px-1.5 py-0.5 rounded">.../exec</code>) in the input box above and click <strong>Connect Sheet</strong>.</li>
-                </ol>
               </div>
             </div>
           )}
@@ -3220,7 +3208,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     </div>
                     <div>
                       <h3 className="font-extrabold text-slate-900 text-sm">
-                        {editingIndex !== null ? `Edit Agent (@${newSystemUser})` : 'Add New Agent'}
+                        {editingIndex !== null ? `Edit Agent (${newSystemUser})` : 'Add New Agent'}
                       </h3>
                       <p className="text-[11px] text-slate-500">
                         All in 1 Row — Click Team, Team Leader, and Access Control to open configuration popups.
@@ -3228,18 +3216,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onUpdateAgents([], true);
-                        OrderService.saveAgents([]);
-                        showToast('Local agent cache cleared.');
-                      }}
-                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                      title="Clear local cached users"
-                    >
-                      Clear Local Users
-                    </button>
                     <button
                       type="button"
                       disabled={isSyncingAgents}
@@ -4223,7 +4199,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           >
                             {/* user_id */}
                             <td className="py-3 px-3.5 font-mono font-bold text-indigo-700 whitespace-nowrap">
-                              @{agent.user}
+                              {agent.user}
                             </td>
 
                             {/* email */}
@@ -4428,7 +4404,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       <ShieldCheck className="w-4 h-4 text-indigo-600" />
                       <div>
                         <h4 className="font-extrabold text-sm text-slate-900">
-                          Access Control: <span className="text-indigo-600">@{tableRowAccessAgent.user}</span>
+                          Access Control: <span className="text-indigo-600">{tableRowAccessAgent.user}</span>
                         </h4>
                         <p className="text-[11px] text-slate-500">
                           {tableRowAccessAgent.name || `User ${tableRowAccessAgent.user}`} ({tableRowAccessAgent.role || 'Agent'})
@@ -4881,7 +4857,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <span className="text-slate-300">•</span>
                     <span className="text-slate-500 font-mono text-[11px] bg-indigo-50 text-indigo-700 font-bold px-2.5 py-0.5 rounded-full border border-indigo-200">
                       {userOrderScope === 'my_orders'
-                        ? `My Orders (@${currentManager.user}): ${scopedOrders.length}`
+                        ? `My Orders (${currentManager.user}): ${scopedOrders.length}`
                         : `Sheet Total: ${orders.length}`}
                     </span>
                   </div>
@@ -5224,7 +5200,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           scheduledTime: quickUpdateScheduledTime,
                           schedule_time: quickUpdateScheduledTime
                         },
-                        'Manager (@1)',
+                        'Manager (1)',
                         quickUpdateNotes
                       );
                       const updatedOId = quickUpdateOrderId;
@@ -5582,7 +5558,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10">
-                        <th className="py-3 px-3.5 whitespace-nowrap text-indigo-700">Followup ID</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Order ID</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Date</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Customer Name</th>
@@ -5602,44 +5577,31 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <tbody className="divide-y divide-slate-100 text-slate-800">
                       {filteredFollowupHistory.length === 0 ? (
                         <tr>
-                          <td colSpan={15} className="text-center py-10 text-slate-400 font-semibold">
+                          <td colSpan={14} className="text-center py-10 text-slate-400 font-semibold">
                             No followup history records matching filters.
                           </td>
                         </tr>
                       ) : (
                         filteredFollowupHistory
                           .map((hist, histIdx) => {
-                            const isUndoRecord = !!hist.isUndo;
-                            const isRevertedRecord = !!hist.isUndone;
-
                             return (
                               <tr 
                                 key={`followup-hist-${hist.id || hist.followupId || histIdx}-${histIdx}`} 
-                                className={`transition-colors ${isUndoRecord ? 'bg-amber-50/50 hover:bg-amber-100/50 border-l-4 border-l-amber-500' : (isRevertedRecord ? 'opacity-80 bg-slate-50/40 hover:bg-slate-100/50' : 'hover:bg-slate-50')}`}
+                                className="transition-colors hover:bg-slate-50"
                               >
-                                <td className="py-3 px-3.5 font-mono font-bold text-indigo-800 whitespace-nowrap">
-                                  #{hist.followupId || hist.id}
-                                </td>
                                 <td className="py-3 px-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">
-                                  <div className="flex items-center gap-1.5">
-                                    {isUndoRecord && (
-                                      <span title="Undo Audit Event">
-                                        <RotateCcw className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                                      </span>
-                                    )}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const ord = orders.find((o) => String(o.order_id || o.id) === String(hist.orderId));
-                                        if (ord) setViewJourneyOrder(ord);
-                                      }}
-                                      className="font-mono font-bold text-indigo-700 hover:text-indigo-900 hover:underline flex items-center gap-1 cursor-pointer"
-                                      title="Click to view full order details & complete journey"
-                                    >
-                                      <span>#{hist.orderId}</span>
-                                      <ExternalLink className="w-3 h-3 text-indigo-400" />
-                                    </button>
-                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const ord = orders.find((o) => String(o.order_id || o.id) === String(hist.orderId));
+                                      if (ord) setViewJourneyOrder(ord);
+                                    }}
+                                    className="font-mono font-bold text-indigo-700 hover:text-indigo-900 hover:underline flex items-center gap-1 cursor-pointer"
+                                    title="Click to view full order details & complete journey"
+                                  >
+                                    <span>#{hist.orderId}</span>
+                                    <ExternalLink className="w-3 h-3 text-indigo-400" />
+                                  </button>
                                 </td>
                                 <td className="py-3 px-3.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">
                                   {hist.timestamp}
@@ -5651,29 +5613,17 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                   {hist.customerContact || '-'}
                                 </td>
                                 <td className="py-3 px-3.5 whitespace-nowrap">
-                                  {isUndoRecord ? (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-200">
-                                      from {hist.previousStatus}
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-600 font-medium">
-                                      {hist.previousStatus}
-                                    </span>
-                                  )}
+                                  <span className="text-slate-600 font-medium">
+                                    {hist.previousStatus || '-'}
+                                  </span>
                                 </td>
                                 <td className="py-3 px-3.5 whitespace-nowrap">
-                                  {isUndoRecord ? (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                      ➔ to {hist.newStatus}
-                                    </span>
-                                  ) : (
-                                    <span className="font-bold text-indigo-700">
-                                      {hist.newStatus}
-                                    </span>
-                                  )}
+                                  <span className="font-bold text-indigo-700">
+                                    {hist.newStatus || '-'}
+                                  </span>
                                 </td>
                                 <td className="py-3 px-3.5 text-slate-600 whitespace-nowrap">
-                                  {hist.orderStatus}
+                                  {hist.orderStatus || '-'}
                                 </td>
                                 <td className="py-3 px-3.5 text-slate-700 font-medium whitespace-nowrap">
                                   ৳ {hist.orderValue != null ? Number(hist.orderValue).toLocaleString() : '-'}
@@ -5682,26 +5632,19 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                   {hist.scheduleDate}<br/>{hist.scheduledTime}
                                 </td>
                                 <td className="py-3 px-3.5 font-bold text-slate-700 whitespace-nowrap">
-                                  {hist.updatedBy === '1' || hist.updatedBy?.toLowerCase() === 'manager' || (hist.updatedBy?.includes('@') && (hist.updatedByName?.toLowerCase().includes('manager') || hist.updatedBy?.includes('abujar')))
+                                  {hist.updatedBy === '1' || hist.updatedBy?.toLowerCase() === 'manager'
                                     ? '1'
-                                    : (hist.updatedBy?.replace(/\s*\(@.*\)/, '').replace('@', '_') || '1')}
+                                    : (hist.updatedBy?.replace(/\s*\(@.*\)/, '').replace(/^@/, '') || '1')}
                                 </td>
                                 <td className="py-3 px-3.5 text-slate-600 whitespace-nowrap">
-                                  {hist.updatedBy === '1' || hist.updatedByName?.toLowerCase() === 'manager' || hist.updatedBy?.toLowerCase() === 'manager' || hist.updatedBy?.includes('abujar')
+                                  {hist.updatedBy === '1' || hist.updatedByName?.toLowerCase() === 'manager' || hist.updatedBy?.toLowerCase() === 'manager'
                                     ? 'Manager'
                                     : (hist.updatedByName || '-')}
                                 </td>
                                 <td className="py-3 px-3.5 whitespace-nowrap">
-                                  {isUndoRecord ? (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
-                                      <RotateCcw className="w-3 h-3 text-amber-700" />
-                                      {hist.action || 'Undo / Revert'}
-                                    </span>
-                                  ) : (
-                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                                      {hist.action || 'Follow-up Update'}
-                                    </span>
-                                  )}
+                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                    {hist.action || 'Follow-up Update'}
+                                  </span>
                                 </td>
                                 <td className="py-3 px-3.5 text-slate-600 max-w-[200px] truncate" title={hist.notes}>
                                   {hist.notes?.replace(/\(Status: (.*) -> (.*)\).*/, 'Status: $1 -> $2') || '-'}
@@ -5714,34 +5657,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                         const ord = orders.find((o) => String(o.order_id || o.id) === String(hist.orderId));
                                         if (ord) setViewJourneyOrder(ord);
                                       }}
-                                      className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md font-bold text-[10px] cursor-pointer transition-colors"
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md font-bold text-xs cursor-pointer transition-colors"
                                       title="Open Full Order Details & Step-by-Step Activity Journey"
                                     >
-                                      <History className="w-3 h-3 text-indigo-600" />
+                                      <History className="w-3.5 h-3.5 text-indigo-600" />
                                       <span>Journey</span>
                                     </button>
-                                    {isUndoRecord ? (
-                                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-md font-bold text-[10px]">
-                                        <RotateCcw className="w-2.5 h-2.5 text-amber-600" />
-                                        Undo
-                                      </span>
-                                    ) : isRevertedRecord ? (
-                                      <span 
-                                        className="px-2 py-1 bg-slate-100 text-slate-400 border border-slate-200 rounded-md font-bold text-[10px] italic"
-                                        title="This action has already been reverted via Undo"
-                                      >
-                                        Reverted
-                                      </span>
-                                    ) : (
-                                      <button
-                                        onClick={() => handleUndoFollowup(hist.id)}
-                                        title={`Undo this follow-up & revert order back to "${hist.previousStatus}"`}
-                                        className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-md font-bold text-[10px] cursor-pointer transition-colors"
-                                      >
-                                        <RotateCcw className="w-3 h-3 text-red-600" />
-                                        Revert
-                                      </button>
-                                    )}
                                   </div>
                                 </td>
                               </tr>
@@ -5749,7 +5670,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           })
                       )}
                     </tbody>
-                  </table>
+                    </table>
                 </div>
               </div>
             </div>
@@ -7019,7 +6940,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   <table className="w-full text-xs text-left">
                     <thead>
                       <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 whitespace-nowrap select-none">
-                        <th className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'name', setAgentSortKey, setAgentSortDirection)}>Agent Details</th>
+                        <th className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'id', setAgentSortKey, setAgentSortDirection)}>Agent ID</th>
+                        <th className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'name', setAgentSortKey, setAgentSortDirection)}>Agent Name</th>
                         <th className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'team', setAgentSortKey, setAgentSortDirection)}>Team</th>
                         <th className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'role', setAgentSortKey, setAgentSortDirection)}>Role</th>
                         <th className="py-3 px-3.5 text-right text-indigo-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'createOrders', setAgentSortKey, setAgentSortDirection)}>Create Orders</th>
@@ -7040,16 +6962,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <tbody className="divide-y divide-slate-100 text-slate-800">
                       {filteredAgentPerformance.length === 0 ? (
                         <tr>
-                          <td colSpan={16} className="text-center py-6 text-slate-400 font-semibold">
+                          <td colSpan={17} className="text-center py-6 text-slate-400 font-semibold">
                             No agent found matching the filters.
                           </td>
                         </tr>
                       ) : (
                         filteredAgentPerformance.map((row, index) => (
                           <tr key={`${row.id}-${index}`} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
+                            <td className="py-3 px-3.5 font-bold font-mono text-slate-700">
+                              {row.id}
+                            </td>
                             <td className="py-3 px-3.5 font-bold text-slate-900">
-                              <div>{row.name}</div>
-                              <div className="text-[10px] text-slate-500 font-mono">@{row.id}</div>
+                              {row.name}
                             </td>
                             <td className="py-3 px-3.5">
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
@@ -7086,6 +7010,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       <tfoot className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300">
                         <tr className="whitespace-nowrap">
                           <td className="py-3.5 px-3.5 font-black uppercase text-slate-900">Grand Total</td>
+                          <td className="py-3.5 px-3.5 font-bold text-slate-500">-</td>
                           <td className="py-3.5 px-3.5 font-bold text-slate-500">-</td>
                           <td className="py-3.5 px-3.5 font-bold text-slate-500">-</td>
                           <td className="py-3.5 px-3.5 text-right font-black text-indigo-700">{filteredAgentGrandTotal.createOrders}</td>
@@ -7150,50 +7075,38 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {/* TAB: CATEGORY & TEAM MAPPING */}
           {activeTab === 'category-mapping' && (
             <div className="max-w-6xl space-y-6">
-              {/* Header Hero */}
+              {/* Header with ONLY Demo CSV, Update CSV, Export CSV */}
               <div className="bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 shadow-md border border-indigo-800/40">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold text-xl border border-indigo-400/30">
                       🏷️
                     </div>
                     <div>
-                      <h3 className="font-extrabold text-base text-white">Category, Order Status, Team, Channel &amp; Team Leader</h3>
+                      <h3 className="font-extrabold text-base text-white">Master Configuration Lists</h3>
                       <p className="text-xs text-indigo-200 mt-0.5">
-                        Manage master configuration lists for Categories, Order Statuses, Teams, Channels, and Team Leaders. Add or remove items dynamically.
+                        Manage master categories, order statuses, teams, channels, team leaders, and time slots.
                       </p>
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {/* 1. Demo CSV */}
                     <button
                       type="button"
                       onClick={handleDownloadDemoCsv}
-                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
-                      title="Download Demo CSV template for category mappings"
+                      className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                      title="Download Demo CSV template"
                     >
-                      <FileSpreadsheet className="w-3.5 h-3.5" />
+                      <Download className="w-4 h-4" />
                       <span>Demo CSV</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={handlePreviewDemoCsv}
-                      className="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
-                      title="Preview Demo CSV template data format"
+
+                    {/* 2. Update CSV */}
+                    <label
+                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                      title="Import and update mappings via CSV"
                     >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Preview Demo</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleExportCategoryMappingsCsv}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
-                      title="Export Category Mappings to CSV"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Export CSV</span>
-                    </button>
-                    <label className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer">
-                      <FileText className="w-3.5 h-3.5" />
+                      <FileText className="w-4 h-4" />
                       <span>Update CSV</span>
                       <input
                         type="file"
@@ -7202,673 +7115,362 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         className="hidden"
                       />
                     </label>
+
+                    {/* 3. Export CSV */}
                     <button
                       type="button"
-                      onClick={() => setShowDemoGuide(!showDemoGuide)}
-                      className="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 text-indigo-200 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
-                      title="Toggle Demo CSV sample format"
+                      onClick={handleExportCategoryMappingsCsv}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                      title="Export category mappings as CSV"
                     >
-                      <span>{showDemoGuide ? 'Hide Sample' : 'Sample Format'}</span>
+                      <FileSpreadsheet className="w-4 h-4" />
+                      <span>Export CSV</span>
                     </button>
-                    <span className="text-xs bg-white/10 text-indigo-100 font-bold px-3 py-1.5 rounded-xl border border-white/10">
-                      6 Master Columns
-                    </span>
-                  </div>
-                </div>
-
-                {/* Quick Column Metrics */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 pt-4">
-                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
-                    <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider block">Categories</span>
-                    <span className="text-lg font-extrabold text-white mt-0.5 block">{categories.length}</span>
-                  </div>
-                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
-                    <span className="text-[10px] text-emerald-300 font-bold uppercase tracking-wider block">Order Statuses</span>
-                    <span className="text-lg font-extrabold text-white mt-0.5 block">{orderStatuses.length}</span>
-                  </div>
-                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
-                    <span className="text-[10px] text-purple-300 font-bold uppercase tracking-wider block">Teams</span>
-                    <span className="text-lg font-extrabold text-white mt-0.5 block">{teamsList.length}</span>
-                  </div>
-                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
-                    <span className="text-[10px] text-blue-300 font-bold uppercase tracking-wider block">Channels</span>
-                    <span className="text-lg font-extrabold text-white mt-0.5 block">{channelsList.length}</span>
-                  </div>
-                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
-                    <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider block">Team Leaders</span>
-                    <span className="text-lg font-extrabold text-white mt-0.5 block">{teamLeadersList.length}</span>
-                  </div>
-                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
-                    <span className="text-[10px] text-sky-300 font-bold uppercase tracking-wider block">Time Slots</span>
-                    <span className="text-lg font-extrabold text-white mt-0.5 block">{timeSlotsList.length}</span>
                   </div>
                 </div>
               </div>
 
-              {/* DEMO CSV FORMAT & IMPORT GUIDE */}
-              {showDemoGuide && (
-                <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-indigo-500/10 border border-amber-300/40 rounded-2xl p-4 shadow-xs">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-amber-200/40">
-                    <div className="flex items-center gap-2.5">
-                      <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-800 flex items-center justify-center font-bold text-sm">
-                        📄
-                      </span>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-extrabold text-xs text-slate-900 tracking-wide">Demo CSV Template &amp; Import Guide</h4>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
-                            category, team, orderStatus, channel, teamLeader, timeSlot
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-600 mt-0.5">
-                          Use the demo format to bulk upload mappings. Duplicate status for the same category will be automatically avoided.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={handleDownloadDemoCsv}
-                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download Demo CSV</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handlePreviewDemoCsv}
-                        className="px-2.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>View Table</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleLoadDemoCategoryMappings}
-                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
-                        title="Load demo mapping rows into category mapping table"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Load Demo Data</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Sample CSV Data Preview Table */}
-                  <div className="pt-3 overflow-x-auto">
-                    <table className="w-full text-[11px] text-left border border-amber-200/60 rounded-lg overflow-hidden bg-white">
-                      <thead>
-                        <tr className="bg-amber-50 text-slate-700 font-bold border-b border-amber-200/60">
-                          <th className="py-1.5 px-3">category</th>
-                          <th className="py-1.5 px-3">team</th>
-                          <th className="py-1.5 px-3">orderStatus</th>
-                          <th className="py-1.5 px-3">channel</th>
-                          <th className="py-1.5 px-3">teamLeader</th>
-                          <th className="py-1.5 px-3">timeSlot</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
-                        {DEMO_CATEGORY_MAPPINGS_DATA.slice(0, 4).map((row, idx) => (
-                          <tr key={idx} className="hover:bg-amber-50/40">
-                            <td className="py-1 px-3 font-semibold text-slate-900">{row.category}</td>
-                            <td className="py-1 px-3">{row.team}</td>
-                            <td className="py-1 px-3">
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                {row.orderStatus}
-                              </span>
-                            </td>
-                            <td className="py-1 px-3">
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                                {row.channel}
-                              </span>
-                            </td>
-                            <td className="py-1 px-3">{row.teamLeader}</td>
-                            <td className="py-1 px-3">
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200">
-                                {row.timeSlot}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium mt-1.5 px-1">
-                      <span>Showing 4 of {DEMO_CATEGORY_MAPPINGS_DATA.length} sample rows with Channel &amp; Time Slot. Click &quot;Download Demo CSV&quot; for complete file.</span>
-                      <span className="text-amber-700 font-bold">✓ Duplicate Status Filter Active</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 6 MASTER CONFIGURATION COLUMNS SIDE BY SIDE */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-                {/* Column 1: Category */}
-                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">🏷️</span>
-                      <span className="font-extrabold text-xs text-slate-900 uppercase tracking-wider">Category</span>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                      {categories.length}
-                    </span>
-                  </div>
-                  {/* Add form */}
-                  <form onSubmit={handleAddNewCategory} className="flex gap-1.5 mb-3">
-                    <input
-                      type="text"
-                      value={newCategoryInput}
-                      onChange={(e) => setNewCategoryInput(e.target.value)}
-                      placeholder="Add category..."
-                      className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-indigo-600 font-medium"
-                    />
-                    <button
-                      type="submit"
-                      className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer shrink-0"
-                    >
-                      + Add
-                    </button>
-                  </form>
-                  {/* List */}
-                  <div className="flex-1 space-y-1.5 overflow-y-auto max-h-64 pr-1">
-                    {categories.map((cat) => (
-                      <div
-                        key={cat}
-                        className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-200/60 text-xs transition-colors group"
-                      >
-                        <span className="font-semibold text-slate-800 truncate" title={cat}>{cat}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteCategory(cat)}
-                          title={`Remove ${cat}`}
-                          className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors cursor-pointer shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Column 2: Order Status */}
-                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">📊</span>
-                      <span className="font-extrabold text-xs text-slate-900 uppercase tracking-wider">Order Status</span>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      {orderStatuses.length}
-                    </span>
-                  </div>
-                  {/* Add form */}
-                  <form onSubmit={handleAddNewOrderStatus} className="flex gap-1.5 mb-3">
-                    <input
-                      type="text"
-                      value={newOrderStatusInput}
-                      onChange={(e) => setNewOrderStatusInput(e.target.value)}
-                      placeholder="Add status..."
-                      className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-indigo-600 font-medium"
-                    />
-                    <button
-                      type="submit"
-                      className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer shrink-0"
-                    >
-                      + Add
-                    </button>
-                  </form>
-                  {/* List */}
-                  <div className="flex-1 space-y-1.5 overflow-y-auto max-h-64 pr-1">
-                    {orderStatuses.map((st) => (
-                      <div
-                        key={st}
-                        className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-200/60 text-xs transition-colors group"
-                      >
-                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold truncate ${
-                          st === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
-                          st === 'Cancelled' ? 'bg-red-100 text-red-800' :
-                          st === 'Confirmed' ? 'bg-blue-100 text-blue-800' :
-                          st === 'In Progress' ? 'bg-amber-100 text-amber-800' :
-                          'bg-slate-200 text-slate-800'
-                        }`} title={st}>{st}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteOrderStatus(st)}
-                          title={`Remove ${st}`}
-                          className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors cursor-pointer shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Column 3: Team */}
-                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">👥</span>
-                      <span className="font-extrabold text-xs text-slate-900 uppercase tracking-wider">Team</span>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
-                      {teamsList.length}
-                    </span>
-                  </div>
-                  {/* Add form */}
-                  <form onSubmit={handleAddNewTeamItem} className="flex gap-1.5 mb-3">
-                    <input
-                      type="text"
-                      value={newTeamInput}
-                      onChange={(e) => setNewTeamInput(e.target.value)}
-                      placeholder="Add team..."
-                      className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-indigo-600 font-medium"
-                    />
-                    <button
-                      type="submit"
-                      className="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold cursor-pointer shrink-0"
-                    >
-                      + Add
-                    </button>
-                  </form>
-                  {/* List */}
-                  <div className="flex-1 space-y-1.5 overflow-y-auto max-h-64 pr-1">
-                    {teamsList.map((tm) => (
-                      <div
-                        key={tm}
-                        className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-200/60 text-xs transition-colors group"
-                      >
-                        <span className="font-semibold text-slate-800 truncate" title={tm}>{tm}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteTeamItem(tm)}
-                          title={`Remove ${tm}`}
-                          className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors cursor-pointer shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Column 4: Channel */}
-                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">🌐</span>
-                      <span className="font-extrabold text-xs text-slate-900 uppercase tracking-wider">Channel</span>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                      {channelsList.length}
-                    </span>
-                  </div>
-                  {/* Add form */}
-                  <form onSubmit={handleAddNewChannel} className="flex gap-1.5 mb-3">
-                    <input
-                      type="text"
-                      value={newChannelInput}
-                      onChange={(e) => setNewChannelInput(e.target.value)}
-                      placeholder="Add channel..."
-                      className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-indigo-600 font-medium"
-                    />
-                    <button
-                      type="submit"
-                      className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer shrink-0"
-                    >
-                      + Add
-                    </button>
-                  </form>
-                  {/* List */}
-                  <div className="flex-1 space-y-1.5 overflow-y-auto max-h-64 pr-1">
-                    {channelsList.map((ch) => (
-                      <div
-                        key={ch}
-                        className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-200/60 text-xs transition-colors group"
-                      >
-                        <span className="font-semibold text-slate-800 truncate" title={ch}>{ch}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteChannel(ch)}
-                          title={`Remove ${ch}`}
-                          className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors cursor-pointer shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Column 5: Team Leader */}
-                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">👔</span>
-                      <span className="font-extrabold text-xs text-slate-900 uppercase tracking-wider">Team Leader</span>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                      {teamLeadersList.length}
-                    </span>
-                  </div>
-                  {/* Add form */}
-                  <form onSubmit={handleAddNewTeamLeader} className="flex gap-1.5 mb-3">
-                    <input
-                      type="text"
-                      value={newTeamLeaderInput}
-                      onChange={(e) => setNewTeamLeaderInput(e.target.value)}
-                      placeholder="Add leader..."
-                      className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-indigo-600 font-medium"
-                    />
-                    <button
-                      type="submit"
-                      className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold cursor-pointer shrink-0"
-                    >
-                      + Add
-                    </button>
-                  </form>
-                  {/* List */}
-                  <div className="flex-1 space-y-1.5 overflow-y-auto max-h-64 pr-1">
-                    {teamLeadersList.map((tl) => (
-                      <div
-                        key={tl}
-                        className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-200/60 text-xs transition-colors group"
-                      >
-                        <span className="font-semibold text-slate-800 truncate" title={tl}>{tl}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteTeamLeader(tl)}
-                          title={`Remove ${tl}`}
-                          className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors cursor-pointer shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Column 6: Time Slot */}
-                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">⏰</span>
-                      <span className="font-extrabold text-xs text-slate-900 uppercase tracking-wider">Time Slot</span>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
-                      {timeSlotsList.length}
-                    </span>
-                  </div>
-                  {/* Add form */}
-                  <form onSubmit={handleAddNewTimeSlot} className="flex gap-1.5 mb-3">
-                    <input
-                      type="text"
-                      value={newTimeSlotInput}
-                      onChange={(e) => setNewTimeSlotInput(e.target.value)}
-                      placeholder="Add slot..."
-                      className="flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-indigo-600 font-medium"
-                    />
-                    <button
-                      type="submit"
-                      className="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold cursor-pointer shrink-0"
-                    >
-                      + Add
-                    </button>
-                  </form>
-                  {/* List */}
-                  <div className="flex-1 space-y-1.5 overflow-y-auto max-h-64 pr-1">
-                    {timeSlotsList.map((slot) => (
-                      <div
-                        key={slot}
-                        className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100/80 border border-slate-200/60 text-xs transition-colors group"
-                      >
-                        <span className="font-semibold text-slate-800 truncate" title={slot}>{slot}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteTimeSlot(slot)}
-                          title={`Remove ${slot}`}
-                          className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors cursor-pointer shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* CATEGORY MAPPINGS MATRIX (LIVE ACTIVE RULES) */}
+              {/* MASTER CONFIGURATION LISTS (QUOTED & COMMA SEPARATED WITH EDIT BUTTON) */}
               <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-lg">🗂️</span>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-extrabold text-sm text-slate-900">Active Category Mappings Matrix</h4>
-                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                          {filteredCategoryMappings.length} Rules Active
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Rules mapping category to team, order status, and team leader. Update via CSV, download Demo CSV, or add rules manually.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {categoryMappings.length > new Set(categoryMappings.map(m => (m.category || '').toLowerCase().trim())).size && (
-                      <button
-                        type="button"
-                        onClick={handleCleanDuplicateMappings}
-                        className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
-                        title="Remove duplicate category mappings"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Clean Duplicates</span>
-                      </button>
-                    )}
-                    <div className="relative">
-                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        value={mappingSearchQuery}
-                        onChange={(e) => setMappingSearchQuery(e.target.value)}
-                        placeholder="Search mappings..."
-                        className="pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:border-indigo-600 w-44 sm:w-56"
-                      />
-                    </div>
-                  </div>
+                <div className="border-b border-slate-100 pb-3">
+                  <h4 className="font-extrabold text-sm text-slate-900">
+                    Master Configuration Lists
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Items formatted as comma-separated quoted values. Click Edit to add or modify items.
+                  </p>
                 </div>
 
-                {/* Add New Rule Form */}
-                <form onSubmit={handleAddNewMapping} className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
-                  <div className="text-[11px] font-bold text-slate-700 mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                    <Plus className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Add New Mapping Rule</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2">
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Category</label>
-                      <input
-                        type="text"
-                        list="category-suggestions"
-                        value={newMappingCategory}
-                        onChange={(e) => setNewMappingCategory(e.target.value)}
-                        placeholder="e.g. Electronics"
-                        className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:border-indigo-600 font-medium"
-                      />
-                      <datalist id="category-suggestions">
-                        {categories.map(c => <option key={c} value={c} />)}
-                      </datalist>
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Assigned Team</label>
-                      <select
-                        value={newMappingTeam}
-                        onChange={(e) => setNewMappingTeam(e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:border-indigo-600 font-medium"
-                      >
-                        {teamsList.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Order Status</label>
-                      <select
-                        value={newMappingStatus}
-                        onChange={(e) => setNewMappingStatus(e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:border-indigo-600 font-medium"
-                      >
-                        {orderStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Channel</label>
-                      <select
-                        value={newMappingChannel}
-                        onChange={(e) => setNewMappingChannel(e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:border-indigo-600 font-medium"
-                      >
-                        {channelsList.map(ch => <option key={ch} value={ch}>{ch}</option>)}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Team Leader</label>
-                      <select
-                        value={newMappingTeamLeader}
-                        onChange={(e) => setNewMappingTeamLeader(e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:border-indigo-600 font-medium"
-                      >
-                        {availableTeamLeaders.map(tl => <option key={tl} value={tl}>{tl}</option>)}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Time Slot</label>
-                      <select
-                        value={newMappingTimeSlot}
-                        onChange={(e) => setNewMappingTimeSlot(e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:border-indigo-600 font-medium"
-                      >
-                        {timeSlotsList.map(slot => <option key={slot} value={slot}>{slot}</option>)}
-                      </select>
-                    </div>
-
-                    <div className="flex items-end">
-                      <button
-                        type="submit"
-                        className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors shadow-xs flex items-center justify-center gap-1"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Save Rule</span>
-                      </button>
-                    </div>
-                  </div>
-                </form>
-
-                {/* Mappings Table */}
-                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left">
-                      <thead>
-                        <tr className="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-200">
-                          <th className="py-2.5 px-3 w-12 text-center text-[11px] text-slate-500">#</th>
-                          <th className="py-2.5 px-4 font-bold">Category</th>
-                          <th className="py-2.5 px-4 font-bold">Assigned Team</th>
-                          <th className="py-2.5 px-4 font-bold">Order Status</th>
-                          <th className="py-2.5 px-4 font-bold">Channel</th>
-                          <th className="py-2.5 px-4 font-bold">Team Leader</th>
-                          <th className="py-2.5 px-4 font-bold">Time Slot</th>
-                          <th className="py-2.5 px-3 text-right font-bold w-20">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-700">
-                        {filteredCategoryMappings.length === 0 ? (
-                          <tr>
-                            <td colSpan={8} className="py-10 text-center text-slate-400">
-                              <p className="font-semibold text-xs">No category mappings found.</p>
-                              <div className="flex items-center justify-center gap-2 mt-2">
-                                <button
-                                  type="button"
-                                  onClick={handleDownloadDemoCsv}
-                                  className="text-xs font-bold text-amber-600 hover:underline cursor-pointer"
-                                >
-                                  Download Demo CSV
-                                </button>
-                                <span>•</span>
-                                <button
-                                  type="button"
-                                  onClick={handleLoadDemoCategoryMappings}
-                                  className="text-xs font-bold text-indigo-600 hover:underline cursor-pointer"
-                                >
-                                  Load Demo Data
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Category */}
+                  {(() => {
+                    const key = 'categories';
+                    const isEditing = editingMasterKey === key;
+                    const formattedStr = categories.map(c => `"${c}"`).join(',');
+                    return (
+                      <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 shadow-2xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-slate-900">🏷️ Category ({categories.length})</span>
+                          {!isEditing ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingMasterKey(key);
+                                setMasterEditText(formattedStr);
+                              }}
+                              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
+                            >
+                              Edit
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleSaveMasterList(key)}
+                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold cursor-pointer"
+                              >
+                                Update
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingMasterKey(null)}
+                                className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[11px] font-bold cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {!isEditing ? (
+                          <div className="p-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 font-mono font-medium leading-relaxed break-all">
+                            {formattedStr}
+                          </div>
                         ) : (
-                          filteredCategoryMappings.map((m, idx) => (
-                            <tr key={m.id || idx} className="hover:bg-slate-50/80 transition-colors">
-                              <td className="py-2 px-3 text-center text-[11px] text-slate-400 font-semibold">{idx + 1}</td>
-                              <td className="py-2 px-4 font-bold text-slate-900">
-                                <span className="inline-flex items-center gap-1.5">
-                                  <span>🏷️</span>
-                                  <span>{m.category}</span>
-                                </span>
-                              </td>
-                              <td className="py-2 px-4">
-                                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                                  {m.team}
-                                </span>
-                              </td>
-                              <td className="py-2 px-4">
-                                <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
-                                  m.orderStatus === 'Delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                  m.orderStatus === 'Cancelled' ? 'bg-red-50 text-red-700 border-red-200' :
-                                  m.orderStatus === 'Confirmed' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                  m.orderStatus === 'In Progress' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                  'bg-slate-100 text-slate-700 border-slate-200'
-                                }`}>
-                                  {m.orderStatus || (m as any).status || 'Pending'}
-                                </span>
-                              </td>
-                              <td className="py-2 px-4">
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                  <span>📢</span>
-                                  <span>{m.channel || 'Facebook'}</span>
-                                </span>
-                              </td>
-                              <td className="py-2 px-4">
-                                <span className="inline-flex items-center gap-1.5 text-slate-700 font-semibold">
-                                  <span>👔</span>
-                                  <span>{m.teamLeader}</span>
-                                </span>
-                              </td>
-                              <td className="py-2 px-4">
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200">
-                                  <span>⏰</span>
-                                  <span>{m.timeSlot || '10AM to 11AM'}</span>
-                                </span>
-                              </td>
-                              <td className="py-2 px-3 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteMapping(m.id)}
-                                  title={`Remove mapping for ${m.category}`}
-                                  className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))
+                          <textarea
+                            value={masterEditText}
+                            onChange={(e) => setMasterEditText(e.target.value)}
+                            rows={3}
+                            className="w-full p-2.5 text-xs rounded-lg border border-indigo-500 font-medium bg-white focus:outline-hidden"
+                          />
                         )}
-                      </tbody>
-                    </table>
-                  </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Order Status */}
+                  {(() => {
+                    const key = 'orderStatuses';
+                    const isEditing = editingMasterKey === key;
+                    const formattedStr = orderStatuses.map(s => `"${s}"`).join(',');
+                    return (
+                      <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 shadow-2xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-slate-900">📊 Order Status ({orderStatuses.length})</span>
+                          {!isEditing ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingMasterKey(key);
+                                setMasterEditText(formattedStr);
+                              }}
+                              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
+                            >
+                              Edit
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleSaveMasterList(key)}
+                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold cursor-pointer"
+                              >
+                                Update
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingMasterKey(null)}
+                                className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[11px] font-bold cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {!isEditing ? (
+                          <div className="p-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 font-mono font-medium leading-relaxed break-all">
+                            {formattedStr}
+                          </div>
+                        ) : (
+                          <textarea
+                            value={masterEditText}
+                            onChange={(e) => setMasterEditText(e.target.value)}
+                            rows={3}
+                            className="w-full p-2.5 text-xs rounded-lg border border-indigo-500 font-medium bg-white focus:outline-hidden"
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Team */}
+                  {(() => {
+                    const key = 'teamsList';
+                    const isEditing = editingMasterKey === key;
+                    const formattedStr = teamsList.map(t => `"${t}"`).join(',');
+                    return (
+                      <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 shadow-2xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-slate-900">👥 Team ({teamsList.length})</span>
+                          {!isEditing ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingMasterKey(key);
+                                setMasterEditText(formattedStr);
+                              }}
+                              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
+                            >
+                              Edit
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleSaveMasterList(key)}
+                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold cursor-pointer"
+                              >
+                                Update
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingMasterKey(null)}
+                                className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[11px] font-bold cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {!isEditing ? (
+                          <div className="p-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 font-mono font-medium leading-relaxed break-all">
+                            {formattedStr}
+                          </div>
+                        ) : (
+                          <textarea
+                            value={masterEditText}
+                            onChange={(e) => setMasterEditText(e.target.value)}
+                            rows={3}
+                            className="w-full p-2.5 text-xs rounded-lg border border-indigo-500 font-medium bg-white focus:outline-hidden"
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Channel */}
+                  {(() => {
+                    const key = 'channelsList';
+                    const isEditing = editingMasterKey === key;
+                    const formattedStr = channelsList.map(ch => `"${ch}"`).join(',');
+                    return (
+                      <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 shadow-2xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-slate-900">🌐 Channel ({channelsList.length})</span>
+                          {!isEditing ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingMasterKey(key);
+                                setMasterEditText(formattedStr);
+                              }}
+                              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
+                            >
+                              Edit
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleSaveMasterList(key)}
+                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold cursor-pointer"
+                              >
+                                Update
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingMasterKey(null)}
+                                className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[11px] font-bold cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {!isEditing ? (
+                          <div className="p-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 font-mono font-medium leading-relaxed break-all">
+                            {formattedStr}
+                          </div>
+                        ) : (
+                          <textarea
+                            value={masterEditText}
+                            onChange={(e) => setMasterEditText(e.target.value)}
+                            rows={3}
+                            className="w-full p-2.5 text-xs rounded-lg border border-indigo-500 font-medium bg-white focus:outline-hidden"
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Team Leader */}
+                  {(() => {
+                    const key = 'teamLeadersList';
+                    const isEditing = editingMasterKey === key;
+                    const formattedStr = teamLeadersList.map(tl => `"${tl}"`).join(',');
+                    return (
+                      <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 shadow-2xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-slate-900">👔 Team Leader ({teamLeadersList.length})</span>
+                          {!isEditing ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingMasterKey(key);
+                                setMasterEditText(formattedStr);
+                              }}
+                              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
+                            >
+                              Edit
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleSaveMasterList(key)}
+                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold cursor-pointer"
+                              >
+                                Update
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingMasterKey(null)}
+                                className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[11px] font-bold cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {!isEditing ? (
+                          <div className="p-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 font-mono font-medium leading-relaxed break-all">
+                            {formattedStr}
+                          </div>
+                        ) : (
+                          <textarea
+                            value={masterEditText}
+                            onChange={(e) => setMasterEditText(e.target.value)}
+                            rows={3}
+                            className="w-full p-2.5 text-xs rounded-lg border border-indigo-500 font-medium bg-white focus:outline-hidden"
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Time Slot */}
+                  {(() => {
+                    const key = 'timeSlotsList';
+                    const isEditing = editingMasterKey === key;
+                    const formattedStr = timeSlotsList.map(slot => `"${slot}"`).join(',');
+                    return (
+                      <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 shadow-2xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-slate-900">⏰ Time Slot ({timeSlotsList.length})</span>
+                          {!isEditing ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingMasterKey(key);
+                                setMasterEditText(formattedStr);
+                              }}
+                              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
+                            >
+                              Edit
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleSaveMasterList(key)}
+                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold cursor-pointer"
+                              >
+                                Update
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingMasterKey(null)}
+                                className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[11px] font-bold cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {!isEditing ? (
+                          <div className="p-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 font-mono font-medium leading-relaxed break-all">
+                            {formattedStr}
+                          </div>
+                        ) : (
+                          <textarea
+                            value={masterEditText}
+                            onChange={(e) => setMasterEditText(e.target.value)}
+                            rows={3}
+                            className="w-full p-2.5 text-xs rounded-lg border border-indigo-500 font-medium bg-white focus:outline-hidden"
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -8212,7 +7814,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     Edit Agent Profile &amp; Permissions
                   </h3>
                   <p className="text-xs text-indigo-200">
-                    Modifying configuration for <span className="font-bold text-white">@{editingUserModal.user}</span>
+                    Modifying configuration for <span className="font-bold text-white">{editingUserModal.user}</span>
                   </p>
                 </div>
               </div>
@@ -8323,7 +7925,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         Assign Team Leader(s) <span className="text-indigo-600 font-extrabold normal-case">(Multiple Select Allowed)</span>
                       </label>
                       <p className="text-[11px] text-slate-500">
-                        Select one or multiple Team Leaders for @{editUser}
+                        Select one or multiple Team Leaders for {editUser}
                       </p>
                     </div>
                     <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
@@ -8496,7 +8098,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         Access Control &amp; Permissions
                       </h4>
                       <p className="text-[11px] text-slate-500">
-                        Configure permissions for agent <span className="font-semibold text-slate-700">@{editUser}</span>
+                        Configure permissions for agent <span className="font-semibold text-slate-700">{editUser}</span>
                       </p>
                     </div>
                   </div>

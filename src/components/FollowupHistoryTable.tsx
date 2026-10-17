@@ -340,7 +340,6 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10 uppercase tracking-wider text-[11px]">
-                <th className="py-3 px-3.5 whitespace-nowrap text-indigo-700">Followup ID</th>
                 <th className="py-3 px-3.5 whitespace-nowrap">Order ID</th>
                 <th className="py-3 px-3.5 whitespace-nowrap">Date</th>
                 <th className="py-3 px-3.5 whitespace-nowrap">Customer Name</th>
@@ -360,27 +359,17 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
             <tbody className="divide-y divide-slate-100 text-slate-800">
               {paginatedRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={15} className="text-center py-12 text-slate-400 font-semibold">
+                  <td colSpan={14} className="text-center py-12 text-slate-400 font-semibold">
                     No followup history records matching filters.
                   </td>
                 </tr>
               ) : (
                 paginatedRecords.map((hist, histIdx) => {
-                  const isUndoRecord = !!hist.isUndo;
-                  const isRevertedRecord = !!hist.isUndone;
-
                   return (
                     <tr 
                       key={`fol-row-${hist.id || hist.followupId || histIdx}-${histIdx}`} 
-                      className={`transition-colors hover:bg-slate-50/80 ${
-                        isUndoRecord 
-                          ? 'bg-amber-50/50 border-l-4 border-l-amber-500' 
-                          : (isRevertedRecord ? 'opacity-80 bg-slate-50/40' : '')
-                      }`}
+                      className="transition-colors hover:bg-slate-50/80"
                     >
-                      <td className="py-3 px-3.5 font-mono font-bold text-indigo-800 whitespace-nowrap">
-                        #{hist.followupId || hist.id}
-                      </td>
                       <td className="py-3 px-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">
                         <button
                           type="button"
@@ -449,20 +438,6 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                           >
                             View Order
                           </button>
-                          {onUndoFollowup && !hist.isUndo && !hist.isUndone && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (window.confirm(`Are you sure you want to undo status change for Order #${hist.orderId}?`)) {
-                                  onUndoFollowup(hist.id, hist.orderId, hist.previousStatus, hist.updatedBy);
-                                }
-                              }}
-                              className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs font-bold cursor-pointer transition-colors border border-amber-200"
-                              title="Undo this status change"
-                            >
-                              Undo
-                            </button>
-                          )}
                         </div>
                       </td>
                     </tr>

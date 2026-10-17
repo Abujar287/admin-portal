@@ -136,8 +136,8 @@ export default function App() {
       orderValue: updates.order_value ?? updates.orderValue ?? targetOrder?.order_value ?? targetOrder?.orderValue ?? 0,
       scheduleDate: updates.schedule_date || updates.scheduleDate || targetOrder?.schedule_date || targetOrder?.scheduleDate || '',
       scheduledTime: updates.schedule_time || updates.scheduledTime || targetOrder?.schedule_time || targetOrder?.scheduledTime || '',
-      updatedBy: updatedBy || currentSession?.manager?.user || 'Manager',
-      updatedByName: currentSession?.manager?.name || 'Manager',
+      updatedBy: updatedBy && updatedBy.includes('(@') ? updatedBy.split('(@')[1].replace(')', '').trim() : (updatedBy || currentSession?.manager?.user || 'Manager'),
+      updatedByName: updatedBy && updatedBy.includes('(@') ? updatedBy.split('(@')[0].trim() : (currentSession?.manager?.name || 'Manager'),
       action: notes || `Followup updated to ${updates.followup_status || updates.followupStatus || 'Pending'}`,
       timestamp: OrderService.getBdtTimestamp()
     };

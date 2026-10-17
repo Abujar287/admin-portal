@@ -93,21 +93,19 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
   const [isUpdatingAddress, setIsUpdatingAddress] = useState(false);
   const [addressMsg, setAddressMsg] = useState<string | null>(null);
 
-  // Format operator name: for manager access, user ID must strictly be '1', never email
+  // Format operator name: clean IDs without '@' prefix
   const sessionRole = typeof window !== 'undefined' ? sessionStorage.getItem('portal_session_role') : null;
   const isManagerRole = 
     sessionRole === 'manager' ||
     currentUser.role === 'Manager' || 
-    currentUser.role === 'Team Leader' ||
     currentUser.user === '1' ||
-    currentUser.user.toLowerCase() === 'manager' ||
-    currentUser.user.toLowerCase().includes('admin') ||
-    currentUser.user.toLowerCase().includes('abujar') ||
-    currentUser.user.includes('@');
+    currentUser.user?.toLowerCase() === 'manager';
 
-  const actorUserId = isManagerRole ? '1' : currentUser.user;
-  const actorUserName = isManagerRole ? 'Manager' : (currentUser.name || currentUser.user);
-  const userDisplayName = `${actorUserName} (@${actorUserId})`;
+  const actorUserId = (currentUser.user === '1' || currentUser.user?.toLowerCase() === 'manager' || (!currentUser.user && isManagerRole))
+    ? '1' 
+    : (currentUser.user || '1');
+  const actorUserName = actorUserId === '1' ? 'Manager' : (currentUser.name || currentUser.user || 'Agent');
+  const userDisplayName = actorUserId === '1' ? 'Manager (1)' : `${actorUserName} (${actorUserId})`;
 
   const handleProfitChange = (valStr: string) => {
     setSingleProfit(valStr);
@@ -700,50 +698,52 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
             </div>
           )}
 
-          {/* ALL 22 PROPERTIES / DETAILS GRID */}
-          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-2xs space-y-3">
-            <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-700 border-b pb-2 flex items-center gap-2">
-              <Package className="w-4 h-4 text-indigo-600" />
-              <span>All Order Properties for #{orderId}</span>
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 text-xs">
+          {/* COMPACT ORDER SUMMARY (Clean, minimal space, easy to read) */}
+          <div className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-2xs space-y-2">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+              <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                <Package className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Order Summary (#{orderId})</span>
+              </h3>
+              <span className="text-[10px] text-slate-400 font-mono">22 fields</span>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1.5 text-xs py-1">
               {[
-                { label: 'order_id', value: order.order_id || order.id },
-                { label: 'customer_id', value: order.customer_id || order.customerId },
-                { label: 'customer_mobile', value: order.customer_mobile || order.customerContact },
-                { label: 'customer_name', value: order.customer_name || order.customerName },
-                { label: 'gender', value: order.gender },
-                { label: 'create_date', value: OrderService.formatDateTime(order.create_date || order.createDate) },
-                { label: 'order_channel', value: order.order_channel || order.orderChannel },
-                { label: 'agent_id', value: order.agent_id || order.agentId },
-                { label: 'agent_name', value: order.agent_name || order.agentName },
-                { label: 'product_category', value: order.product_category || order.productCategory },
-                { label: 'product_name', value: order.product_name || order.productName },
-                { label: 'city', value: order.city },
-                { label: 'delivery_area', value: order.delivery_area || order.deliveryArea },
-                { label: 'address_details', value: order.address_details || order.addressDetails },
-                { label: 'schedule_date', value: order.schedule_date || order.scheduleDate },
-                { label: 'schedule_time', value: order.schedule_time || order.scheduledTime },
-                { label: 'order_value', value: `৳ ${((order.order_value ?? order.orderValue) || 0).toLocaleString()}` },
-                { label: 'order_status', value: order.order_status || order.orderStatus },
-                { label: 'followup_status', value: order.followup_status || order.followupStatus },
-                { label: 'profit', value: `৳ ${((order.profit ?? 0) || 0).toLocaleString()}` },
-                { label: 'delivered_date', value: order.delivered_date ? OrderService.formatDateTime(order.delivered_date) : '-' },
-                { label: 'cancelled_date', value: order.cancelled_date ? OrderService.formatDateTime(order.cancelled_date) : '-' }
-              ].map((col, idx) => (
-                <div key={`col-${idx}`} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                  <span className="text-[10px] font-mono font-bold uppercase text-slate-400 block mb-0.5">
-                    {col.label}
-                  </span>
-                  <span className="font-semibold text-slate-800 break-words">{col.value || '-'}</span>
+                { label: 'Order ID', value: order.order_id || order.id },
+                { label: 'Order Date', value: OrderService.formatDateTime(order.create_date || order.createDate) },
+                { label: 'Channel', value: order.order_channel || order.orderChannel },
+                { label: 'Category', value: order.product_category || order.productCategory },
+                { label: 'Customer', value: order.customer_name || order.customerName },
+                { label: 'Mobile', value: order.customer_mobile || order.customerContact },
+                { label: 'Gender', value: order.gender },
+                { label: 'Product', value: order.product_name || order.productName },
+                { label: 'City', value: order.city },
+                { label: 'Delivery Area', value: order.delivery_area || order.deliveryArea },
+                { label: 'Schedule Date', value: order.schedule_date || order.scheduleDate },
+                { label: 'Schedule Time', value: order.schedule_time || order.scheduledTime },
+                { label: 'Agent ID', value: order.agent_id || order.agentId },
+                { label: 'Agent Name', value: order.agent_name || order.agentName },
+                { label: 'Order Value', value: `৳ ${((order.order_value ?? order.orderValue) || 0).toLocaleString()}` },
+                { label: 'Profit', value: `৳ ${((order.profit ?? 0) || 0).toLocaleString()}` },
+                { label: 'Order Status', value: order.order_status || order.orderStatus },
+                { label: 'Followup Status', value: order.followup_status || order.followupStatus },
+                { label: 'Delivered Date', value: order.delivered_date ? OrderService.formatDateTime(order.delivered_date) : '-' },
+                { label: 'Cancelled Date', value: order.cancelled_date ? OrderService.formatDateTime(order.cancelled_date) : '-' },
+                { label: 'Customer ID', value: order.customer_id || order.customerId },
+                { label: 'Address', value: order.address_details || order.addressDetails, span: 'col-span-2 sm:col-span-3' }
+              ].map((item, idx) => (
+                <div key={idx} className={`flex items-baseline gap-1.5 py-0.5 border-b border-slate-50 ${item.span || ''}`}>
+                  <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap min-w-[70px]">{item.label}:</span>
+                  <span className="text-[11px] font-semibold text-slate-800 truncate" title={String(item.value || '-')}>{item.value || '-'}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* ORDER HISTORY */}
-          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-2xs space-y-3">
-            <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-700 border-b pb-2">Order History</h3>
+          <div className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-2xs space-y-2">
+            <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-700 border-b pb-1.5">Order History</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-[11px] border-collapse">
                 <thead>
@@ -760,9 +760,9 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                       <tr key={i} className="text-slate-700 hover:bg-slate-50">
                         <td className="py-2 px-3 font-mono whitespace-nowrap">{h.timestamp}</td>
                         <td className="py-2 px-3 whitespace-nowrap font-medium">
-                          {h.updatedBy === '1' || h.updatedBy?.toLowerCase() === 'manager' || (h.updatedBy?.includes('@') && (h.updatedByName?.toLowerCase().includes('manager') || h.updatedBy?.includes('abujar')))
-                            ? 'Manager'
-                            : (h.updatedByName || h.updatedBy?.replace(/\s*\(@.*\)/, '').replace('@', '_'))}
+                          {h.updatedBy === '1' || h.updatedBy?.toLowerCase() === 'manager' || (h.updatedByName?.toLowerCase().includes('manager'))
+                            ? 'Manager (1)'
+                            : (h.updatedByName || h.updatedBy?.replace(/\s*\(@.*\)/, '').replace(/^@/, ''))}
                         </td>
                         <td className="py-2 px-3">
                            <div className="font-bold">{h.action}</div>
