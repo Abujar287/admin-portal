@@ -52,7 +52,6 @@ export interface FollowupHistoryTableProps {
   onExportXlsx?: (data: FollowupHistoryItem[], filename: string) => void;
   allFilteredRecords?: FollowupHistoryItem[];
   onViewOrder: (order: OrderItem) => void;
-  onUndoFollowup: (id: string | number) => void;
 }
 
 export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
@@ -88,8 +87,7 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
   onExportCsv,
   onExportXlsx,
   allFilteredRecords = [],
-  onViewOrder,
-  onUndoFollowup
+  onViewOrder
 }) => {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
@@ -175,7 +173,7 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
           {/* Timestamp Date Filter */}
           <div className="flex-1 min-w-[150px]">
             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-              timestamp
+              Date
             </label>
             <select
               value={dateFilter}
@@ -284,11 +282,6 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                 <option value="customer_id">customer_id</option>
                 <option value="customer_mobile">customer_mobile</option>
                 <option value="customer_name">customer_name</option>
-                <option value="updated_by_name">updated_by_name</option>
-                <option value="updated_by">updated_by</option>
-                <option value="followup_id">followup_id</option>
-                <option value="new_status">new_status</option>
-                <option value="all">all_fields</option>
               </select>
               <input
                 type="text"
@@ -346,7 +339,7 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
               <tr className="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10 uppercase tracking-wider text-[11px]">
                 <th className="py-3 px-3.5 whitespace-nowrap text-indigo-700">Followup ID</th>
                 <th className="py-3 px-3.5 whitespace-nowrap">Order ID</th>
-                <th className="py-3 px-3.5 whitespace-nowrap">Timestamp</th>
+                <th className="py-3 px-3.5 whitespace-nowrap">Date</th>
                 <th className="py-3 px-3.5 whitespace-nowrap">Customer Name</th>
                 <th className="py-3 px-3.5 whitespace-nowrap">Contact</th>
                 <th className="py-3 px-3.5 whitespace-nowrap">Previous Status</th>
@@ -442,7 +435,7 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                         {hist.notes || '-'}
                       </td>
                       <td className="py-3 px-3.5 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-1.5">
+                        <div className="flex items-center justify-center">
                           <button
                             type="button"
                             onClick={() => {
@@ -453,29 +446,6 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                           >
                             View Order
                           </button>
-                          {isUndoRecord ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-md font-bold text-[10px]">
-                              <RotateCcw className="w-2.5 h-2.5 text-amber-600" />
-                              Undo
-                            </span>
-                          ) : isRevertedRecord ? (
-                            <span 
-                              className="px-2 py-1 bg-slate-100 text-slate-400 border border-slate-200 rounded-md font-bold text-[10px] italic"
-                              title="This action has already been reverted via Undo"
-                            >
-                              Reverted
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => onUndoFollowup(hist.id)}
-                              title={`Undo this follow-up & revert order back to "${hist.previousStatus}"`}
-                              className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-md font-bold text-[10px] cursor-pointer transition-colors"
-                            >
-                              <RotateCcw className="w-3 h-3 text-red-600" />
-                              Revert
-                            </button>
-                          )}
                         </div>
                       </td>
                     </tr>

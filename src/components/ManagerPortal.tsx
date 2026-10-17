@@ -5485,11 +5485,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           <option value="customer_id">customer_id</option>
                           <option value="customer_mobile">customer_mobile</option>
                           <option value="customer_name">customer_name</option>
-                          <option value="updated_by_name">updated_by_name</option>
-                          <option value="updated_by">updated_by</option>
-                          <option value="followup_id">followup_id</option>
-                          <option value="new_status">new_status</option>
-                          <option value="all">all_fields</option>
                         </select>
                         <input
                           type="text"
@@ -5518,7 +5513,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10">
                         <th className="py-3 px-3.5 whitespace-nowrap text-indigo-700">Followup ID</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Order ID</th>
-                        <th className="py-3 px-3.5 whitespace-nowrap">Timestamp</th>
+                        <th className="py-3 px-3.5 whitespace-nowrap">Date</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Customer Name</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Contact</th>
                         <th className="py-3 px-3.5 whitespace-nowrap">Previous Status</th>
