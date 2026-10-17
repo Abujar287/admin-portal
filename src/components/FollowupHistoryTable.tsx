@@ -282,6 +282,7 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                 <option value="customer_id">customer_id</option>
                 <option value="customer_mobile">customer_mobile</option>
                 <option value="customer_name">customer_name</option>
+                <option value="user_name">user_name</option>
               </select>
               <input
                 type="text"

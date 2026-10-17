@@ -522,14 +522,21 @@ export class OrderService {
       const stored = localStorage.getItem(STORAGE_KEYS.AGENTS);
       if (stored !== null) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed;
         }
       }
     } catch {
       // fallback
     }
-    return [];
+    const defaultAgents: AgentUser[] = [
+      { user: '1', pass: '1', name: 'Manager', role: 'Manager', team: 'Acquisition', status: 'active', email: 'manager@portal.com' },
+      { user: 'Rahim Ahmed', pass: '123456', name: 'Rahim Ahmed', role: 'Agent', team: 'Acquisition', status: 'active', email: 'rahim@portal.com' }
+    ];
+    try {
+      localStorage.setItem(STORAGE_KEYS.AGENTS, JSON.stringify(defaultAgents));
+    } catch {}
+    return defaultAgents;
   }
 
   static saveAgents(agents: AgentUser[]): void {

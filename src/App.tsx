@@ -107,6 +107,43 @@ export default function App() {
     showToast(`Welcome, ${mgrUser.name}!`);
   };
 
+  const handleUpdateOrderStatus = async (orderId: string, updates: Partial<OrderItem>, updatedBy?: string, notes?: string) => {
+    const updatedOrders = orders.map(o => {
+      if (String(o.order_id || o.id) === String(orderId)) {
+        return { ...o, ...updates };
+      }
+      return o;
+    });
+    setOrders(updatedOrders);
+    OrderService.saveLocalOrders(updatedOrders);
+
+    const targetOrder = orders.find(o => String(o.order_id || o.id) === String(orderId));
+    const newHistoryItem: FollowupHistoryItem = {
+      id: String(Date.now()),
+      orderId: orderId,
+      customerName: updates.customer_name || targetOrder?.customer_name || targetOrder?.customerName || '',
+      customerContact: updates.customer_mobile || targetOrder?.customer_mobile || targetOrder?.customerContact || '',
+      previousStatus: targetOrder?.followup_status || targetOrder?.followupStatus || 'Pending',
+      newStatus: updates.followup_status || updates.followupStatus || 'Pending',
+      orderValue: updates.order_value ?? updates.orderValue ?? targetOrder?.order_value ?? targetOrder?.orderValue ?? 0,
+      scheduleDate: updates.schedule_date || updates.scheduleDate || targetOrder?.schedule_date || targetOrder?.scheduleDate || '',
+      scheduledTime: updates.schedule_time || updates.scheduleTime || targetOrder?.schedule_time || targetOrder?.scheduleTime || '',
+      updatedBy: updatedBy || currentSession?.manager?.user || 'Manager',
+      updatedByName: currentSession?.manager?.name || 'Manager',
+      action: notes || `Followup updated to ${updates.followup_status || updates.followupStatus || 'Pending'}`,
+      date: OrderService.getBdtTimestamp()
+    };
+    const updatedHistory = [newHistoryItem, ...followupHistory];
+    setFollowupHistory(updatedHistory);
+    OrderService.saveFollowupHistory(updatedHistory);
+
+    try {
+      await OrderService.updateOrderInSheet(orderId, updates, updatedBy, notes);
+    } catch (e) {
+      console.warn('Sheet sync update failed:', e);
+    }
+  };
+
   const handleLogout = () => {
     setCurrentSession(null);
     sessionStorage.removeItem('portal_session_role');
@@ -150,6 +187,7 @@ export default function App() {
           onRefreshOrders={() => loadOrdersData(true)}
           isRefreshing={isRefreshing}
           onLogout={handleLogout}
+          onUpdateOrderStatus={handleUpdateOrderStatus}
         />
       )}
     </div>
