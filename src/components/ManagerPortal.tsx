@@ -295,7 +295,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       ? currentUserPermissions.allowedTabs
       : ['summary', 'orders', 'followup', 'agent-performance', 'category-distribution', 'profiles'];
     
-    // Strictly strip out admin tabs ('users', 'category-mapping', 'sheet-connection') for non-manager users
+    // Strictly strip out manager/admin tabs ('users' for user details, 'category-mapping', 'sheet-connection' for Google Sheet & tabs) for non-manager users
     return baseTabs.filter(t => t !== 'users' && t !== 'category-mapping' && t !== 'sheet-connection') as AgentNavTab[];
   }, [isSuperAdminOrFullManager, currentUserPermissions]);
 
