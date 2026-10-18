@@ -157,7 +157,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
         {
           profit: parsedProfit
         },
-        actorUserId,
+        userDisplayName,
         `Profit updated to ${parsedProfit.toLocaleString()}`
       );
       setProfitMsg('Updated!');

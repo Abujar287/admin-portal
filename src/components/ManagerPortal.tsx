@@ -271,7 +271,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   // Resolve current user permissions and allowed tabs
   const currentUserPermissions: AgentPermissions | undefined = useMemo(() => {
     if (currentManager.permissions) return currentManager.permissions;
-    const matched = users.find(u => u.user.toLowerCase() === currentManager.user.toLowerCase());
+    const matched = users.find(u => u && u.user && String(u.user).toLowerCase() === String(currentManager.user || '').toLowerCase());
     return matched?.permissions;
   }, [currentManager, users]);
 
@@ -847,7 +847,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setNewTeamLeaderInputName('');
     if (tlName && tlName !== 'Unassigned TL') {
       const tlUsername = teamName.toLowerCase() + '_tl';
-      const existingAgent = users.find(a => a.user.toLowerCase() === tlUsername.toLowerCase());
+      const existingAgent = users.find(a => a && a.user && String(a.user).toLowerCase() === tlUsername.toLowerCase());
       if (!existingAgent) {
         const newAgent: SystemUser = {
           user: tlUsername,
@@ -1420,7 +1420,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     }
 
     const prevStatus = item.previousStatus || 'Pending';
-    const undoneBy = currentManager.name || currentManager.user || 'Manager';
+    const undoneBy = currentManager ? `${currentManager.name || currentManager.user} (${currentManager.user})` : '1';
     if (onRevertFollowup) {
       await onRevertFollowup(historyId, item.orderId, prevStatus, undoneBy);
     } else {
@@ -1810,7 +1810,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       );
       setEditingIndex(null);
     } else {
-      const existingIdx = users.findIndex((a) => a.user.toLowerCase() === u.toLowerCase());
+      const existingIdx = users.findIndex((a) => a && a.user && String(a.user).toLowerCase() === u.toLowerCase());
       if (existingIdx >= 0) {
         updated = users.map((agent, idx) =>
           idx === existingIdx
@@ -1868,7 +1868,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setNewOrderScope('my_orders');
     showToast('Agent created locally! Syncing to Google Sheet...');
 
-    const savedAgent = updated.find(a => a.user.toLowerCase() === u.toLowerCase());
+    const savedAgent = updated.find(a => a && a.user && String(a.user).toLowerCase() === u.toLowerCase());
     if (savedAgent) {
       OrderService.saveAgentToSheet(savedAgent).then((sheetRes) => {
         if (sheetRes.success) {
@@ -1970,7 +1970,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setEditAllowedOrderStatuses(['Pending', 'In Progress', 'Confirmed', 'Follow-up']);
     showToast('Agent updated locally! Syncing to Google Sheet...');
 
-    const updatedAgent = updated.find(a => a.user.toLowerCase() === u.toLowerCase());
+    const updatedAgent = updated.find(a => a && a.user && String(a.user).toLowerCase() === u.toLowerCase());
     if (updatedAgent) {
       OrderService.saveAgentToSheet(updatedAgent).then((sheetRes) => {
         if (sheetRes.success) {
@@ -5371,7 +5371,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           scheduledTime: quickUpdateScheduledTime,
                           schedule_time: quickUpdateScheduledTime
                         },
-                        'Manager (1)',
+                        currentManager ? `${currentManager.name || currentManager.user} (${currentManager.user})` : '1',
                         quickUpdateNotes
                       );
                       const updatedOId = quickUpdateOrderId;

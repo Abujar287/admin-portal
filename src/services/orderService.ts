@@ -793,34 +793,24 @@ export class OrderService {
         }
 
         const rawTs = String(r[idxTs !== -1 ? idxTs : 0] || '');
-        let uBy = String(r[idxUpBy !== -1 ? idxUpBy : 11] || '1');
-        let uByName = String(r[idxUpByNm !== -1 ? idxUpByNm : 12] || '');
-        if (!uByName && uBy.includes('(@')) {
-          const m = uBy.match(/\(@(.*)\)/);
-          if (m) {
-            uByName = uBy.replace(/\s*\(@.*\)/, '').replace('@', '').trim();
-            uBy = m[1].trim();
+        let uBy = String(r[idxUpBy !== -1 ? idxUpBy : 11] || '').trim();
+        let uByName = String(r[idxUpByNm !== -1 ? idxUpByNm : 12] || '').trim();
+        if (uBy.includes('(')) {
+          const m = uBy.match(/^(.*?)\s*\((?:@)?(.*)\)$/);
+          if (m && m[1] && m[2]) {
+            if (!uByName) uByName = m[1].trim();
+            uBy = m[2].trim().replace(/^@/, '');
           }
-        } else if (!uByName && uBy.startsWith('@')) {
+        } else if (uBy.startsWith('@')) {
           uBy = uBy.substring(1);
         }
 
-        // Manager access should strictly have update_by as '1', not email
-        const lowerUBy = uBy.toLowerCase();
-        const lowerUName = uByName.toLowerCase();
-        if (
-          lowerUBy === 'manager' ||
-          lowerUBy === 'admin' ||
-          lowerUBy === '1' ||
-          lowerUBy.includes('abujar') ||
-          lowerUBy.includes('@') ||
-          lowerUName === 'manager' ||
-          lowerUName === 'manager (admin)' ||
-          lowerUName.includes('manager') ||
-          lowerUName.includes('admin')
-        ) {
+        // Only default to '1' if user ID is genuinely blank/empty
+        if (!uBy) {
           uBy = '1';
-          if (!uByName || uByName.includes('@')) uByName = 'Manager';
+        }
+        if (!uByName) {
+          uByName = uBy === '1' ? 'Manager' : uBy;
         }
 
         parsedItems.push({
@@ -977,7 +967,9 @@ export class OrderService {
     const agentMap = new Map<string, AgentUser>();
 
     // Seed existing
-    currentAgents.forEach(a => agentMap.set(a.user.toLowerCase(), a));
+    currentAgents.forEach(a => {
+      if (a && a.user) agentMap.set(String(a.user).toLowerCase(), a);
+    });
 
     // Extract from sheet orders
     orders.forEach(o => {
@@ -1502,7 +1494,7 @@ export class OrderService {
   static async updateOrderStatus(
     orderId: string,
     updates: Partial<OrderItem>,
-    updatedBy: string = 'manager',
+    updatedBy: string = '1',
     notes: string = ''
   ): Promise<{ updatedOrders: OrderItem[]; historyItem?: FollowupHistoryItem; remoteSynced: boolean }> {
     console.log('Update Order Payload:', JSON.stringify(updates));
@@ -1521,8 +1513,8 @@ export class OrderService {
     }
 
     // Resolve manager / agent user ID and name cleanly (strip '@')
-    let uById = updatedBy || '1';
-    let uByName = updatedBy || 'Manager';
+    let uById = '';
+    let uByName = '';
 
     if (updatedBy) {
       const trimmed = String(updatedBy).trim();
@@ -1544,13 +1536,22 @@ export class OrderService {
       }
     }
 
-    const lowerId = uById.toLowerCase();
-    const lowerName = uByName.toLowerCase();
-    // Keep the uById and uByName derived from the input updatedBy,
-    // do not force override to 'Manager' / '1' if name matches 'manager' etc.
-    // This allows individual manager/admin names to show up in audit logs.
-    
-    // (Removed hardcoded override for manager/admin names here)
+    if (!uById) {
+      uById = '1';
+    }
+
+    // Try to resolve matching agent's proper name if uByName was just the ID or empty
+    if (uById && (!uByName || uByName === uById || uByName === '1')) {
+      const foundAgent = (this.getAgents() || []).find(a => 
+        String(a.user || '').trim().toLowerCase() === uById.toLowerCase() ||
+        String(a.email || '').trim().toLowerCase() === uById.toLowerCase()
+      );
+      if (foundAgent && foundAgent.name) {
+        uByName = foundAgent.name;
+      } else if (!uByName || uByName === '1') {
+        uByName = uById === '1' ? 'Manager' : `User ${uById}`;
+      }
+    }
 
     const finalOrderStatus = 'Pending';
     const finalFollowupStatus = updates.followup_status || updates.followupStatus || existingOrder?.followup_status || existingOrder?.followupStatus || 'Pending';
@@ -1866,7 +1867,7 @@ export class OrderService {
   static async updateOrderInSheet(
     orderId: string,
     updates: Partial<OrderItem>,
-    updatedBy: string = 'manager',
+    updatedBy: string = '1',
     notes: string = ''
   ): Promise<{ updatedOrders: OrderItem[]; historyItem?: FollowupHistoryItem; remoteSynced: boolean }> {
     return this.updateOrderStatus(orderId, updates, updatedBy, notes);
@@ -1922,16 +1923,36 @@ export class OrderService {
     const nextFollowupId = this.getMaxFollowupId(history) + 1;
     localStorage.setItem('agent_portal_max_followup_id', String(nextFollowupId));
 
-    const sessionRoleUndo = typeof window !== 'undefined' ? sessionStorage.getItem('portal_session_role') : null;
-    const normalizedUndoneBy = (
-      sessionRoleUndo === 'manager' ||
-      !undoneBy ||
-      undoneBy.toLowerCase() === 'manager' ||
-      undoneBy.toLowerCase() === 'admin' ||
-      undoneBy.includes('abujar') ||
-      undoneBy.includes('@') ||
-      undoneBy === '1'
-    ) ? '1' : undoneBy;
+    let undoById = '';
+    let undoByName = '';
+    if (undoneBy) {
+      const trimmed = String(undoneBy).trim();
+      if (trimmed.includes('(')) {
+        const m = trimmed.match(/^(.*?)\s*\((?:@)?(.*)\)$/);
+        if (m && m[1] && m[2]) {
+          undoByName = m[1].trim();
+          undoById = m[2].trim().replace(/^@/, '');
+        } else {
+          undoById = trimmed.replace(/^@/, '');
+          undoByName = trimmed.replace(/^@/, '');
+        }
+      } else if (trimmed.startsWith('@')) {
+        undoById = trimmed.substring(1);
+        undoByName = trimmed.substring(1);
+      } else {
+        undoById = trimmed;
+        undoByName = trimmed;
+      }
+    }
+
+    if (!undoById) {
+      undoById = '1';
+    }
+    if (!undoByName || undoByName === undoById || undoByName === '1') {
+      undoByName = undoById === '1' ? 'Manager' : `User ${undoById}`;
+    }
+
+    const normalizedUndoneBy = undoById;
 
     // Create the new UNDO history audit record (recording from which status to which status)
     const undoHistoryItem: FollowupHistoryItem = {
@@ -2202,32 +2223,17 @@ function doPost(e) {
         var custMob = data.customerMobile || data.customer_mobile || rows[foundRowIndex - 1][2] || '';
         var scDate = data.scheduleDate || data.schedule_date || rows[foundRowIndex - 1][14] || '';
         var scTime = data.scheduledTime || data.scheduled_time || rows[foundRowIndex - 1][15] || '';
-        var uByVal = String(data.updatedBy || data.updated_by || data.updateBy || data.update_by || '1').trim();
+        var uByVal = String(data.updatedBy || data.updated_by || data.updateBy || data.update_by || '').trim();
         var uByNameVal = String(data.updatedByName || data.updated_by_name || data.updateByName || data.update_by_name || '').trim();
-        if (!uByNameVal && uByVal.indexOf('(@') !== -1) {
-          var m = uByVal.match(/(@(.*))/);
-          if (m) {
-            uByNameVal = uByVal.replace(/s*(@.*)/, '').replace('@', '').trim();
-            uByVal = m[1].trim();
+        if (uByVal.indexOf('(') !== -1) {
+          var m = uByVal.match(/^(.*?)\s*\((?:@)?(.*)\)$/);
+          if (m && m[1] && m[2]) {
+            if (!uByNameVal) uByNameVal = m[1].trim();
+            uByVal = m[2].trim().replace(/^@/, '');
           }
         }
-        var lowerUBy = uByVal.toLowerCase();
-        var lowerUName = uByNameVal.toLowerCase();
-        if (
-          lowerUBy === 'manager' ||
-          lowerUBy === 'admin' ||
-          lowerUBy === '1' ||
-          lowerUBy.indexOf('abujar') !== -1 ||
-          lowerUBy.indexOf('manager') !== -1 ||
-          lowerUBy.indexOf('admin') !== -1 ||
-          lowerUBy.indexOf('@') !== -1 ||
-          lowerUName === 'manager' ||
-          lowerUName.indexOf('manager') !== -1 ||
-          lowerUName.indexOf('admin') !== -1
-        ) {
-          uByVal = '1';
-          if (!uByNameVal || uByNameVal.indexOf('@') !== -1) uByNameVal = 'Manager';
-        }
+        if (!uByVal) uByVal = '1';
+        if (!uByNameVal) uByNameVal = uByVal === '1' ? 'Manager' : ('User ' + uByVal);
         var actName = data.actionName || data.action_name || ("Undo");
 
         followupSheet.appendRow([
@@ -2423,31 +2429,15 @@ function doPost(e) {
 
       var uByVal = String(data.updatedBy || data.updated_by || data.updateBy || data.update_by || '').trim();
       var uByNameVal = String(data.updatedByName || data.updated_by_name || data.updateByName || data.update_by_name || '').trim();
-      if (!uByNameVal && uByVal.indexOf('(@') !== -1) {
-        var m = uByVal.match(/\(@(.*)\)/);
-        if (m) {
-          uByNameVal = uByVal.replace(/\s*\(@.*\)/, '').replace('@', '').trim();
-          uByVal = m[1].trim();
+      if (uByVal.indexOf('(') !== -1) {
+        var m = uByVal.match(/^(.*?)\s*\((?:@)?(.*)\)$/);
+        if (m && m[1] && m[2]) {
+          if (!uByNameVal) uByNameVal = m[1].trim();
+          uByVal = m[2].trim().replace(/^@/, '');
         }
       }
-      var lowerUBy = uByVal.toLowerCase();
-      var lowerUName = uByNameVal.toLowerCase();
-      // Removed hardcoded override to allow actual user ID/name to be logged in followup sheet
-      // if (
-      //   lowerUBy === 'manager' ||
-      //   lowerUBy === 'admin' ||
-      //   lowerUBy === '1' ||
-      //   lowerUBy.indexOf('abujar') !== -1 ||
-      //   lowerUBy.indexOf('manager') !== -1 ||
-      //   lowerUBy.indexOf('admin') !== -1 ||
-      //   lowerUBy.indexOf('@') !== -1 ||
-      //   lowerUName === 'manager' ||
-      //   lowerUName.indexOf('manager') !== -1 ||
-      //   lowerUName.indexOf('admin') !== -1
-      // ) {
-      //   uByVal = '1';
-      //   if (!uByNameVal || uByNameVal.indexOf('@') !== -1) uByNameVal = 'Manager';
-      // }
+      if (!uByVal) uByVal = '1';
+      if (!uByNameVal) uByNameVal = uByVal === '1' ? 'Manager' : ('User ' + uByVal);
 
       followupSheet.appendRow([
         timestamp,

@@ -57,17 +57,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           }
         }
 
-        // 2. Check local agent/user list strictly by EMAIL with exact password match (NO username login)
+        // 2. Check local agent/user list by email or user ID with exact password match
         const agent = agents.find(a => 
-          a.email && a.email.trim().toLowerCase() === normalizedEmail
+          (a.email && a.email.trim().toLowerCase() === normalizedEmail) ||
+          (a.user && a.user.trim().toLowerCase() === normalizedEmail)
         );
 
         if (agent) {
           if (agent.pass && agent.pass === normalizedPassword) {
+            const resolvedUserId = agent.user || normalizedEmail;
             onManagerLogin({
-              user: agent.user || '1',
+              user: resolvedUserId,
               pass: agent.pass,
-              name: agent.name || `User ${agent.user}`,
+              name: agent.name || `User ${resolvedUserId}`,
               role: agent.role || 'Agent',
               permissions: agent.permissions,
               team: agent.team,
@@ -77,11 +79,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             });
             return;
           } else {
-            throw new Error('Incorrect password for this email account.');
+            throw new Error('Incorrect password for this account.');
           }
         }
 
-        throw new Error('Invalid email or incorrect password. Only registered emails can log in.');
+        throw new Error('Invalid email/user ID or incorrect password. Please check your credentials.');
     } catch (err: any) {
       console.error('Authentication Error Details:', {
         message: err.message,

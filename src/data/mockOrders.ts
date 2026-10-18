@@ -27,6 +27,15 @@ export const INITIAL_AGENTS: AgentUser[] = [
     team: 'Sales',
     email: 'alex@portal.local',
     status: 'active'
+  },
+  {
+    user: '100',
+    pass: 'superadmin123',
+    name: 'superadmin',
+    role: 'Superadmin',
+    team: 'All',
+    email: 'superadmin@gmail.com',
+    status: 'active'
   }
 ];
 
