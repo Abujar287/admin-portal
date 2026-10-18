@@ -350,28 +350,22 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
             </div>
 
             {/* MASTER CATEGORY HIGHLIGHT CARD */}
-            <div className="bg-gradient-to-r from-purple-50 via-indigo-50/70 to-purple-50 dark:from-purple-950/40 dark:via-indigo-950/30 dark:to-purple-950/20 p-3.5 sm:p-4 rounded-2xl border border-purple-200 dark:border-purple-800/60 shadow-2xs mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="bg-gradient-to-r from-purple-50 via-indigo-50/70 to-purple-50 dark:from-purple-950/40 dark:via-indigo-950/30 dark:to-purple-950/20 p-4 rounded-2xl border border-purple-200 dark:border-purple-800/60 shadow-2xs mb-3 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
                   <Tag className="w-5 h-5" />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 dark:text-purple-300">
-                      Master Category (Lifetime Top Preference)
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200/80 text-purple-900 dark:bg-purple-900/60 dark:text-purple-200">
-                      {masterCategoryInfo.count} {masterCategoryInfo.count === 1 ? 'Order' : 'Orders'} ({masterCategoryInfo.percentage}%)
-                    </span>
-                  </div>
-                  <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white mt-0.5">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Master Category:
+                  </span>
+                  <span className="text-base sm:text-lg font-black text-purple-900 dark:text-purple-100">
                     {masterCategoryInfo.category}
-                  </h3>
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-purple-200/90 text-purple-900 dark:bg-purple-900 dark:text-purple-200 shadow-2xs">
+                    {masterCategoryInfo.count} {masterCategoryInfo.count === 1 ? 'Order' : 'Orders'}
+                  </span>
                 </div>
-              </div>
-
-              <div className="text-xs text-purple-800 dark:text-purple-300 font-medium bg-white/80 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-purple-200/60 dark:border-purple-700/50">
-                সবচেয়ে বেশি অর্ডার করেছেন: <strong className="font-bold text-purple-900 dark:text-purple-100">{masterCategoryInfo.category}</strong>
               </div>
             </div>
 

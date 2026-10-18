@@ -291,11 +291,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     if (isSuperAdminOrFullManager) {
       return ['summary', 'orders', 'followup', 'agent-performance', 'category-distribution', 'users', 'category-mapping', 'sheet-connection', 'profiles'];
     }
-    if (currentUserPermissions?.allowedTabs && currentUserPermissions.allowedTabs.length > 0) {
-      return currentUserPermissions.allowedTabs;
-    }
-    // Default fallback
-    return ['summary', 'orders', 'followup', 'agent-performance', 'category-distribution', 'profiles'];
+    const baseTabs = currentUserPermissions?.allowedTabs && currentUserPermissions.allowedTabs.length > 0
+      ? currentUserPermissions.allowedTabs
+      : ['summary', 'orders', 'followup', 'agent-performance', 'category-distribution', 'profiles'];
+    
+    // Strictly strip out admin tabs ('users', 'category-mapping', 'sheet-connection') for non-manager users
+    return baseTabs.filter(t => t !== 'users' && t !== 'category-mapping' && t !== 'sheet-connection') as AgentNavTab[];
   }, [isSuperAdminOrFullManager, currentUserPermissions]);
 
   const isTabAllowed = (tab: AgentNavTab) => userAllowedTabs.includes(tab);
@@ -3177,28 +3178,30 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       </div>
                     </button>
 
-                    {/* 2. Google Sheet & Tabs */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveTab('sheet-connection');
-                        setIsUserMenuOpen(false);
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer text-left"
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-                        <FileSpreadsheet className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span>Google Sheet &amp; Tabs</span>
-                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100/70 dark:bg-emerald-900/60 px-1.5 py-0.5 rounded-md">Sheet</span>
+                    {/* 2. Google Sheet & Tabs (only if allowed) */}
+                    {isTabAllowed('sheet-connection') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('sheet-connection');
+                          setIsUserMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer text-left"
+                      >
+                        <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                          <FileSpreadsheet className="w-4 h-4" />
                         </div>
-                        <span className="block text-[10px] font-normal text-slate-400 truncate">
-                          Connect sheet &amp; manage tabs
-                        </span>
-                      </div>
-                    </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span>Google Sheet &amp; Tabs</span>
+                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100/70 dark:bg-emerald-900/60 px-1.5 py-0.5 rounded-md">Sheet</span>
+                          </div>
+                          <span className="block text-[10px] font-normal text-slate-400 truncate">
+                            Connect sheet &amp; manage tabs
+                          </span>
+                        </div>
+                      </button>
+                    )}
 
                     {/* 3. Lock */}
                     <button

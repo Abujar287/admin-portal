@@ -103,42 +103,39 @@ export function App() {
   };
 
   const handleUpdateOrderStatus = async (orderId: string, updates: Partial<OrderItem>, updatedBy = '1', notes = '') => {
-    const updatedOrders = orders.map(o => {
-      const oid = String(o.order_id || o.id);
-      if (oid === String(orderId)) {
-        return { ...o, ...updates };
+    try {
+      const res = await OrderService.updateOrderStatus(
+        orderId,
+        updates,
+        currentManager?.name || updatedBy,
+        notes || 'Order details updated'
+      );
+      if (res.updatedOrders && res.updatedOrders.length > 0) {
+        setOrders(res.updatedOrders);
+      } else {
+        const updatedOrders = orders.map(o => {
+          const oid = String(o.order_id || o.id);
+          if (oid === String(orderId)) {
+            return { ...o, ...updates };
+          }
+          return o;
+        });
+        handleUpdateOrders(updatedOrders);
       }
-      return o;
-    });
-    handleUpdateOrders(updatedOrders);
-
-    // Record in followup history if status changed
-    const targetOrder = orders.find(o => String(o.order_id || o.id) === String(orderId));
-    if (targetOrder) {
-      const prevStatus = targetOrder.followup_status || targetOrder.followupStatus || 'Pending';
-      const newStatus = updates.followup_status || updates.followupStatus || prevStatus;
-      const orderSt = updates.order_status || updates.orderStatus || targetOrder.order_status || targetOrder.orderStatus || 'Pending';
-      
-      const newHistoryItem: FollowupHistoryItem = {
-        id: String(Date.now()),
-        followupId: OrderService.getMaxFollowupId(followupHistory) + 1,
-        orderId: String(orderId),
-        customerName: targetOrder.customer_name || targetOrder.customerName || '',
-        customerContact: targetOrder.customer_mobile || targetOrder.customerContact || '',
-        previousStatus: prevStatus,
-        newStatus: newStatus,
-        orderStatus: orderSt,
-        orderValue: Number(targetOrder.order_value || targetOrder.orderValue || 0),
-        scheduleDate: updates.schedule_date || updates.scheduleDate || targetOrder.schedule_date || targetOrder.scheduleDate || '',
-        scheduledTime: updates.schedule_time || updates.scheduledTime || targetOrder.schedule_time || targetOrder.scheduledTime || '',
-        updatedBy: updatedBy,
-        updatedByName: currentManager?.name || 'Manager',
-        timestamp: OrderService.getBdtTimestamp(),
-        notes: notes || `Status updated to ${newStatus}`
-      };
-
-      const updatedHistory = [newHistoryItem, ...followupHistory];
-      handleUpdateFollowupHistory(updatedHistory);
+      const history = OrderService.getFollowupHistory();
+      if (history) {
+        setFollowupHistory(history);
+      }
+    } catch (e) {
+      console.error('Error updating order status / sheet sync:', e);
+      const updatedOrders = orders.map(o => {
+        const oid = String(o.order_id || o.id);
+        if (oid === String(orderId)) {
+          return { ...o, ...updates };
+        }
+        return o;
+      });
+      handleUpdateOrders(updatedOrders);
     }
   };
 

@@ -31,9 +31,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     setMessage('');
 
     try {
-        // 1. Check for Manager Login (credentials)
         const normalizedEmail = email.trim().toLowerCase();
-        const isManagerEmailOrUser = 
+        const normalizedPassword = password.trim();
+
+        // 1. Check for Manager Login (strict credentials)
+        const isManagerEmail = 
           normalizedEmail === 'abujar287.algifari@gmail.com' ||
           normalizedEmail === 'abujaralgefari228@gmail.com' ||
           normalizedEmail === 'manager' ||
@@ -41,42 +43,45 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           normalizedEmail === 'superadmin' ||
           normalizedEmail === '1';
 
-        if (
-          isManagerEmailOrUser && 
-          (password === '01410089771' || password === 'manager' || password === 'superadmin' || password === '1')
-        ) {
-          onManagerLogin({
-            user: '1',
-            pass: password,
-            name: 'Manager',
-            role: 'Manager'
-          });
-          return;
+        if (isManagerEmail) {
+          if (normalizedPassword === '01410089771' || normalizedPassword === 'manager') {
+            onManagerLogin({
+              user: '1',
+              pass: normalizedPassword,
+              name: 'Manager',
+              role: 'Manager'
+            });
+            return;
+          } else {
+            throw new Error('Incorrect password for manager account.');
+          }
         }
 
-        // 2. Check local agent/user list by email, user, or name with exact password match
+        // 2. Check local agent/user list strictly by EMAIL with exact password match (NO username login)
         const agent = agents.find(a => 
-          (a.email?.toLowerCase() === normalizedEmail || 
-           a.user?.toLowerCase() === normalizedEmail ||
-           a.name?.toLowerCase() === normalizedEmail) && 
-          (a.pass === password || (!a.pass && !password))
+          a.email && a.email.trim().toLowerCase() === normalizedEmail
         );
+
         if (agent) {
-          onManagerLogin({
-            user: agent.user || '1',
-            pass: agent.pass,
-            name: agent.name || `User ${agent.user}`,
-            role: agent.role || 'Agent',
-            permissions: agent.permissions,
-            team: agent.team,
-            teamLeaderId: agent.teamLeaderId,
-            teamLeaders: agent.teamLeaders,
-            email: agent.email
-          });
-          return;
+          if (agent.pass && agent.pass === normalizedPassword) {
+            onManagerLogin({
+              user: agent.user || '1',
+              pass: agent.pass,
+              name: agent.name || `User ${agent.user}`,
+              role: agent.role || 'Agent',
+              permissions: agent.permissions,
+              team: agent.team,
+              teamLeaderId: agent.teamLeaderId,
+              teamLeaders: agent.teamLeaders,
+              email: agent.email
+            });
+            return;
+          } else {
+            throw new Error('Incorrect password for this email account.');
+          }
         }
 
-        throw new Error('Invalid email/username or incorrect password. Only registered users can log in.');
+        throw new Error('Invalid email or incorrect password. Only registered emails can log in.');
     } catch (err: any) {
       console.error('Authentication Error Details:', {
         message: err.message,
