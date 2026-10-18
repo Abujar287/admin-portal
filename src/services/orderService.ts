@@ -2231,9 +2231,15 @@ function doPost(e) {
             if (!uByNameVal) uByNameVal = m[1].trim();
             uByVal = m[2].trim().replace(/^@/, '');
           }
+        } else if (uByVal.indexOf('@') !== -1) {
+          uByVal = uByVal.replace(/^@/, '');
         }
-        if (!uByVal) uByVal = '1';
-        if (!uByNameVal) uByNameVal = uByVal === '1' ? 'Manager' : ('User ' + uByVal);
+        if (!uByVal) {
+          uByVal = '1';
+        }
+        if (!uByNameVal || uByNameVal === '1') {
+          uByNameVal = uByVal === '1' ? 'Manager' : ('User ' + uByVal);
+        }
         var actName = data.actionName || data.action_name || ("Undo");
 
         followupSheet.appendRow([
@@ -2435,9 +2441,15 @@ function doPost(e) {
           if (!uByNameVal) uByNameVal = m[1].trim();
           uByVal = m[2].trim().replace(/^@/, '');
         }
+      } else if (uByVal.indexOf('@') !== -1) {
+        uByVal = uByVal.replace(/^@/, '');
       }
-      if (!uByVal) uByVal = '1';
-      if (!uByNameVal) uByNameVal = uByVal === '1' ? 'Manager' : ('User ' + uByVal);
+      if (!uByVal) {
+        uByVal = '1';
+      }
+      if (!uByNameVal || uByNameVal === '1') {
+        uByNameVal = uByVal === '1' ? 'Manager' : ('User ' + uByVal);
+      }
 
       followupSheet.appendRow([
         timestamp,

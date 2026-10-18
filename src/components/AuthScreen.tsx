@@ -40,13 +40,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           normalizedEmail === 'abujaralgefari228@gmail.com' ||
           normalizedEmail === 'manager' ||
           normalizedEmail === 'admin' ||
-          normalizedEmail === 'superadmin' ||
           normalizedEmail === '1';
+
+        const isSuperAdminLogin = 
+          normalizedEmail === 'superadmin' ||
+          normalizedEmail === 'superadmin@gmail.com' ||
+          normalizedEmail === '100';
 
         if (isManagerEmail) {
           if (normalizedPassword === '01410089771' || normalizedPassword === 'manager') {
             onManagerLogin({
-              user: normalizedEmail,
+              user: '1',
               pass: normalizedPassword,
               name: 'Manager',
               role: 'Manager'
@@ -54,6 +58,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             return;
           } else {
             throw new Error('Incorrect password for manager account.');
+          }
+        }
+
+        if (isSuperAdminLogin) {
+          if (normalizedPassword === 'superadmin123' || normalizedPassword === '01410089771' || normalizedPassword === 'manager') {
+            onManagerLogin({
+              user: '100',
+              pass: normalizedPassword,
+              name: 'superadmin',
+              role: 'Superadmin'
+            });
+            return;
+          } else {
+            throw new Error('Incorrect password for superadmin account.');
           }
         }
 
