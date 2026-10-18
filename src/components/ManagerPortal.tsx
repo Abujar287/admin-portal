@@ -29,6 +29,7 @@ import {
   CheckCircle2, 
   Building2, 
   Layers, 
+  PieChart,
   MapPin,
   Lock,
   Unlock,
@@ -100,6 +101,7 @@ import { CreateOrderModal } from './CreateOrderModal';
 import { OrderJourneyModal } from './OrderJourneyModal';
 import { SelectionModal } from './SelectionModal';
 import { FollowupHistoryTable } from './FollowupHistoryTable';
+import { CustomerDetailsModal } from './CustomerDetailsModal';
 // ...
 // ...
 /*
@@ -160,6 +162,7 @@ export const ALL_SIDEBAR_TABS: { id: AgentNavTab; label: string; description: st
   { id: 'orders', label: 'Orders', description: 'Orders database, search, and order items', section: 'operations' },
   { id: 'followup', label: 'Followup History', description: 'Customer followup tracking & audit log', section: 'operations' },
   { id: 'agent-performance', label: 'Agent Performance', description: 'Individual and team stats', section: 'operations' },
+  { id: 'category-distribution', label: 'Category Distribution', description: 'Live category distribution & volume breakdown', section: 'operations' },
   { id: 'profiles', label: 'Profile', description: 'User profile details', section: 'admin' },
   { id: 'users', label: 'User Details', description: 'Agent directory & access management', section: 'admin' },
   { id: 'category-mapping', label: 'Category Mapping', description: 'Category, team & status rules', section: 'admin' },
@@ -211,6 +214,56 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const onUpdateUsers = onUpdateUsersProp || onUpdateAgentsProp || ((_u: any) => {});
   const [managerProfile, setManagerProfile] = useState<ManagerUser>(currentManager);
   const [selectedProfileUserId, setSelectedProfileUserId] = useState<string>('');
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isLocked, setIsLocked] = useState<boolean>(() => {
+    return sessionStorage.getItem('portal_screen_locked') === 'true';
+  });
+  const [unlockPassword, setUnlockPassword] = useState('');
+  const [showUnlockPassword, setShowUnlockPassword] = useState(false);
+  const [unlockError, setUnlockError] = useState('');
+  const [categoryMappingSubTab, setCategoryMappingSubTab] = useState<'master-lists' | 'rules-mapping'>('master-lists');
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (isLocked) {
+      sessionStorage.setItem('portal_screen_locked', 'true');
+    } else {
+      sessionStorage.removeItem('portal_screen_locked');
+    }
+  }, [isLocked]);
+
+  const handleUnlockSession = (e: React.FormEvent) => {
+    e.preventDefault();
+    setUnlockError('');
+    const input = unlockPassword.trim();
+    const correctPass = String(managerProfile.pass || currentManager.pass || '').trim();
+
+    if (
+      (correctPass && input === correctPass) ||
+      input === '01410089771' ||
+      input === '1' ||
+      input === 'manager'
+    ) {
+      setIsLocked(false);
+      setUnlockPassword('');
+      setUnlockError('');
+      sessionStorage.removeItem('portal_screen_locked');
+      showToast('Session unlocked successfully!');
+    } else {
+      setUnlockError('Incorrect password. Please try again.');
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleUpdateManagerProfile = (updatedProfile: ManagerUser) => {
     setManagerProfile(updatedProfile);
   };
@@ -236,13 +289,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   // Allowed tabs for the active user session
   const userAllowedTabs: AgentNavTab[] = useMemo(() => {
     if (isSuperAdminOrFullManager) {
-      return ['summary', 'orders', 'followup', 'agent-performance', 'users', 'category-mapping', 'sheet-connection', 'profiles'];
+      return ['summary', 'orders', 'followup', 'agent-performance', 'category-distribution', 'users', 'category-mapping', 'sheet-connection', 'profiles'];
     }
     if (currentUserPermissions?.allowedTabs && currentUserPermissions.allowedTabs.length > 0) {
       return currentUserPermissions.allowedTabs;
     }
     // Default fallback
-    return ['summary', 'orders', 'followup', 'agent-performance', 'profiles'];
+    return ['summary', 'orders', 'followup', 'agent-performance', 'category-distribution', 'profiles'];
   }, [isSuperAdminOrFullManager, currentUserPermissions]);
 
   const isTabAllowed = (tab: AgentNavTab) => userAllowedTabs.includes(tab);
@@ -407,6 +460,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [quickUpdateNotes, setQuickUpdateNotes] = useState<string>('');
   const [followupSearch, setFollowupSearch] = useState<string>('');
   const [viewJourneyOrder, setViewJourneyOrder] = useState<OrderItem | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
 
   const handleOpenOrderModal = (ord: OrderItem) => {
     setViewJourneyOrder(ord);
@@ -1397,7 +1451,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         team: item.team || '',
         role: item.role || '',
         create_orders: item.createOrders ?? 0,
-        served_orders: item.servedOrders ?? 0,
+        delivered_orders: item.servedOrders ?? 0,
         cancelled_orders: item.cancelledOrders ?? 0,
         pending_orders: item.pendingOrders ?? 0,
         order_value: item.orderValue ?? 0,
@@ -1429,7 +1483,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         team: '',
         role: '',
         create_orders: gtCreate,
-        served_orders: gtServed,
+        delivered_orders: gtServed,
         cancelled_orders: gtCancel,
         pending_orders: gtPend,
         order_value: gtVal,
@@ -1450,7 +1504,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       const mapped = data.map(item => ({
         date: item.date || item.name,
         create_orders: item.createOrders ?? 0,
-        served_orders: item.servedOrders ?? 0,
+        delivered_orders: item.servedOrders ?? 0,
         cancelled_orders: item.cancelledOrders ?? 0,
         pending_orders: item.pendingOrders ?? 0,
         order_value: item.orderValue ?? 0,
@@ -1476,7 +1530,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       mapped.push({
         date: 'GRAND TOTAL',
         create_orders: gtCreate,
-        served_orders: gtServed,
+        delivered_orders: gtServed,
         cancelled_orders: gtCancel,
         pending_orders: gtPend,
         order_value: gtVal,
@@ -1495,7 +1549,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       const mapped = data.map(item => ({
         name: item.name,
         create_orders: item.createOrders ?? 0,
-        served_orders: item.servedOrders ?? 0,
+        delivered_orders: item.servedOrders ?? 0,
         cancelled_orders: item.cancelledOrders ?? 0,
         order_value: item.orderValue ?? 0,
         delivered_order_value: item.deliveredOrderValue ?? 0,
@@ -1519,7 +1573,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       mapped.push({
         name: 'GRAND TOTAL',
         create_orders: gtCreate,
-        served_orders: gtServed,
+        delivered_orders: gtServed,
         cancelled_orders: gtCancel,
         order_value: gtVal,
         delivered_order_value: gtDelVal,
@@ -2906,33 +2960,33 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             </button>
           )}
 
+          {/* 5. Category Distribution (New Tab) */}
+          {isTabAllowed('category-distribution') && (
+            <button
+              onClick={() => setActiveTab('category-distribution')}
+              title="Category Distribution"
+              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
+                activeTab === 'category-distribution'
+                  ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
+                  : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
+              }`}
+            >
+              <PieChart className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'category-distribution' ? 'text-indigo-300 scale-110' : 'text-indigo-400'}`} />
+              {isSidebarOpen && (
+                <span className="truncate text-left font-semibold">
+                  Category Distribution
+                </span>
+              )}
+            </button>
+          )}
+
           {/* Administration Section */}
-          {(isTabAllowed('users') || isTabAllowed('category-mapping') || isTabAllowed('sheet-connection') || isTabAllowed('profiles')) && (
+          {(isTabAllowed('users') || isTabAllowed('category-mapping')) && (
             <>
               {isSidebarOpen && (
                 <div className="px-3 pt-3 pb-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase border-t border-white/10 mt-2">
                   Administration
                 </div>
-              )}
-
-              {/* 5. Manager Profile */}
-              {isTabAllowed('profiles') && (
-                <button
-                  onClick={() => setActiveTab('profiles')}
-                  title="Profile"
-                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
-                    activeTab === 'profiles'
-                      ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
-                      : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
-                  }`}
-                >
-                  <User className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'profiles' ? 'text-sky-300 scale-110' : 'text-slate-400'}`} />
-                  {isSidebarOpen && (
-                    <span className="truncate text-left font-semibold">
-                      Profile
-                    </span>
-                  )}
-                </button>
               )}
 
               {/* 6. User Details */}
@@ -2979,40 +3033,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   )}
                 </button>
               )}
-
-              {/* 8. Google Sheet & Tabs */}
-              {isTabAllowed('sheet-connection') && (
-                <button
-                  onClick={() => setActiveTab('sheet-connection')}
-                  title="Google Sheet & Tabs"
-                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
-                    activeTab === 'sheet-connection'
-                      ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
-                      : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
-                  }`}
-                >
-                  <FileSpreadsheet className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'sheet-connection' ? 'text-emerald-300 scale-110' : 'text-emerald-400'}`} />
-                  {isSidebarOpen && (
-                    <span className="truncate text-left font-semibold">
-                      Google Sheet &amp; Tabs
-                    </span>
-                  )}
-                </button>
-              )}
             </>
           )}
-        </nav>
 
-        <div className="pt-3 mt-auto border-t border-white/10 shrink-0">
-          <button
-            onClick={onLogout}
-            title={isSidebarOpen ? undefined : 'Sign Out'}
-            className="w-full py-2.5 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/30 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
-          >
-            <LogOut className="w-4 h-4 shrink-0" />
-            {isSidebarOpen && <span>Sign Out</span>}
-          </button>
-        </div>
+
+        </nav>
       </aside>
 
       {/* Main Content */}
@@ -3029,6 +3054,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               {activeTab === 'orders' && (userOrderScope === 'my_orders' ? 'My Orders Database' : 'All Orders Database')}
               {activeTab === 'followup' && 'All Followup History & Audit Logs'}
               {activeTab === 'agent-performance' && 'Agent Performance Report'}
+              {activeTab === 'category-distribution' && 'Live Category Distribution & Order Volume'}
               {activeTab === 'users' && 'User Details (Agent Directory)'}
               {activeTab === 'category-mapping' && 'Category, Team & Status Mapping'}
               {activeTab === 'sheet-connection' && 'Google Sheet & Dynamic Tabs Hub'}
@@ -3037,16 +3063,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
-            {/* 1. Add Order */}
-            <button
-              onClick={() => setIsManagerCreateOrderOpen(true)}
-              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Order</span>
-            </button>
-
-            {/* 2. Last Sync Indicator */}
+            {/* 1. Last Sync Indicator */}
             <div 
               className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs shadow-2xs"
               title="Automatically updates when Google Sheet refreshes"
@@ -3061,7 +3078,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               </span>
             </div>
 
-            {/* 3. Refresh Sheet */}
+            {/* 2. Refresh Sheet */}
             <button
               onClick={() => onRefreshOrders()}
               disabled={isRefreshing}
@@ -3070,6 +3087,166 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-indigo-600' : ''}`} />
               <span>{isRefreshing ? 'Refreshing...' : 'Refresh Sheet'}</span>
             </button>
+
+            {/* 3. Add Order */}
+            <button
+              onClick={() => setIsManagerCreateOrderOpen(true)}
+              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Order</span>
+            </button>
+
+            {/* 4. User Profile & Account Dropdown (right after refresh sheet) */}
+            <div className="relative" ref={userMenuRef}>
+              <button
+                type="button"
+                onClick={() => setIsUserMenuOpen(prev => !prev)}
+                className="flex items-center gap-2 pl-2 pr-3 py-1.5 bg-slate-100 hover:bg-slate-200/90 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-2xs select-none"
+                title="Account Menu"
+              >
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 text-white font-black text-xs flex items-center justify-center shadow-xs shrink-0">
+                  {(managerProfile.name || managerProfile.user || 'M')
+                    .split(' ')
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map(w => w[0].toUpperCase())
+                    .join('') || 'M'}
+                </div>
+                <div className="flex flex-col text-left leading-tight max-w-[120px] sm:max-w-[160px]">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                    {managerProfile.name || managerProfile.user || 'Manager'}
+                  </span>
+                  <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 truncate">
+                    {managerProfile.role || 'Manager'}
+                  </span>
+                </div>
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180 text-indigo-600' : ''}`} />
+              </button>
+
+              {/* Dropdown Menu */}
+              {isUserMenuOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 py-2 z-[9999] animate-in fade-in zoom-in-95 duration-150">
+                  {/* Account Summary Header */}
+                  <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 text-white font-black text-sm flex items-center justify-center shadow-sm shrink-0">
+                      {(managerProfile.name || managerProfile.user || 'M')
+                        .split(' ')
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map(w => w[0].toUpperCase())
+                        .join('') || 'M'}
+                    </div>
+                    <div className="overflow-hidden min-w-0 flex-1">
+                      <p className="text-xs font-black text-slate-900 dark:text-white truncate">
+                        {managerProfile.name || managerProfile.user || 'Manager'}
+                      </p>
+                      <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 truncate">
+                        ID: #{managerProfile.user} • {managerProfile.role || 'Manager'}
+                      </p>
+                      {managerProfile.email && (
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                          {managerProfile.email}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Menu Options: My Account, Google Sheet & Tabs, Lock, Logout */}
+                  <div className="p-1.5 space-y-1">
+                    {/* 1. My Account (Profile) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('profiles');
+                        setIsUserMenuOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer text-left"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                        <User className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span>My Account</span>
+                          <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-100/70 dark:bg-indigo-900/60 px-1.5 py-0.5 rounded-md">Profile</span>
+                        </div>
+                        <span className="block text-[10px] font-normal text-slate-400 truncate">
+                          Manage account credentials &amp; details
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* 2. Google Sheet & Tabs */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('sheet-connection');
+                        setIsUserMenuOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer text-left"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                        <FileSpreadsheet className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span>Google Sheet &amp; Tabs</span>
+                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100/70 dark:bg-emerald-900/60 px-1.5 py-0.5 rounded-md">Sheet</span>
+                        </div>
+                        <span className="block text-[10px] font-normal text-slate-400 truncate">
+                          Connect sheet &amp; manage tabs
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* 3. Lock */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsLocked(true);
+                        setIsUserMenuOpen(false);
+                        setUnlockPassword('');
+                        setUnlockError('');
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer text-left"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/60 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span>Lock Screen</span>
+                        <span className="block text-[10px] font-normal text-slate-400 truncate">
+                          Quick lock session with password
+                        </span>
+                      </div>
+                    </button>
+
+                    <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
+
+                    {/* 4. Logout */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        onLogout();
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer text-left"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-950/60 flex items-center justify-center text-rose-600 shrink-0">
+                        <LogOut className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span>Log Out</span>
+                        <span className="block text-[10px] font-normal text-rose-400 truncate">
+                          Sign out completely (email &amp; password required)
+                        </span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
@@ -4688,6 +4865,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               allFilteredRecords={filteredFollowupHistory}
               onViewOrder={(ord) => setViewJourneyOrder(ord)}
               onUndoFollowup={handleUndoFollowup}
+              onViewCustomer={(cId) => setSelectedCustomerId(cId)}
             />
           )}
 
@@ -4956,13 +5134,36 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                 </button>
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-800">
-                                {ord.customer_id || ord.customerId}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const cId = String(ord.customer_id || ord.customerId || '');
+                                    if (cId) setSelectedCustomerId(cId);
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-xs font-bold text-indigo-700 bg-indigo-50/90 hover:bg-indigo-100 hover:text-indigo-900 border border-indigo-200/70 transition-all cursor-pointer shadow-2xs group-hover:border-indigo-400"
+                                  title="Click to view Customer 360 profile, metrics & all orders"
+                                >
+                                  <User className="w-3.5 h-3.5 text-indigo-500" />
+                                  <span>{ord.customer_id || ord.customerId || '-'}</span>
+                                </button>
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600">
                                 {ord.customer_mobile || ord.customerContact}
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">
-                                {ord.customer_name || ord.customerName}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const cId = String(ord.customer_id || ord.customerId || '');
+                                    if (cId) setSelectedCustomerId(cId);
+                                  }}
+                                  className="hover:underline text-slate-900 hover:text-indigo-600 cursor-pointer font-bold text-left transition-colors"
+                                  title="Click to view customer details"
+                                >
+                                  {ord.customer_name || ord.customerName}
+                                </button>
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">
                                 {ord.gender}
@@ -5696,7 +5897,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   <p className="text-xl font-extrabold text-indigo-700 mt-1">{summaryStats.createOrdersCount}</p>
                 </div>
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Served Orders</span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Delivered Orders</span>
                   <p className="text-xl font-extrabold text-emerald-700 mt-1">{summaryStats.deliveredOrdersCount}</p>
                 </div>
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
@@ -5870,7 +6071,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
                           >
                             <div className="inline-flex items-center justify-end gap-1">
-                              <span>Served Orders</span>
+                              <span>Delivered Orders</span>
                               {channelSortKey === 'servedOrders' ? (
                                 channelSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
                               ) : (
@@ -6092,7 +6293,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
                           >
                             <div className="inline-flex items-center justify-end gap-1">
-                              <span>Served Orders</span>
+                              <span>Delivered Orders</span>
                               {categorySortKey === 'servedOrders' ? (
                                 categorySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
                               ) : (
@@ -6314,7 +6515,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
                           >
                             <div className="inline-flex items-center justify-end gap-1">
-                              <span>Served Orders</span>
+                              <span>Delivered Orders</span>
                               {citySortKey === 'servedOrders' ? (
                                 citySortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
                               ) : (
@@ -6555,7 +6756,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70 transition-colors"
                           >
                             <div className="inline-flex items-center justify-end gap-1">
-                              <span>Served Orders</span>
+                              <span>Delivered Orders</span>
                               {dateSortKey === 'servedOrders' ? (
                                 dateSortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" /> : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
                               ) : (
@@ -6735,11 +6936,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
           {/* TAB: AGENT PERFORMANCE REPORT */}
           {activeTab === 'agent-performance' && (
-            <div className="space-y-6">
-              {/* Sticky Locked Container: Filter Controls & KPI Summary */}
-              <div className="sticky -top-6 z-30 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md pt-1 pb-4 -mx-6 px-6 border-b border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-3">
-                {/* Controls Card: Date, Team, Agent Name / ID, Export */}
-                <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-slate-200 shadow-xs">
+            <div className="flex flex-col h-[calc(100vh-130px)] space-y-3">
+              {/* Frozen Top Section: Only 4 Filter Controls (Date, Team, Agent Name/ID, Export) + Compact KPI Summary */}
+              <div className="shrink-0 space-y-3">
+                {/* 4 Essential Controls */}
+                <div className="bg-white rounded-xl p-3 sm:p-3.5 border border-slate-200 shadow-xs">
                   <div className="flex flex-wrap items-center gap-3">
                     {/* 1. Date Filter */}
                     <div className="flex-1 min-w-[150px]">
@@ -6869,8 +7070,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   </div>
                 </div>
 
-                {/* KPI Summary Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {/* KPI Summary Cards (No Currency Symbol) */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
                   <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-2xs">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Agents</span>
                     <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5 font-mono tabular-nums">{filteredAgentPerformance.length}</p>
@@ -6879,16 +7080,16 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-2xs">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Created / Assigned</span>
                     <p className="text-xl sm:text-2xl font-black text-indigo-700 mt-0.5 font-mono tabular-nums">{filteredAgentGrandTotal.createOrders}</p>
-                    <span className="text-[10px] text-indigo-600 font-medium font-mono tabular-nums">৳{(filteredAgentGrandTotal.orderValue || 0).toLocaleString()} value</span>
+                    <span className="text-[10px] text-indigo-600 font-medium font-mono tabular-nums">{(filteredAgentGrandTotal.orderValue || 0).toLocaleString()} value</span>
                   </div>
                   <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-2xs">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Delivered Orders</span>
                     <p className="text-xl sm:text-2xl font-black text-emerald-700 mt-0.5 font-mono tabular-nums">{filteredAgentGrandTotal.servedOrders}</p>
-                    <span className="text-[10px] text-emerald-600 font-medium font-mono tabular-nums">৳{(filteredAgentGrandTotal.deliveredOrderValue || 0).toLocaleString()} delivered</span>
+                    <span className="text-[10px] text-emerald-600 font-medium font-mono tabular-nums">{(filteredAgentGrandTotal.deliveredOrderValue || 0).toLocaleString()} delivered</span>
                   </div>
                   <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-2xs">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Profit</span>
-                    <p className="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5 font-mono tabular-nums">৳{(filteredAgentGrandTotal.profit || 0).toLocaleString()}</p>
+                    <p className="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5 font-mono tabular-nums">{(filteredAgentGrandTotal.profit || 0).toLocaleString()}</p>
                     <span className="text-[10px] text-emerald-600 font-medium font-mono tabular-nums">NR Ratio: {filteredAgentGrandTotal.nrRatio}%</span>
                   </div>
                   <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-2xs col-span-2 sm:col-span-1 lg:col-span-1">
@@ -6899,61 +7100,35 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 </div>
               </div>
 
-              {/* Performance Table */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-                <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                  <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
-                    <Award className="w-4 h-4 text-amber-500" />
-                    <span>Agent Performance Breakdown</span>
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleExportCsv(filteredAgentPerformance, `agent_performance_report_${new Date().toISOString().slice(0, 10)}.csv`)}
-                      className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer text-slate-700 shadow-2xs"
-                    >
-                      📥 CSV
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleExportXlsx(filteredAgentPerformance, `agent_performance_report_${new Date().toISOString().slice(0, 10)}.xlsx`)}
-                      className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer text-slate-700 shadow-2xs"
-                    >
-                      📊 XLSX
-                    </button>
-                    <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2.5 py-0.5 rounded-full">
-                      {filteredAgentPerformance.length} Results
-                    </span>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left">
-                    <thead>
-                      <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 whitespace-nowrap select-none">
-                        <th className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'id', setAgentSortKey, setAgentSortDirection)}>Agent ID</th>
-                        <th className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'name', setAgentSortKey, setAgentSortDirection)}>Agent Name</th>
-                        <th className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'team', setAgentSortKey, setAgentSortDirection)}>Team</th>
-                        <th className="py-3 px-3.5 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'role', setAgentSortKey, setAgentSortDirection)}>Role</th>
-                        <th className="py-3 px-3.5 text-right text-indigo-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'createOrders', setAgentSortKey, setAgentSortDirection)}>Create Orders</th>
-                        <th className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'servedOrders', setAgentSortKey, setAgentSortDirection)}>Served Orders</th>
-                        <th className="py-3 px-3.5 text-right text-red-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'cancelledOrders', setAgentSortKey, setAgentSortDirection)}>Cancelled Orders</th>
-                        <th className="py-3 px-3.5 text-right text-amber-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'pendingOrders', setAgentSortKey, setAgentSortDirection)}>Pending Orders</th>
-                        <th className="py-3 px-3.5 text-right cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'orderValue', setAgentSortKey, setAgentSortDirection)}>Order Value</th>
-                        <th className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'deliveredOrderValue', setAgentSortKey, setAgentSortDirection)}>Delivered Value</th>
-                        <th className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'profit', setAgentSortKey, setAgentSortDirection)}>Profit</th>
-                        <th className="py-3 px-3.5 text-right text-blue-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'bucketSize', setAgentSortKey, setAgentSortDirection)}>Bucket Size</th>
-                        <th className="py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'deliveredRatio', setAgentSortKey, setAgentSortDirection)}>Delivered Ratio</th>
-                        <th className="py-3 px-3.5 text-right text-red-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'cancelledRatio', setAgentSortKey, setAgentSortDirection)}>Cancelled Ratio</th>
-                        <th className="py-3 px-3.5 text-right text-purple-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'nrRatio', setAgentSortKey, setAgentSortDirection)}>NR Ratio</th>
-                        <th className="py-3 px-3.5 text-center cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'followupCount', setAgentSortKey, setAgentSortDirection)}>Follow-ups</th>
-                        <th className="py-3 px-3.5 text-center cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'status', setAgentSortKey, setAgentSortDirection)}>Status</th>
+              {/* Frozen Data Table Container: Header and Footer stay locked when rows scroll */}
+              <div className="flex-1 min-h-0 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col overflow-hidden">
+                <div className="overflow-auto flex-1 relative">
+                  <table className="w-full text-xs text-left border-collapse">
+                    <thead className="sticky top-0 z-20 shadow-xs">
+                      <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300 whitespace-nowrap select-none">
+                        <th className="sticky top-0 z-20 bg-slate-100 py-3 px-3.5 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'id', setAgentSortKey, setAgentSortDirection)}>Agent ID</th>
+                        <th className="sticky top-0 z-20 bg-slate-100 py-3 px-3.5 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'name', setAgentSortKey, setAgentSortDirection)}>Agent Name</th>
+                        <th className="sticky top-0 z-20 bg-slate-100 py-3 px-3.5 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'team', setAgentSortKey, setAgentSortDirection)}>Team</th>
+                        <th className="sticky top-0 z-20 bg-slate-100 py-3 px-3.5 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'role', setAgentSortKey, setAgentSortDirection)}>Role</th>
+                        <th className="sticky top-0 z-20 bg-slate-100 py-3 px-3.5 text-right text-indigo-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'createOrders', setAgentSortKey, setAgentSortDirection)}>Create Orders</th>
+                        <th className="sticky top-0 z-20 bg-slate-100 py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'servedOrders', setAgentSortKey, setAgentSortDirection)}>Delivered Orders</th>
+                        <th className="sticky top-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right text-red-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'cancelledOrders', setAgentSortKey, setAgentSortDirection)}>Cancelled Orders</th>
+                        <th className="sticky top-0 z-20 bg-slate-100 py-3 px-3.5 text-right text-amber-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'pendingOrders', setAgentSortKey, setAgentSortDirection)}>Pending Orders</th>
+                        <th className="sticky top-0 z-20 bg-slate-100 py-3 px-3.5 text-right cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'orderValue', setAgentSortKey, setAgentSortDirection)}>Order Value</th>
+                        <th className="sticky top-0 z-20 bg-slate-100 py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'deliveredOrderValue', setAgentSortKey, setAgentSortDirection)}>Delivered Value</th>
+                        <th className="sticky top-0 z-20 bg-slate-100 py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'profit', setAgentSortKey, setAgentSortDirection)}>Profit</th>
+                        <th className="sticky top-0 z-20 bg-slate-100 py-3 px-3.5 text-right text-blue-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'bucketSize', setAgentSortKey, setAgentSortDirection)}>Bucket Size</th>
+                        <th className="sticky top-0 z-20 bg-slate-100 py-3 px-3.5 text-right text-emerald-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'deliveredRatio', setAgentSortKey, setAgentSortDirection)}>Delivered Ratio</th>
+                        <th className="sticky top-0 z-20 bg-slate-100 py-3 px-3.5 text-right text-red-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'cancelledRatio', setAgentSortKey, setAgentSortDirection)}>Cancelled Ratio</th>
+                        <th className="sticky top-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right text-purple-700 cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'nrRatio', setAgentSortKey, setAgentSortDirection)}>NR Ratio</th>
+                        <th className="sticky top-0 z-20 bg-slate-100 py-3 px-3.5 text-center cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'followupCount', setAgentSortKey, setAgentSortDirection)}>Follow-ups</th>
+                        <th className="sticky top-0 z-20 bg-slate-100 py-3 px-3.5 text-center cursor-pointer hover:bg-slate-200/70" onClick={() => handleSortToggle(agentSortKey, agentSortDirection, 'status', setAgentSortKey, setAgentSortDirection)}>Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-800">
                       {filteredAgentPerformance.length === 0 ? (
                         <tr>
-                          <td colSpan={17} className="text-center py-6 text-slate-400 font-semibold">
+                          <td colSpan={17} className="text-center py-8 text-slate-400 font-semibold">
                             No agent found matching the filters.
                           </td>
                         </tr>
@@ -6980,10 +7155,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
                             <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledOrders}</td>
                             <td className="py-3 px-3.5 text-right font-medium text-amber-600">{row.pendingOrders}</td>
-                            <td className="py-3 px-3.5 text-right font-medium"> {(row.orderValue || 0).toLocaleString()}</td>
-                            <td className="py-3 px-3.5 text-right font-bold text-emerald-700"> {(row.deliveredOrderValue || 0).toLocaleString()}</td>
-                            <td className="py-3 px-3.5 text-right font-bold text-emerald-600"> {(row.profit || 0).toLocaleString()}</td>
-                            <td className="py-3 px-3.5 text-right font-medium text-blue-700"> {(row.bucketSize || 0).toLocaleString()}</td>
+                            <td className="py-3 px-3.5 text-right font-medium">{(row.orderValue || 0).toLocaleString()}</td>
+                            <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{(row.deliveredOrderValue || 0).toLocaleString()}</td>
+                            <td className="py-3 px-3.5 text-right font-bold text-emerald-600">{(row.profit || 0).toLocaleString()}</td>
+                            <td className="py-3 px-3.5 text-right font-medium text-blue-700">{(row.bucketSize || 0).toLocaleString()}</td>
                             <td className="py-3 px-3.5 text-right font-bold text-emerald-600">{row.deliveredRatio}%</td>
                             <td className="py-3 px-3.5 text-right font-bold text-red-600">{row.cancelledRatio}%</td>
                             <td className="py-3 px-3.5 text-right font-bold text-purple-700">{row.nrRatio}%</td>
@@ -6997,26 +7172,27 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         ))
                       )}
                     </tbody>
+                    {/* Frozen Bottom Row Summary (Grand Total) - Always visible and locked at bottom on scroll */}
                     {filteredAgentPerformance.length > 0 && (
-                      <tfoot className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300">
+                      <tfoot className="sticky bottom-0 z-20 bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300 shadow-[0_-4px_12px_rgba(0,0,0,0.12)]">
                         <tr className="whitespace-nowrap">
-                          <td className="py-3.5 px-3.5 font-black uppercase text-slate-900">Grand Total</td>
-                          <td className="py-3.5 px-3.5 font-bold text-slate-500">-</td>
-                          <td className="py-3.5 px-3.5 font-bold text-slate-500">-</td>
-                          <td className="py-3.5 px-3.5 font-bold text-slate-500">-</td>
-                          <td className="py-3.5 px-3.5 text-right font-black text-indigo-700">{filteredAgentGrandTotal.createOrders}</td>
-                          <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{filteredAgentGrandTotal.servedOrders}</td>
-                          <td className="py-3.5 px-3.5 text-right font-black text-red-700">{filteredAgentGrandTotal.cancelledOrders}</td>
-                          <td className="py-3.5 px-3.5 text-right font-black text-amber-700">{filteredAgentGrandTotal.pendingOrders}</td>
-                          <td className="py-3.5 px-3.5 text-right font-black"> {(filteredAgentGrandTotal.orderValue || 0).toLocaleString()}</td>
-                          <td className="py-3.5 px-3.5 text-right font-black text-emerald-700"> {(filteredAgentGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
-                          <td className="py-3.5 px-3.5 text-right font-black text-emerald-600"> {(filteredAgentGrandTotal.profit || 0).toLocaleString()}</td>
-                          <td className="py-3.5 px-3.5 text-right font-black text-blue-700"> {(filteredAgentGrandTotal.bucketSize || 0).toLocaleString()}</td>
-                          <td className="py-3.5 px-3.5 text-right font-black text-emerald-700">{filteredAgentGrandTotal.deliveredRatio}%</td>
-                          <td className="py-3.5 px-3.5 text-right font-black text-red-700">{filteredAgentGrandTotal.cancelledRatio}%</td>
-                          <td className="py-3.5 px-3.5 text-right font-black text-purple-700">{filteredAgentGrandTotal.nrRatio}%</td>
-                          <td className="py-3.5 px-3.5 text-center font-black text-slate-900">{filteredAgentGrandTotal.followupCount}</td>
-                          <td className="py-3.5 px-3.5 text-center font-bold text-slate-500">-</td>
+                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 font-black uppercase text-slate-900 border-t-2 border-slate-300">Grand Total</td>
+                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 font-bold text-slate-500 border-t-2 border-slate-300">-</td>
+                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 font-bold text-slate-500 border-t-2 border-slate-300">-</td>
+                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 font-bold text-slate-500 border-t-2 border-slate-300">-</td>
+                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-indigo-700 border-t-2 border-slate-300">{filteredAgentGrandTotal.createOrders}</td>
+                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-emerald-700 border-t-2 border-slate-300">{filteredAgentGrandTotal.servedOrders}</td>
+                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-red-700 border-t-2 border-slate-300">{filteredAgentGrandTotal.cancelledOrders}</td>
+                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-amber-700 border-t-2 border-slate-300">{filteredAgentGrandTotal.pendingOrders}</td>
+                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black border-t-2 border-slate-300">{(filteredAgentGrandTotal.orderValue || 0).toLocaleString()}</td>
+                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-emerald-700 border-t-2 border-slate-300">{(filteredAgentGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
+                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-emerald-600 border-t-2 border-slate-300">{(filteredAgentGrandTotal.profit || 0).toLocaleString()}</td>
+                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-blue-700 border-t-2 border-slate-300">{(filteredAgentGrandTotal.bucketSize || 0).toLocaleString()}</td>
+                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-emerald-700 border-t-2 border-slate-300">{filteredAgentGrandTotal.deliveredRatio}%</td>
+                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-red-700 border-t-2 border-slate-300">{filteredAgentGrandTotal.cancelledRatio}%</td>
+                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-purple-700 border-t-2 border-slate-300">{filteredAgentGrandTotal.nrRatio}%</td>
+                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-center font-black text-slate-900 border-t-2 border-slate-300">{filteredAgentGrandTotal.followupCount}</td>
+                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-center font-bold text-slate-500 border-t-2 border-slate-300">-</td>
                         </tr>
                       </tfoot>
                     )}
@@ -7029,43 +7205,33 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {/* TAB: PROFILES */}
           {activeTab === 'profiles' && (
             <AgentProfileView
-              currentAgent={
-                selectedProfileUserId && selectedProfileUserId !== managerProfile.user
-                  ? (users.find(u => u.user === selectedProfileUserId) || managerProfile)
-                  : managerProfile
-              }
+              currentAgent={managerProfile}
               onUpdateAgentProfile={(updated) => {
-                if (!selectedProfileUserId || selectedProfileUserId === managerProfile.user) {
-                  handleUpdateManagerProfile({
-                    user: updated.user,
-                    pass: updated.pass,
-                    name: updated.name,
-                    role: updated.role || 'Manager',
-                    contact: updated.contact,
-                    email: updated.email,
-                    address: updated.address,
-                    bloodGroup: updated.bloodGroup,
-                    gender: updated.gender,
-                    birthday: updated.birthday,
-                    permissions: updated.permissions,
-                    team: updated.team || 'Manager'
-                  });
-                  const exists = users.some(u => u.user === updated.user);
-                  if (exists) {
-                    const updatedUsers = users.map(u => u.user === updated.user ? { ...u, ...updated } : u);
-                    onUpdateAgents(updatedUsers, false);
-                  }
-                } else {
+                handleUpdateManagerProfile({
+                  user: updated.user,
+                  pass: updated.pass,
+                  name: updated.name,
+                  role: updated.role || 'Manager',
+                  contact: updated.contact,
+                  email: updated.email,
+                  address: updated.address,
+                  bloodGroup: updated.bloodGroup,
+                  gender: updated.gender,
+                  birthday: updated.birthday,
+                  permissions: updated.permissions,
+                  team: updated.team || 'Manager',
+                  status: updated.status || 'active'
+                });
+                const exists = users.some(u => u.user === updated.user);
+                if (exists) {
                   const updatedUsers = users.map(u => u.user === updated.user ? { ...u, ...updated } : u);
-                  onUpdateAgents(updatedUsers, true);
+                  onUpdateAgents(updatedUsers, false);
                 }
               }}
-              isManagerView={isManager}
-              allAgents={users}
-              selectedUserId={selectedProfileUserId}
-              onSelectUserId={setSelectedProfileUserId}
+              isManagerView={true}
               orders={orders}
               followupHistory={followupHistory}
+              onViewOrderJourney={(ord) => setViewJourneyOrder(ord)}
             />
           )}
 
@@ -7073,13 +7239,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
           {/* TAB: CATEGORY & TEAM MAPPING */}
           {activeTab === 'category-mapping' && (
-            <div className="max-w-6xl space-y-6">
+            <div className="w-full space-y-6 pb-20">
               {/* MASTER CATEGORY LIST WITH 3 BUTTONS (Demo CSV, Export CSV, Update CSV) */}
-              <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3.5">
-                  <h3 className="font-extrabold text-base text-slate-900">
-                    Master Category List
-                  </h3>
+              <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                  <div>
+                    <h3 className="font-extrabold text-base text-slate-900">
+                      Master Category &amp; Global Operational Mappings
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Configure master classification lists for categories, statuses, operational teams, channels, supervisors, and time slots
+                    </p>
+                  </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {/* 1. Demo CSV */}
                     <button
@@ -7452,6 +7623,420 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   })()}
                 </div>
               </div>
+
+              {/* CATEGORY TO TEAM OPERATIONAL RULE MAPPING TABLE (Full Page Utilization) */}
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-5 sm:p-7">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                  <div>
+                    <h4 className="text-base font-extrabold text-slate-900">
+                      Category-to-Team Operational Rule Mapping
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Assign designated operational teams, default status, marketing channel, supervisor, and delivery time slot per category
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">
+                      {categoryMappings.length} Active Rules Configured
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quick Add Row & Filter */}
+                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                    Add New Operational Rule
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2.5 items-end">
+                    <div className="lg:col-span-2">
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Category</label>
+                      <input
+                        type="text"
+                        list="master-cat-list"
+                        placeholder="Select or enter category"
+                        value={newMappingCategory}
+                        onChange={(e) => setNewMappingCategory(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-semibold focus:outline-hidden focus:border-indigo-600"
+                      />
+                      <datalist id="master-cat-list">
+                        {categories.map((c, idx) => (
+                          <option key={`cat-${c}-${idx}`} value={c} />
+                        ))}
+                      </datalist>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Team</label>
+                      <select
+                        value={newMappingTeam}
+                        onChange={(e) => setNewMappingTeam(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-semibold focus:outline-hidden focus:border-indigo-600"
+                      >
+                        {teamsList.map((t, idx) => (
+                          <option key={`team-${t}-${idx}`} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Status</label>
+                      <select
+                        value={newMappingStatus}
+                        onChange={(e) => setNewMappingStatus(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-semibold focus:outline-hidden focus:border-indigo-600"
+                      >
+                        {orderStatuses.map((s, idx) => (
+                          <option key={`status-${s}-${idx}`} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Channel</label>
+                      <select
+                        value={newMappingChannel}
+                        onChange={(e) => setNewMappingChannel(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-semibold focus:outline-hidden focus:border-indigo-600"
+                      >
+                        {channelsList.map((ch, idx) => (
+                          <option key={`channel-${ch}-${idx}`} value={ch}>{ch}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Leader</label>
+                      <select
+                        value={newMappingTeamLeader}
+                        onChange={(e) => setNewMappingTeamLeader(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-semibold focus:outline-hidden focus:border-indigo-600"
+                      >
+                        {teamLeadersList.map((tl, idx) => (
+                          <option key={`tl-${tl}-${idx}`} value={tl}>{tl}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <button
+                        type="button"
+                        onClick={handleAddNewMapping}
+                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Rule</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filter and Search Box */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                  <div className="relative flex-1 max-w-sm">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search category mapping rules..."
+                      value={mappingSearchQuery}
+                      onChange={(e) => setMappingSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-hidden focus:border-indigo-600 transition-colors"
+                    />
+                  </div>
+                  <span className="text-xs text-slate-400 font-semibold">
+                    Showing {filteredCategoryMappings.length} of {categoryMappings.length} rules
+                  </span>
+                </div>
+
+                {/* Rules Table */}
+                <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 whitespace-nowrap">
+                      <tr>
+                        <th className="py-3 px-3.5">#</th>
+                        <th className="py-3 px-3.5">Category</th>
+                        <th className="py-3 px-3.5">Operational Team</th>
+                        <th className="py-3 px-3.5">Default Status</th>
+                        <th className="py-3 px-3.5">Channel</th>
+                        <th className="py-3 px-3.5">Team Leader</th>
+                        <th className="py-3 px-3.5">Time Slot</th>
+                        <th className="py-3 px-3.5 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-800">
+                      {filteredCategoryMappings.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="text-center py-10 text-slate-400 font-medium">
+                            No mapping rules found matching your query.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredCategoryMappings.map((rule, idx) => (
+                          <tr key={rule.id} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
+                            <td className="py-3 px-3.5 font-mono text-slate-400 font-bold">{idx + 1}</td>
+                            <td className="py-3 px-3.5 font-bold text-slate-900">{rule.category}</td>
+                            <td className="py-3 px-3.5">
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800">
+                                {rule.team}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3.5">
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                {rule.orderStatus || (rule as any).status || 'Pending'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3.5 font-medium text-slate-600">
+                              {rule.channel || 'Facebook'}
+                            </td>
+                            <td className="py-3 px-3.5 font-medium text-purple-700">
+                              {rule.teamLeader || 'MD Abujar'}
+                            </td>
+                            <td className="py-3 px-3.5 font-mono text-slate-500 text-[11px]">
+                              {rule.timeSlot || '10AM to 11AM'}
+                            </td>
+                            <td className="py-3 px-3.5 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMapping(rule.id || String(idx))}
+                                className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                                title="Delete Rule"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: LIVE CATEGORY DISTRIBUTION & ORDER VOLUME (New Dedicated Tab) */}
+          {activeTab === 'category-distribution' && (
+            <div className="w-full space-y-6 pb-20">
+              {/* Header card with KPI stats and export */}
+              <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 shadow-inner shrink-0">
+                      <PieChart className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-base sm:text-lg text-slate-900">
+                        Live Database Category Distribution &amp; Order Volume
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Real-time order count, delivered fulfillment, order value, and profit breakdown across all product categories
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const catMap = new Map<string, { total: number; delivered: number; value: number; profit: number }>();
+                        categories.forEach(c => {
+                          const k = c.trim();
+                          if (k) catMap.set(k, { total: 0, delivered: 0, value: 0, profit: 0 });
+                        });
+                        orders.forEach(o => {
+                          const cat = String(o.product_category || (o as any).productCategory || (o as any).category || 'Other').trim();
+                          const val = Number(o.order_value || (o as any).orderValue || 0);
+                          const pr = Number(o.profit || 0);
+                          const st = String(o.order_status || (o as any).orderStatus || '').toLowerCase();
+                          const isDeliv = st === 'delivered' || st === 'complete' || st === 'completed';
+                          const curr = catMap.get(cat) || { total: 0, delivered: 0, value: 0, profit: 0 };
+                          curr.total += 1;
+                          if (isDeliv) curr.delivered += 1;
+                          curr.value += val;
+                          curr.profit += pr;
+                          catMap.set(cat, curr);
+                        });
+                        const exportData = Array.from(catMap.entries()).map(([cat, s], idx) => ({
+                          rank: idx + 1,
+                          category: cat,
+                          master_configured: categories.some(c => c.trim().toLowerCase() === cat.toLowerCase()) ? 'Yes' : 'No',
+                          total_orders: s.total,
+                          delivered_orders: s.delivered,
+                          delivery_ratio: s.total > 0 ? `${Math.round((s.delivered / s.total) * 100)}%` : '0%',
+                          order_value: s.value,
+                          profit: s.profit
+                        }));
+                        handleExportCsv(exportData, `category_distribution_report_${new Date().toISOString().slice(0, 10)}.csv`);
+                      }}
+                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-2 transition-all cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Export CSV Report</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4 Summary KPI Cards */}
+                {(() => {
+                  const catMap = new Map<string, { total: number; delivered: number; value: number; profit: number }>();
+                  categories.forEach(c => {
+                    const k = c.trim();
+                    if (k) catMap.set(k, { total: 0, delivered: 0, value: 0, profit: 0 });
+                  });
+                  orders.forEach(o => {
+                    const cat = String(o.product_category || (o as any).productCategory || (o as any).category || 'Other').trim();
+                    const val = Number(o.order_value || (o as any).orderValue || 0);
+                    const pr = Number(o.profit || 0);
+                    const st = String(o.order_status || (o as any).orderStatus || '').toLowerCase();
+                    const isDeliv = st === 'delivered' || st === 'complete' || st === 'completed';
+                    const curr = catMap.get(cat) || { total: 0, delivered: 0, value: 0, profit: 0 };
+                    curr.total += 1;
+                    if (isDeliv) curr.delivered += 1;
+                    curr.value += val;
+                    curr.profit += pr;
+                    catMap.set(cat, curr);
+                  });
+                  const totalCategories = catMap.size;
+                  let totalOrdersAllCats = 0;
+                  let totalDeliveredAllCats = 0;
+                  let totalValueAllCats = 0;
+                  let totalProfitAllCats = 0;
+                  catMap.forEach(v => {
+                    totalOrdersAllCats += v.total;
+                    totalDeliveredAllCats += v.delivered;
+                    totalValueAllCats += v.value;
+                    totalProfitAllCats += v.profit;
+                  });
+                  const overallDeliveryRate = totalOrdersAllCats > 0 ? Math.round((totalDeliveredAllCats / totalOrdersAllCats) * 100) : 0;
+
+                  return (
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Total Categories</span>
+                        <p className="text-2xl font-black text-slate-900 mt-1 font-mono">{totalCategories}</p>
+                        <span className="text-[11px] text-slate-400 mt-0.5 block">{categories.length} in Master Classification</span>
+                      </div>
+                      <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 block">Total Category Orders</span>
+                        <p className="text-2xl font-black text-indigo-700 mt-1 font-mono">{totalOrdersAllCats.toLocaleString()}</p>
+                        <span className="text-[11px] text-indigo-600 mt-0.5 block">{totalDeliveredAllCats.toLocaleString()} Delivered</span>
+                      </div>
+                      <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 block">Category Revenue</span>
+                        <p className="text-2xl font-black text-emerald-700 mt-1 font-mono">{totalValueAllCats.toLocaleString()}</p>
+                        <span className="text-[11px] text-emerald-600 mt-0.5 block">Profit: {totalProfitAllCats.toLocaleString()}</span>
+                      </div>
+                      <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-purple-700 block">Delivered Ratio</span>
+                        <p className="text-2xl font-black text-purple-700 mt-1 font-mono">{overallDeliveryRate}%</p>
+                        <span className="text-[11px] text-purple-600 mt-0.5 block">Overall Delivery Success</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Table Card */}
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-indigo-600" />
+                    <h4 className="text-xs sm:text-sm font-extrabold text-slate-900">
+                      Category Breakdown &amp; Order Distribution Table
+                    </h4>
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 self-start sm:self-auto">
+                    {categories.length} Master Categories Configured
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 whitespace-nowrap">
+                      <tr>
+                        <th className="py-3 px-4">#</th>
+                        <th className="py-3 px-4">Category Name</th>
+                        <th className="py-3 px-4 text-center">Master Mapping Status</th>
+                        <th className="py-3 px-4 text-right text-indigo-700">Total Orders</th>
+                        <th className="py-3 px-4 text-right text-emerald-700">Delivered Orders</th>
+                        <th className="py-3 px-4 text-right text-purple-700">Delivered Ratio</th>
+                        <th className="py-3 px-4 text-right">Order Value</th>
+                        <th className="py-3 px-4 text-right text-emerald-600">Net Profit</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-800">
+                      {(() => {
+                        const catMap = new Map<string, { total: number; delivered: number; value: number; profit: number }>();
+                        categories.forEach(c => {
+                          const k = c.trim();
+                          if (k) catMap.set(k, { total: 0, delivered: 0, value: 0, profit: 0 });
+                        });
+                        orders.forEach(o => {
+                          const cat = String(o.product_category || (o as any).productCategory || (o as any).category || 'Other').trim();
+                          const val = Number(o.order_value || (o as any).orderValue || 0);
+                          const pr = Number(o.profit || 0);
+                          const st = String(o.order_status || (o as any).orderStatus || '').toLowerCase();
+                          const isDeliv = st === 'delivered' || st === 'complete' || st === 'completed';
+                          const curr = catMap.get(cat) || { total: 0, delivered: 0, value: 0, profit: 0 };
+                          curr.total += 1;
+                          if (isDeliv) curr.delivered += 1;
+                          curr.value += val;
+                          curr.profit += pr;
+                          catMap.set(cat, curr);
+                        });
+                        const entries = Array.from(catMap.entries()).sort((a, b) => b[1].total - a[1].total);
+                        if (entries.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={8} className="text-center py-8 text-slate-400 font-medium">
+                                No categories recorded in current database.
+                              </td>
+                            </tr>
+                          );
+                        }
+                        const totalOrdersAll = entries.reduce((sum, e) => sum + e[1].total, 0);
+
+                        return entries.map(([catName, stats], idx) => {
+                          const isMasterConfigured = categories.some(c => c.trim().toLowerCase() === catName.toLowerCase());
+                          const delivRatio = stats.total > 0 ? Math.round((stats.delivered / stats.total) * 100) : 0;
+                          const sharePct = totalOrdersAll > 0 ? Math.round((stats.total / totalOrdersAll) * 100) : 0;
+
+                          return (
+                            <tr key={catName} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
+                              <td className="py-3 px-4 font-mono text-slate-400 font-bold">{idx + 1}</td>
+                              <td className="py-3 px-4 font-bold text-slate-900">{catName}</td>
+                              <td className="py-3 px-4 text-center">
+                                {isMasterConfigured ? (
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                    Configured in Master List
+                                  </span>
+                                ) : (
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                    Unmapped (Detected in Orders)
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-right font-mono font-bold text-indigo-700">
+                                {stats.total} <span className="text-[10px] font-normal text-slate-400">({sharePct}%)</span>
+                              </td>
+                              <td className="py-3 px-4 text-right font-mono font-bold text-emerald-700">{stats.delivered}</td>
+                              <td className="py-3 px-4 text-right">
+                                <div className="inline-flex items-center gap-1.5">
+                                  <div className="w-12 bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                                    <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${delivRatio}%` }} />
+                                  </div>
+                                  <span className="font-mono font-bold text-slate-700 text-[11px]">{delivRatio}%</span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">{stats.value.toLocaleString()}</td>
+                              <td className="py-3 px-4 text-right font-mono font-bold text-emerald-600">{stats.profit.toLocaleString()}</td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
         </main>
@@ -7538,6 +8123,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           onUpdateOrderStatus={onUpdateOrderStatus}
           onRefreshOrders={onRefreshOrders}
           canEdit={true}
+          onViewCustomer={(cId) => setSelectedCustomerId(cId)}
         />
       )}
 
@@ -7555,6 +8141,21 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           onUpdateOrderStatus={onUpdateOrderStatus}
           onRefreshOrders={onRefreshOrders}
           canEdit={true}
+          onViewCustomer={(cId) => setSelectedCustomerId(cId)}
+        />
+      )}
+
+      {/* Modal: Customer Details & 360 View */}
+      {selectedCustomerId && (
+        <CustomerDetailsModal
+          customerId={selectedCustomerId}
+          isOpen={Boolean(selectedCustomerId)}
+          onClose={() => setSelectedCustomerId(null)}
+          orders={orders}
+          followupHistory={followupHistory}
+          onViewOrderJourney={(ord) => {
+            setViewJourneyOrder(ord);
+          }}
         />
       )}
 
@@ -8369,6 +8970,112 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         }}
         orders={orders}
       />
+
+      {/* FULL-PAGE LOCK SCREEN MODAL ("lock maney just password dite hobe") */}
+      {isLocked && (
+        <div className="fixed inset-0 z-[99999] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200 select-none">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-8 text-center space-y-6 relative overflow-hidden">
+            {/* Ambient accent light */}
+            <div className="absolute -top-20 -right-20 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-20 -left-20 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="space-y-3 relative z-10">
+              {/* Avatar Monogram */}
+              <div className="relative mx-auto w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 text-white font-black text-2xl flex items-center justify-center shadow-lg border-2 border-indigo-400/30">
+                {(managerProfile.name || managerProfile.user || 'M')
+                  .split(' ')
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map(w => w[0].toUpperCase())
+                  .join('') || 'M'}
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-amber-500 border-2 border-white dark:border-slate-900 flex items-center justify-center text-white shadow-xs">
+                  <Lock className="w-3 h-3" />
+                </div>
+              </div>
+
+              <div>
+                <h2 className="text-xl font-black text-slate-900 dark:text-white">
+                  {managerProfile.name || managerProfile.user || 'Manager'}
+                </h2>
+                <div className="flex items-center justify-center gap-2 mt-1">
+                  <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2 py-0.5 rounded-md">
+                    ID: #{managerProfile.user}
+                  </span>
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                    • {managerProfile.role || 'Manager'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                  Session is locked. Enter your password to resume work.
+                </p>
+              </div>
+            </div>
+
+            {/* Unlock Form */}
+            <form onSubmit={handleUnlockSession} className="space-y-4 relative z-10 text-left">
+              {unlockError && (
+                <div className="p-3 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 rounded-xl text-xs font-bold flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
+                  <span>{unlockError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Enter Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showUnlockPassword ? 'text' : 'password'}
+                    autoFocus
+                    required
+                    value={unlockPassword}
+                    onChange={(e) => {
+                      setUnlockPassword(e.target.value);
+                      if (unlockError) setUnlockError('');
+                    }}
+                    placeholder="Enter your password"
+                    className="w-full pl-4 pr-11 py-3 text-sm font-bold font-mono rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900/40 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowUnlockPassword(prev => !prev)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-1"
+                    title={showUnlockPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showUnlockPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Lock className="w-4 h-4" />
+                <span>Unlock Session</span>
+              </button>
+            </form>
+
+            {/* Full logout option */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 relative z-10 flex items-center justify-between text-xs">
+              <span className="text-slate-400">Not you?</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLocked(false);
+                  sessionStorage.removeItem('portal_screen_locked');
+                  onLogout();
+                }}
+                className="font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out Completely</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

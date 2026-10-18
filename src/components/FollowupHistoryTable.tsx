@@ -53,6 +53,7 @@ export interface FollowupHistoryTableProps {
   allFilteredRecords?: FollowupHistoryItem[];
   onViewOrder: (order: OrderItem) => void;
   onUndoFollowup?: (historyId: string, orderId: string, previousStatus: string, updatedBy?: string) => void;
+  onViewCustomer?: (customerId: string) => void;
 }
 
 export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
@@ -89,7 +90,8 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
   onExportXlsx,
   allFilteredRecords = [],
   onViewOrder,
-  onUndoFollowup
+  onUndoFollowup,
+  onViewCustomer
 }) => {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
@@ -356,7 +358,26 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                         {hist.timestamp}
                       </td>
                       <td className="py-3 px-3.5 text-slate-700 whitespace-nowrap font-medium">
-                        {hist.customerName || '-'}
+                        {onViewCustomer ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const ord = orders.find((o) => String(o.order_id || o.id) === String(hist.orderId));
+                              const cId = ord ? String(ord.customer_id || ord.customerId || '') : '';
+                              if (cId) {
+                                onViewCustomer(cId);
+                              } else if (hist.customerContact) {
+                                onViewCustomer(hist.customerContact);
+                              }
+                            }}
+                            className="hover:underline text-slate-900 hover:text-indigo-600 font-bold cursor-pointer text-left"
+                            title="Click to view Customer 360 profile"
+                          >
+                            {hist.customerName || '-'}
+                          </button>
+                        ) : (
+                          hist.customerName || '-'
+                        )}
                       </td>
                       <td className="py-3 px-3.5 font-mono text-slate-600 whitespace-nowrap">
                         {hist.customerContact || '-'}

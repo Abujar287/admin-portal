@@ -35,6 +35,7 @@ interface OrderJourneyModalProps {
   ) => Promise<void>;
   onRefreshOrders?: () => Promise<void>;
   canEdit?: boolean;
+  onViewCustomer?: (customerId: string) => void;
 }
 
 export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
@@ -44,7 +45,8 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
   currentUser,
   onUpdateOrderStatus,
   onRefreshOrders,
-  canEdit = true
+  canEdit = true,
+  onViewCustomer
 }) => {
   if (!order) return null;
 
@@ -391,7 +393,21 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-indigo-200/80 mt-0.5">
-                Customer: <strong className="text-white">{order.customer_name || order.customerName}</strong> ({order.customer_mobile || order.customerContact}) • Agent: <strong className="text-white">{order.agent_name || order.agentName}</strong>
+                Customer:{' '}
+                {onViewCustomer ? (
+                  <button
+                    type="button"
+                    onClick={() => onViewCustomer(String(order.customer_id || order.customerId))}
+                    className="text-white font-bold hover:underline hover:text-amber-300 cursor-pointer inline-flex items-center gap-1"
+                    title="Click to view Customer 360 profile & history"
+                  >
+                    <span>{order.customer_name || order.customerName}</span>
+                    <span className="text-[10px] text-indigo-200">({order.customer_id || order.customerId})</span>
+                  </button>
+                ) : (
+                  <strong className="text-white">{order.customer_name || order.customerName}</strong>
+                )}{' '}
+                ({order.customer_mobile || order.customerContact}) • Agent: <strong className="text-white">{order.agent_name || order.agentName}</strong>
               </p>
             </div>
           </div>
@@ -742,12 +758,26 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                 { label: 'Cancelled Date', value: order.cancelled_date ? OrderService.formatDateTime(order.cancelled_date) : '-' },
                 { label: 'Customer ID', value: order.customer_id || order.customerId },
                 { label: 'Address', value: order.address_details || order.addressDetails, span: 'col-span-2 sm:col-span-3' }
-              ].map((item, idx) => (
-                <div key={idx} className={`flex items-baseline gap-1.5 py-0.5 border-b border-slate-50 ${item.span || ''}`}>
-                  <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap min-w-[70px]">{item.label}:</span>
-                  <span className="text-[11px] font-semibold text-slate-800 truncate" title={String(item.value || '-')}>{item.value || '-'}</span>
-                </div>
-              ))}
+              ].map((item, idx) => {
+                const isCustomerField = (item.label === 'Customer ID' || item.label === 'Customer') && onViewCustomer;
+                return (
+                  <div key={idx} className={`flex items-baseline gap-1.5 py-0.5 border-b border-slate-50 ${item.span || ''}`}>
+                    <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap min-w-[70px]">{item.label}:</span>
+                    {isCustomerField ? (
+                      <button
+                        type="button"
+                        onClick={() => onViewCustomer(String(order.customer_id || order.customerId))}
+                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-900 hover:underline cursor-pointer truncate text-left"
+                        title="Click to view Customer 360 profile"
+                      >
+                        {item.value || '-'}
+                      </button>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-slate-800 truncate" title={String(item.value || '-')}>{item.value || '-'}</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 

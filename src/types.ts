@@ -5,6 +5,7 @@ export type AgentNavTab =
   | 'agent-performance' 
   | 'users' 
   | 'category-mapping' 
+  | 'category-distribution'
   | 'sheet-connection' 
   | 'profiles' 
   | 'dashboard';

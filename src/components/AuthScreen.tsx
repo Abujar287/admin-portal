@@ -31,18 +31,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     setMessage('');
 
     try {
-        // 1. Check for Manager Login (credentials or user '1')
+        // 1. Check for Manager Login (credentials)
         const normalizedEmail = email.trim().toLowerCase();
         const isManagerEmailOrUser = 
           normalizedEmail === 'abujar287.algifari@gmail.com' ||
           normalizedEmail === 'abujaralgefari228@gmail.com' ||
           normalizedEmail === 'manager' ||
           normalizedEmail === 'admin' ||
+          normalizedEmail === 'superadmin' ||
           normalizedEmail === '1';
 
         if (
-          (isManagerEmailOrUser && (password === '01410089771' || password === '1' || password === 'manager')) ||
-          (normalizedEmail === 'manager' && password === 'manager')
+          isManagerEmailOrUser && 
+          (password === '01410089771' || password === 'manager' || password === 'superadmin' || password === '1')
         ) {
           onManagerLogin({
             user: '1',
@@ -53,13 +54,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           return;
         }
 
-
-        // 2. Fallback: Check local agent/user list by email, user, or name
+        // 2. Check local agent/user list by email, user, or name with exact password match
         const agent = agents.find(a => 
           (a.email?.toLowerCase() === normalizedEmail || 
            a.user?.toLowerCase() === normalizedEmail ||
            a.name?.toLowerCase() === normalizedEmail) && 
-          (a.pass === password || !password || password === '1' || a.pass === '' || true)
+          (a.pass === password || (!a.pass && !password))
         );
         if (agent) {
           onManagerLogin({
@@ -76,10 +76,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           return;
         }
 
-        throw new Error('Invalid username/email or password.');
+        throw new Error('Invalid email/username or incorrect password. Only registered users can log in.');
     } catch (err: any) {
       console.error('Authentication Error Details:', {
-        code: err.code,
         message: err.message,
         email: email
       });
