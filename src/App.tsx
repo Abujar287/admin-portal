@@ -107,7 +107,7 @@ export function App() {
       const res = await OrderService.updateOrderStatus(
         orderId,
         updates,
-        currentManager?.name || updatedBy,
+        updatedBy,
         notes || 'Order details updated'
       );
       if (res.updatedOrders && res.updatedOrders.length > 0) {

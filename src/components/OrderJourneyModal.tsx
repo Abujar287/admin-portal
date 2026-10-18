@@ -103,18 +103,17 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
     currentUser.user === '1' ||
     currentUser.user?.toLowerCase() === 'manager';
 
-  const actorUserId = (currentUser.user === '1' || currentUser.user?.toLowerCase() === 'manager' || (!currentUser.user && isManagerRole))
-    ? '1' 
-    : (currentUser.user || '1');
-  const actorUserName = actorUserId === '1' ? 'Manager' : (currentUser.name || currentUser.user || 'Agent');
-  const userDisplayName = actorUserId === '1' ? 'Manager (1)' : `${actorUserName} (${actorUserId})`;
+  // Use the actual current user details without hardcoding to 'Manager'
+  const actorUserId = currentUser.user || '1';
+  const actorUserName = currentUser.name || currentUser.user || 'User';
+  const userDisplayName = `${actorUserName} (${actorUserId})`;
 
   const currentFStatus = (order.followup_status || order.followupStatus || '').toLowerCase();
   const currentOStatus = (order.order_status || order.orderStatus || '').toLowerCase();
   const isDelivered = currentFStatus === 'delivered' || currentOStatus === 'delivered';
   const isCancelled = currentFStatus === 'cancelled' || currentOStatus === 'cancelled';
   const isLocked = isDelivered || isCancelled;
-  const canEditEffective = Boolean(canEdit && isManagerRole && !isLocked);
+  const canEditEffective = Boolean(canEdit && !isLocked);
 
   const handleProfitChange = (valStr: string) => {
     setSingleProfit(valStr);
@@ -158,7 +157,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
         {
           profit: parsedProfit
         },
-        userDisplayName,
+        actorUserId,
         `Profit updated to ${parsedProfit.toLocaleString()}`
       );
       setProfitMsg('Updated!');
@@ -800,9 +799,8 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                       <tr key={i} className="text-slate-700 hover:bg-slate-50">
                         <td className="py-2 px-3 font-mono whitespace-nowrap">{h.timestamp}</td>
                         <td className="py-2 px-3 whitespace-nowrap font-medium">
-                          {h.updatedBy === '1' || h.updatedBy?.toLowerCase() === 'manager' || (h.updatedByName?.toLowerCase().includes('manager'))
-                            ? 'Manager (1)'
-                            : (h.updatedByName || h.updatedBy?.replace(/\s*\(@.*\)/, '').replace(/^@/, ''))}
+                          <span className="font-bold text-indigo-700">{h.updatedByName || h.updatedBy || 'System'}</span>
+                          <span className="text-[10px] text-slate-400 ml-1">({h.updatedBy || 'ID: ?'})</span>
                         </td>
                         <td className="py-2 px-3">
                            <div className="font-bold">{h.action}</div>

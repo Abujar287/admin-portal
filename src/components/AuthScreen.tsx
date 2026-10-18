@@ -46,7 +46,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         if (isManagerEmail) {
           if (normalizedPassword === '01410089771' || normalizedPassword === 'manager') {
             onManagerLogin({
-              user: '1',
+              user: normalizedEmail,
               pass: normalizedPassword,
               name: 'Manager',
               role: 'Manager'

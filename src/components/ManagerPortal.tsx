@@ -277,8 +277,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   const isSuperAdminOrFullManager = useMemo(() => {
     return (
-      currentManager.user === '1' ||
       currentManager.role === 'Superadmin' ||
+      currentManager.role === 'Manager' ||
       (currentManager.role === 'Manager' && !currentUserPermissions?.allowedTabs)
     );
   }, [currentManager, currentUserPermissions]);
@@ -348,7 +348,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   // Scoped followup history based on role & permissions
   const scopedFollowupHistory = useMemo(() => {
     const isSuperOrFullManager = 
-      currentManager.user === '1' ||
       currentManager.role === 'Superadmin' ||
       currentManager.role === 'Manager' ||
       currentManager.permissions?.orderScope === 'all_orders';
@@ -8118,14 +8117,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           order={viewJourneyOrder}
           onClose={() => setViewJourneyOrder(null)}
           followupHistory={followupHistory}
-          currentUser={{
-            name: 'Manager',
-            user: '1',
-            role: 'Manager'
-          }}
+          currentUser={currentManager}
           onUpdateOrderStatus={onUpdateOrderStatus}
           onRefreshOrders={onRefreshOrders}
-          canEdit={true}
+          canEdit={currentManager.permissions?.canUpdateStatus || currentManager.role === 'Manager' || currentManager.role === 'Superadmin'}
           onViewCustomer={(cId) => setSelectedCustomerId(cId)}
         />
       )}
@@ -8136,14 +8131,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           order={statusModalOrder}
           onClose={() => setStatusModalOrder(null)}
           followupHistory={followupHistory}
-          currentUser={{
-            name: 'Manager',
-            user: '1',
-            role: 'Manager'
-          }}
+          currentUser={currentManager}
           onUpdateOrderStatus={onUpdateOrderStatus}
           onRefreshOrders={onRefreshOrders}
-          canEdit={true}
+          canEdit={currentManager.permissions?.canUpdateStatus || currentManager.role === 'Manager' || currentManager.role === 'Superadmin'}
           onViewCustomer={(cId) => setSelectedCustomerId(cId)}
         />
       )}

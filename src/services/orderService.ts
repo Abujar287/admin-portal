@@ -1521,8 +1521,8 @@ export class OrderService {
     }
 
     // Resolve manager / agent user ID and name cleanly (strip '@')
-    let uById = '1';
-    let uByName = 'Manager';
+    let uById = updatedBy || '1';
+    let uByName = updatedBy || 'Manager';
 
     if (updatedBy) {
       const trimmed = String(updatedBy).trim();
@@ -1546,17 +1546,11 @@ export class OrderService {
 
     const lowerId = uById.toLowerCase();
     const lowerName = uByName.toLowerCase();
-    if (
-      lowerId === 'manager' ||
-      lowerId === 'admin' ||
-      lowerId === 'superadmin' ||
-      lowerId === '1' ||
-      lowerName === 'manager' ||
-      lowerName === 'manager (admin)'
-    ) {
-      uById = '1';
-      uByName = 'Manager';
-    }
+    // Keep the uById and uByName derived from the input updatedBy,
+    // do not force override to 'Manager' / '1' if name matches 'manager' etc.
+    // This allows individual manager/admin names to show up in audit logs.
+    
+    // (Removed hardcoded override for manager/admin names here)
 
     const finalOrderStatus = 'Pending';
     const finalFollowupStatus = updates.followup_status || updates.followupStatus || existingOrder?.followup_status || existingOrder?.followupStatus || 'Pending';
@@ -2269,7 +2263,7 @@ function doPost(e) {
     var newFollowupStatus = data.followupStatus || data.followup_status || data.new_followup_status || data.newFollowupStatus || data.status || '';
     // order_status must always stay 'Pending' as required
     var newOrderStatus = 'Pending';
-    var updatedBy = data.updatedBy || data.updated_by || 'Manager';
+    var updatedBy = data.updatedBy || data.updated_by || '';
     var note = data.notes || data.remarks || '';
     var timestamp = data['Log Timestamp'] || data.logTimestamp || new Date();
 
@@ -2427,7 +2421,7 @@ function doPost(e) {
         }
       }
 
-      var uByVal = String(data.updatedBy || data.updated_by || data.updateBy || data.update_by || '1').trim();
+      var uByVal = String(data.updatedBy || data.updated_by || data.updateBy || data.update_by || '').trim();
       var uByNameVal = String(data.updatedByName || data.updated_by_name || data.updateByName || data.update_by_name || '').trim();
       if (!uByNameVal && uByVal.indexOf('(@') !== -1) {
         var m = uByVal.match(/\(@(.*)\)/);
@@ -2438,21 +2432,22 @@ function doPost(e) {
       }
       var lowerUBy = uByVal.toLowerCase();
       var lowerUName = uByNameVal.toLowerCase();
-      if (
-        lowerUBy === 'manager' ||
-        lowerUBy === 'admin' ||
-        lowerUBy === '1' ||
-        lowerUBy.indexOf('abujar') !== -1 ||
-        lowerUBy.indexOf('manager') !== -1 ||
-        lowerUBy.indexOf('admin') !== -1 ||
-        lowerUBy.indexOf('@') !== -1 ||
-        lowerUName === 'manager' ||
-        lowerUName.indexOf('manager') !== -1 ||
-        lowerUName.indexOf('admin') !== -1
-      ) {
-        uByVal = '1';
-        if (!uByNameVal || uByNameVal.indexOf('@') !== -1) uByNameVal = 'Manager';
-      }
+      // Removed hardcoded override to allow actual user ID/name to be logged in followup sheet
+      // if (
+      //   lowerUBy === 'manager' ||
+      //   lowerUBy === 'admin' ||
+      //   lowerUBy === '1' ||
+      //   lowerUBy.indexOf('abujar') !== -1 ||
+      //   lowerUBy.indexOf('manager') !== -1 ||
+      //   lowerUBy.indexOf('admin') !== -1 ||
+      //   lowerUBy.indexOf('@') !== -1 ||
+      //   lowerUName === 'manager' ||
+      //   lowerUName.indexOf('manager') !== -1 ||
+      //   lowerUName.indexOf('admin') !== -1
+      // ) {
+      //   uByVal = '1';
+      //   if (!uByNameVal || uByNameVal.indexOf('@') !== -1) uByNameVal = 'Manager';
+      // }
 
       followupSheet.appendRow([
         timestamp,
