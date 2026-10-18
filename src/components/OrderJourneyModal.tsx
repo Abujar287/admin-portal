@@ -721,7 +721,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1.5 text-xs py-1">
               {[
                 { label: 'Order ID', value: order.order_id || order.id },
-                { label: 'Order Date', value: OrderService.formatDateTime(order.create_date || order.createDate) },
+                { label: 'Order Date', value: OrderService.formatDateTime(order.create_date || order.createDate || '') },
                 { label: 'Channel', value: order.order_channel || order.orderChannel },
                 { label: 'Category', value: order.product_category || order.productCategory },
                 { label: 'Customer', value: order.customer_name || order.customerName },

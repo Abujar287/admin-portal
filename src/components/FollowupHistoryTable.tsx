@@ -95,81 +95,8 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* 1. Filters & Search Control Card - Universal Design */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-              <History className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
-                <span>{title}</span>
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
-                  {recordsCount} records
-                </span>
-              </h3>
-              <p className="text-xs text-slate-500">{subtitle}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {onRefresh && (
-              <button
-                type="button"
-                onClick={onRefresh}
-                disabled={isRefreshing}
-                className="py-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
-                title="Refresh latest data"
-              >
-                <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                <span>Refresh Data</span>
-              </button>
-            )}
-
-            {(onExportCsv || onExportXlsx) && (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
-                  className="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Export</span>
-                </button>
-                {isExportMenuOpen && (
-                  <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-lg shadow-xl z-30 p-1 w-28">
-                    {onExportCsv && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onExportCsv(allFilteredRecords, 'followup_audit_logs.csv');
-                          setIsExportMenuOpen(false);
-                        }}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 rounded cursor-pointer font-medium text-slate-700"
-                      >
-                        Export CSV
-                      </button>
-                    )}
-                    {onExportXlsx && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onExportXlsx(allFilteredRecords, 'followup_audit_logs.xlsx');
-                          setIsExportMenuOpen(false);
-                        }}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 rounded cursor-pointer font-medium text-slate-700"
-                      >
-                        Export XLSX
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
+      {/* 1. Filters & Search Control Card - Universal Compact Design */}
+      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs">
         {/* Filters Row - Same design as Orders Table */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Timestamp Date Filter */}
@@ -269,11 +196,52 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
             </select>
           </div>
 
-          {/* Combined Search with Dropdown - Same design as Orders Table */}
+          {/* Combined Search with Export button placed above search input border */}
           <div className="flex-2 min-w-[280px]">
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-              Search
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                Search
+              </label>
+              {(onExportCsv || onExportXlsx) && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+                    className="py-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer shadow-2xs"
+                  >
+                    <span>📥 Export</span>
+                  </button>
+                  {isExportMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-1 w-24">
+                      {onExportCsv && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onExportCsv(allFilteredRecords, 'followup_audit_logs.csv');
+                            setIsExportMenuOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-100 rounded text-slate-700 font-medium cursor-pointer"
+                        >
+                          CSV
+                        </button>
+                      )}
+                      {onExportXlsx && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onExportXlsx(allFilteredRecords, 'followup_audit_logs.xlsx');
+                            setIsExportMenuOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-100 rounded text-slate-700 font-medium cursor-pointer"
+                        >
+                          XLSX
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <select
                 value={searchType}

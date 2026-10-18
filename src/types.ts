@@ -54,6 +54,7 @@ export interface ManagerUser {
   gender?: string;
   birthday?: string;
   permissions?: AgentPermissions;
+  status?: 'active' | 'deactivated';
   team?: string;
   teamLeaderId?: string;
   teamLeaders?: string[];

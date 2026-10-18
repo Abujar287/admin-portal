@@ -138,39 +138,82 @@ export const DEFAULT_TEAM_LEADERS = ['Manager', 'Sarah Agent'];
 let customTeamLeaders = [...DEFAULT_TEAM_LEADERS];
 
 export const getTimeSlots = () => customTimeSlots;
-export const addTimeSlot = (slot: string) => { if (!customTimeSlots.includes(slot)) customTimeSlots.push(slot); };
-export const removeTimeSlot = (slot: string) => { customTimeSlots = customTimeSlots.filter(s => s !== slot); };
+export const addTimeSlot = (slot: string) => {
+  if (!customTimeSlots.includes(slot)) customTimeSlots.push(slot);
+  return customTimeSlots;
+};
+export const removeTimeSlot = (slot: string) => {
+  customTimeSlots = customTimeSlots.filter(s => s !== slot);
+  return customTimeSlots;
+};
 
 export const getOrderChannels = () => customOrderChannels;
-export const addOrderChannel = (ch: string) => { if (!customOrderChannels.includes(ch)) customOrderChannels.push(ch); };
-export const removeOrderChannel = (ch: string) => { customOrderChannels = customOrderChannels.filter(c => c !== ch); };
+export const addOrderChannel = (ch: string) => {
+  if (!customOrderChannels.includes(ch)) customOrderChannels.push(ch);
+  return customOrderChannels;
+};
+export const removeOrderChannel = (ch: string) => {
+  customOrderChannels = customOrderChannels.filter(c => c !== ch);
+  return customOrderChannels;
+};
 
 export const getProductCategories = () => customProductCategories;
-export const addProductCategory = (cat: string) => { if (!customProductCategories.includes(cat)) customProductCategories.push(cat); };
-export const removeProductCategory = (cat: string) => { customProductCategories = customProductCategories.filter(c => c !== cat); };
+export const addProductCategory = (cat: string) => {
+  if (!customProductCategories.includes(cat)) customProductCategories.push(cat);
+  return customProductCategories;
+};
+export const removeProductCategory = (cat: string) => {
+  customProductCategories = customProductCategories.filter(c => c !== cat);
+  return customProductCategories;
+};
 
 export const getOrderStatuses = () => customOrderStatuses;
-export const addOrderStatus = (st: string) => { if (!customOrderStatuses.includes(st)) customOrderStatuses.push(st); };
-export const removeOrderStatus = (st: string) => { customOrderStatuses = customOrderStatuses.filter(s => s !== st); };
+export const addOrderStatus = (st: string) => {
+  if (!customOrderStatuses.includes(st)) customOrderStatuses.push(st);
+  return customOrderStatuses;
+};
+export const removeOrderStatus = (st: string) => {
+  customOrderStatuses = customOrderStatuses.filter(s => s !== st);
+  return customOrderStatuses;
+};
 
-export const getTeamsList = () => customTeams;
-export const addTeamItem = (t: { name: string; teamLeaderName?: string; teamLeaderId?: string }) => {
-  if (!customTeams.some(x => x.name.toLowerCase() === t.name.toLowerCase())) {
-    customTeams.push(t);
+export const getTeamsList = (): string[] => customTeams.map(t => t.name);
+export const getTeamsObjects = () => customTeams;
+export const addTeamItem = (t: { name: string; teamLeaderName?: string; teamLeaderId?: string } | string) => {
+  const teamObj = typeof t === 'string' ? { name: t, teamLeaderName: 'Manager', teamLeaderId: '1' } : t;
+  if (!customTeams.some(x => x.name.toLowerCase() === teamObj.name.toLowerCase())) {
+    customTeams.push({
+      name: teamObj.name,
+      teamLeaderName: teamObj.teamLeaderName || 'Manager',
+      teamLeaderId: teamObj.teamLeaderId || '1'
+    });
   }
+  return customTeams.map(item => item.name);
 };
 export const removeTeamItem = (name: string) => {
   customTeams = customTeams.filter(t => t.name.toLowerCase() !== name.toLowerCase());
+  return customTeams.map(t => t.name);
 };
 
 export const getTeamLeadersList = () => customTeamLeaders;
-export const addTeamLeaderItem = (tl: string) => { if (!customTeamLeaders.includes(tl)) customTeamLeaders.push(tl); };
-export const removeTeamLeaderItem = (tl: string) => { customTeamLeaders = customTeamLeaders.filter(t => t !== tl); };
+export const addTeamLeaderItem = (tl: string) => {
+  if (!customTeamLeaders.includes(tl)) customTeamLeaders.push(tl);
+  return customTeamLeaders;
+};
+export const removeTeamLeaderItem = (tl: string) => {
+  customTeamLeaders = customTeamLeaders.filter(t => t !== tl);
+  return customTeamLeaders;
+};
 
 export interface CategoryTeamMapping {
+  id?: string;
   category: string;
   team: string;
   defaultStatus?: string;
+  orderStatus?: string;
+  channel?: string;
+  teamLeader?: string;
+  timeSlot?: string;
 }
 
 export const getCategoryMappings = (): CategoryTeamMapping[] => {

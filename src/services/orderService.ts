@@ -1098,9 +1098,9 @@ export class OrderService {
     if (!Array.isArray(rowsData) || rowsData.length === 0) return [];
 
     let hasHeader = false;
-    const firstRow = rowsData[0].map(h => String(h || '').trim().toLowerCase());
+    const firstRow = rowsData[0].map((h: any) => String(h || '').trim().toLowerCase());
 
-    if (firstRow.some(col => col.includes('order') || col.includes('customer') || col.includes('agent') || col.includes('date'))) {
+    if (firstRow.some((col: any) => col.includes('order') || col.includes('customer') || col.includes('agent') || col.includes('date'))) {
       hasHeader = true;
     }
 
@@ -1110,7 +1110,7 @@ export class OrderService {
     const findCol = (...candidates: string[]): number => {
       for (const candidate of candidates) {
         const normCand = candidate.toLowerCase().replace(/[\s_-]+/g, '');
-        const idx = headers.findIndex((h) => {
+        const idx = headers.findIndex((h: any) => {
           const normH = String(h || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
           return normH === normCand || String(h || '').trim().toLowerCase() === candidate.toLowerCase();
         });
@@ -1606,32 +1606,32 @@ export class OrderService {
             : (ord.schedule_time || ord.scheduledTime || ''));
 
         return {
-          order_id: ord.order_id || ord.id,
-          id: ord.order_id || ord.id,
-          customer_id: ord.customer_id || ord.customerId,
-          customerId: ord.customer_id || ord.customerId,
-          customer_mobile: ord.customer_mobile || ord.customerContact,
-          customerContact: ord.customer_mobile || ord.customerContact,
-          customer_name: ord.customer_name || ord.customerName,
-          customerName: ord.customer_name || ord.customerName,
-          gender: ord.gender,
-          create_date: ord.create_date || ord.createDate,
-          createDate: ord.create_date || ord.createDate,
-          order_channel: ord.order_channel || ord.orderChannel,
-          orderChannel: ord.order_channel || ord.orderChannel,
-          agent_id: ord.agent_id || ord.agentId,
-          agentId: ord.agent_id || ord.agentId,
-          agent_name: ord.agent_name || ord.agentName,
-          agentName: ord.agent_name || ord.agentName,
-          product_category: ord.product_category || ord.productCategory,
-          productCategory: ord.product_category || ord.productCategory,
-          product_name: ord.product_name || ord.productName,
-          productName: ord.product_name || ord.productName,
-          city: ord.city,
-          delivery_area: ord.delivery_area || ord.deliveryArea,
-          deliveryArea: ord.delivery_area || ord.deliveryArea,
-          address_details: ord.address_details || ord.addressDetails,
-          addressDetails: ord.address_details || ord.addressDetails,
+          order_id: String(ord.order_id || ord.id || ''),
+          id: String(ord.order_id || ord.id || ''),
+          customer_id: String(ord.customer_id || ord.customerId || ''),
+          customerId: String(ord.customer_id || ord.customerId || ''),
+          customer_mobile: String(ord.customer_mobile || ord.customerContact || ''),
+          customerContact: String(ord.customer_mobile || ord.customerContact || ''),
+          customer_name: String(ord.customer_name || ord.customerName || ''),
+          customerName: String(ord.customer_name || ord.customerName || ''),
+          gender: String(ord.gender || ''),
+          create_date: String(ord.create_date || ord.createDate || ''),
+          createDate: String(ord.create_date || ord.createDate || ''),
+          order_channel: String(ord.order_channel || ord.orderChannel || ''),
+          orderChannel: String(ord.order_channel || ord.orderChannel || ''),
+          agent_id: String(ord.agent_id || ord.agentId || ''),
+          agentId: String(ord.agent_id || ord.agentId || ''),
+          agent_name: String(ord.agent_name || ord.agentName || ''),
+          agentName: String(ord.agent_name || ord.agentName || ''),
+          product_category: String(ord.product_category || ord.productCategory || ''),
+          productCategory: String(ord.product_category || ord.productCategory || ''),
+          product_name: String(ord.product_name || ord.productName || ''),
+          productName: String(ord.product_name || ord.productName || ''),
+          city: String(ord.city || ''),
+          delivery_area: String(ord.delivery_area || ord.deliveryArea || ''),
+          deliveryArea: String(ord.delivery_area || ord.deliveryArea || ''),
+          address_details: String(ord.address_details || ord.addressDetails || ''),
+          addressDetails: String(ord.address_details || ord.addressDetails || ''),
           schedule_date: schedDate,
           scheduleDate: schedDate,
           schedule_time: schedTime,

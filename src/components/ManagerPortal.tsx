@@ -210,6 +210,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const onUpdateAgents = onUpdateAgentsProp || onUpdateUsersProp || ((_u: any) => {});
   const onUpdateUsers = onUpdateUsersProp || onUpdateAgentsProp || ((_u: any) => {});
   const [managerProfile, setManagerProfile] = useState<ManagerUser>(currentManager);
+  const [selectedProfileUserId, setSelectedProfileUserId] = useState<string>('');
   const handleUpdateManagerProfile = (updatedProfile: ManagerUser) => {
     setManagerProfile(updatedProfile);
   };
@@ -955,11 +956,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
     // Sync items into master lists without duplicates
     uniqueDemoData.forEach(r => {
-      addProductCategory(r.category);
-      addOrderStatus(r.orderStatus);
-      addTeamItem(r.team);
+      addProductCategory(r.category || '');
+      addOrderStatus(r.orderStatus || '');
+      addTeamItem(r.team || '');
       if (r.channel) addOrderChannel(r.channel);
-      addTeamLeaderItem(r.teamLeader);
+      addTeamLeaderItem(r.teamLeader || '');
       if (r.timeSlot) addTimeSlot(r.timeSlot);
     });
     setCategories(getProductCategories());
@@ -1117,7 +1118,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       m.team.toLowerCase().includes(q) ||
       (m.orderStatus || (m as any).status || '').toLowerCase().includes(q) ||
       (m.channel || '').toLowerCase().includes(q) ||
-      m.teamLeader.toLowerCase().includes(q) ||
+      (m.teamLeader || '').toLowerCase().includes(q) ||
       (m.timeSlot || '').toLowerCase().includes(q)
     );
   }, [categoryMappings, mappingSearchQuery]);
@@ -5038,7 +5039,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                 {ord.cancelled_date ? OrderService.formatDateTime(ord.cancelled_date) : '-'}
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-blue-700 font-medium">
-                                {ord.followup_date || ord.followupDate ? OrderService.formatDateTime(ord.followup_date || ord.followupDate) : '-'}
+                                {ord.followup_date || ord.followupDate ? OrderService.formatDateTime(ord.followup_date || ord.followupDate || '') : '-'}
                               </td>
                             </tr>
                           );
@@ -6735,143 +6736,166 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {/* TAB: AGENT PERFORMANCE REPORT */}
           {activeTab === 'agent-performance' && (
             <div className="space-y-6">
-              {/* Header & Date Filter Bar */}
-              <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-indigo-600" />
-                    <span>Agent Performance Report</span>
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Agent-wise operational analysis: orders created, served/delivered, cancellations, revenue, and profit.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
-                    <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                    <select
-                      value={summaryDateFilter}
-                      onChange={(e) => setSummaryDateFilter(e.target.value as DateFilterType)}
-                      className="text-xs bg-transparent font-bold text-slate-700 focus:outline-hidden cursor-pointer"
-                    >
-                      <option value="all">All Time</option>
-                      <option value="today">Today</option>
-                      <option value="yesterday">Yesterday</option>
-                      <option value="last7">Last 7 Days</option>
-                      <option value="last30">Last 30 Days</option>
-                      <option value="thisMonth">This Month</option>
-                      <option value="lastMonth">Last Month</option>
-                      <option value="lastYear">Last Year</option>
-                      <option value="custom">Custom Range</option>
-                    </select>
-                  </div>
-                  {summaryDateFilter === 'custom' && (
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="date"
-                        value={summaryStartDate}
-                        onChange={(e) => setSummaryStartDate(e.target.value)}
-                        className="text-xs p-1.5 border rounded-lg bg-white"
-                      />
-                      <span className="text-xs text-slate-400">to</span>
-                      <input
-                        type="date"
-                        value={summaryEndDate}
-                        onChange={(e) => setSummaryEndDate(e.target.value)}
-                        className="text-xs p-1.5 border rounded-lg bg-white"
-                      />
+              {/* Sticky Locked Container: Filter Controls & KPI Summary */}
+              <div className="sticky -top-6 z-30 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md pt-1 pb-4 -mx-6 px-6 border-b border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-3">
+                {/* Controls Card: Date, Team, Agent Name / ID, Export */}
+                <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-slate-200 shadow-xs">
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* 1. Date Filter */}
+                    <div className="flex-1 min-w-[150px]">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                        Date
+                      </label>
+                      <select
+                        value={summaryDateFilter}
+                        onChange={(e) => setSummaryDateFilter(e.target.value as DateFilterType)}
+                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 font-medium focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100 cursor-pointer"
+                      >
+                        <option value="all">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="last7">Last 7 Days</option>
+                        <option value="last30">Last 30 Days</option>
+                        <option value="thisMonth">This Month</option>
+                        <option value="lastMonth">Last Month</option>
+                        <option value="lastYear">Last Year</option>
+                        <option value="custom">Custom Range</option>
+                      </select>
                     </div>
-                  )}
 
-                  {/* Export Options for Agent Performance */}
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setOpenExportMenuId(openExportMenuId === 'agent-performance' ? null : 'agent-performance')}
-                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
-                    >
-                      <span>📥 Export Report</span>
-                    </button>
-                    {openExportMenuId === 'agent-performance' && (
-                      <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-30 p-1.5 w-36">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleExportCsv(filteredAgentPerformance, `agent_performance_report_${new Date().toISOString().slice(0, 10)}.csv`);
-                            setOpenExportMenuId(null);
-                          }}
-                          className="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-indigo-50 hover:text-indigo-700 rounded-lg cursor-pointer flex items-center gap-1.5"
-                        >
-                          <span>📄 Export CSV</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleExportXlsx(filteredAgentPerformance, `agent_performance_report_${new Date().toISOString().slice(0, 10)}.xlsx`);
-                            setOpenExportMenuId(null);
-                          }}
-                          className="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-emerald-50 hover:text-emerald-700 rounded-lg cursor-pointer flex items-center gap-1.5"
-                        >
-                          <span>📊 Export Excel</span>
-                        </button>
+                    {/* Custom Date Range */}
+                    {summaryDateFilter === 'custom' && (
+                      <div className="flex items-center gap-1.5 self-end pb-0.5">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">Start</label>
+                          <input
+                            type="date"
+                            value={summaryStartDate}
+                            onChange={(e) => setSummaryStartDate(e.target.value)}
+                            className="px-2 py-1.5 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 font-medium"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">End</label>
+                          <input
+                            type="date"
+                            value={summaryEndDate}
+                            onChange={(e) => setSummaryEndDate(e.target.value)}
+                            className="px-2 py-1.5 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 font-medium"
+                          />
+                        </div>
                       </div>
                     )}
+
+                    {/* 2. Team Filter */}
+                    <div className="flex-1 min-w-[150px]">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                        Team
+                      </label>
+                      <select
+                        value={agentPerformanceTeamFilter}
+                        onChange={(e) => setAgentPerformanceTeamFilter(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white font-medium text-slate-800 focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100 cursor-pointer"
+                      >
+                        <option key="perf-team-all" value="all">All Teams</option>
+                        {ORDER_CHANNELS.map((ch, idx) => (
+                          <option key={`perf-team-ch-${ch}-${idx}`} value={ch}>{ch}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* 3. Agent Name / ID Filter */}
+                    <div className="flex-2 min-w-[220px]">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                        Agent Name / ID
+                      </label>
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={agentPerformanceSearch}
+                          onChange={(e) => setAgentPerformanceSearch(e.target.value)}
+                          placeholder="Search by Agent ID or Name..."
+                          className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100"
+                        />
+                        {agentPerformanceSearch.trim() && (
+                          <button
+                            type="button"
+                            onClick={() => setAgentPerformanceSearch('')}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+                            title="Clear"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 4. Export Button */}
+                    <div className="relative self-end">
+                      <button
+                        type="button"
+                        onClick={() => setOpenExportMenuId(openExportMenuId === 'agent-performance' ? null : 'agent-performance')}
+                        className="py-2 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors h-[34px]"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Export</span>
+                      </button>
+                      {openExportMenuId === 'agent-performance' && (
+                        <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-30 p-1 w-28">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleExportCsv(filteredAgentPerformance, `agent_performance_report_${new Date().toISOString().slice(0, 10)}.csv`);
+                              setOpenExportMenuId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-slate-100 text-slate-700 rounded cursor-pointer"
+                          >
+                            CSV
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleExportXlsx(filteredAgentPerformance, `agent_performance_report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                              setOpenExportMenuId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-slate-100 text-slate-700 rounded cursor-pointer"
+                          >
+                            XLSX
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* KPI Summary Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Agents</span>
-                  <p className="text-2xl font-black text-slate-900 mt-1">{filteredAgentPerformance.length}</p>
-                  <span className="text-[10px] text-slate-500 font-medium">Filtered Directory</span>
-                </div>
-                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Created / Assigned</span>
-                  <p className="text-2xl font-black text-indigo-700 mt-1">{filteredAgentGrandTotal.createOrders}</p>
-                  <span className="text-[10px] text-indigo-600 font-medium"> {(filteredAgentGrandTotal.orderValue || 0).toLocaleString()} value</span>
-                </div>
-                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Delivered Orders</span>
-                  <p className="text-2xl font-black text-emerald-700 mt-1">{filteredAgentGrandTotal.servedOrders}</p>
-                  <span className="text-[10px] text-emerald-600 font-medium"> {(filteredAgentGrandTotal.deliveredOrderValue || 0).toLocaleString()} delivered</span>
-                </div>
-                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Profit</span>
-                  <p className="text-2xl font-black text-emerald-600 mt-1"> {(filteredAgentGrandTotal.profit || 0).toLocaleString()}</p>
-                  <span className="text-[10px] text-emerald-600 font-medium">NR Ratio: {filteredAgentGrandTotal.nrRatio}%</span>
-                </div>
-                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs col-span-2 lg:col-span-1">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Delivery Success</span>
-                  <p className="text-2xl font-black text-purple-700 mt-1">{filteredAgentGrandTotal.deliveredRatio}%</p>
-                  <span className="text-[10px] text-red-500 font-medium">Cancel: {filteredAgentGrandTotal.cancelledRatio}%</span>
-                </div>
-              </div>
-
-              {/* Search & Team Filter Bar */}
-              <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="relative flex-1 w-full sm:w-auto">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={agentPerformanceSearch}
-                    onChange={(e) => setAgentPerformanceSearch(e.target.value)}
-                    placeholder="Search by Agent ID or Full Name..."
-                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-hidden focus:border-indigo-600 focus:bg-white"
-                  />
-                </div>
-                <div className="w-full sm:w-auto flex items-center gap-2">
-                  <select
-                    value={agentPerformanceTeamFilter}
-                    onChange={(e) => setAgentPerformanceTeamFilter(e.target.value)}
-                    className="px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white font-semibold text-slate-700 focus:outline-hidden w-full sm:w-auto cursor-pointer"
-                  >
-                    <option key="perf-team-all" value="all">All Teams</option>
-                    {ORDER_CHANNELS.map((ch, idx) => (
-                      <option key={`perf-team-ch-${ch}-${idx}`} value={ch}>{ch}</option>
-                    ))}
-                  </select>
+                {/* KPI Summary Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                  <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Agents</span>
+                    <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5 font-mono tabular-nums">{filteredAgentPerformance.length}</p>
+                    <span className="text-[10px] text-slate-500 font-medium">Filtered Directory</span>
+                  </div>
+                  <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Created / Assigned</span>
+                    <p className="text-xl sm:text-2xl font-black text-indigo-700 mt-0.5 font-mono tabular-nums">{filteredAgentGrandTotal.createOrders}</p>
+                    <span className="text-[10px] text-indigo-600 font-medium font-mono tabular-nums">৳{(filteredAgentGrandTotal.orderValue || 0).toLocaleString()} value</span>
+                  </div>
+                  <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Delivered Orders</span>
+                    <p className="text-xl sm:text-2xl font-black text-emerald-700 mt-0.5 font-mono tabular-nums">{filteredAgentGrandTotal.servedOrders}</p>
+                    <span className="text-[10px] text-emerald-600 font-medium font-mono tabular-nums">৳{(filteredAgentGrandTotal.deliveredOrderValue || 0).toLocaleString()} delivered</span>
+                  </div>
+                  <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Profit</span>
+                    <p className="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5 font-mono tabular-nums">৳{(filteredAgentGrandTotal.profit || 0).toLocaleString()}</p>
+                    <span className="text-[10px] text-emerald-600 font-medium font-mono tabular-nums">NR Ratio: {filteredAgentGrandTotal.nrRatio}%</span>
+                  </div>
+                  <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-2xs col-span-2 sm:col-span-1 lg:col-span-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Delivery Success</span>
+                    <p className="text-xl sm:text-2xl font-black text-purple-700 mt-0.5 font-mono tabular-nums">{filteredAgentGrandTotal.deliveredRatio}%</p>
+                    <span className="text-[10px] text-rose-500 font-medium font-mono tabular-nums">Cancel: {filteredAgentGrandTotal.cancelledRatio}%</span>
+                  </div>
                 </div>
               </div>
 
@@ -7004,37 +7028,45 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
           {/* TAB: PROFILES */}
           {activeTab === 'profiles' && (
-            <div className="bg-white p-6 rounded-2xl border border-slate-200">
-              <h2 className="text-lg font-bold mb-4">Manager Profile</h2>
-              <AgentProfileView
-                currentAgent={{
-                  user: managerProfile.user,
-                  pass: managerProfile.pass,
-                  name: managerProfile.name,
-                  team: 'Manager',
-                  contact: managerProfile.contact,
-                  email: managerProfile.email,
-                  address: managerProfile.address,
-                  bloodGroup: managerProfile.bloodGroup,
-                  gender: managerProfile.gender,
-                  birthday: managerProfile.birthday
-                }}
-                onUpdateAgentProfile={(updated) => {
-                    handleUpdateManagerProfile({
-                        user: updated.user,
-                        pass: updated.pass,
-                        name: updated.name,
-                        role: 'Manager',
-                        contact: updated.contact,
-                        email: updated.email,
-                        address: updated.address,
-                        bloodGroup: updated.bloodGroup,
-                        gender: updated.gender,
-                        birthday: updated.birthday
-                    });
-                }}
-              />
-            </div>
+            <AgentProfileView
+              currentAgent={
+                selectedProfileUserId && selectedProfileUserId !== managerProfile.user
+                  ? (users.find(u => u.user === selectedProfileUserId) || managerProfile)
+                  : managerProfile
+              }
+              onUpdateAgentProfile={(updated) => {
+                if (!selectedProfileUserId || selectedProfileUserId === managerProfile.user) {
+                  handleUpdateManagerProfile({
+                    user: updated.user,
+                    pass: updated.pass,
+                    name: updated.name,
+                    role: updated.role || 'Manager',
+                    contact: updated.contact,
+                    email: updated.email,
+                    address: updated.address,
+                    bloodGroup: updated.bloodGroup,
+                    gender: updated.gender,
+                    birthday: updated.birthday,
+                    permissions: updated.permissions,
+                    team: updated.team || 'Manager'
+                  });
+                  const exists = users.some(u => u.user === updated.user);
+                  if (exists) {
+                    const updatedUsers = users.map(u => u.user === updated.user ? { ...u, ...updated } : u);
+                    onUpdateAgents(updatedUsers, false);
+                  }
+                } else {
+                  const updatedUsers = users.map(u => u.user === updated.user ? { ...u, ...updated } : u);
+                  onUpdateAgents(updatedUsers, true);
+                }
+              }}
+              isManagerView={isManager}
+              allAgents={users}
+              selectedUserId={selectedProfileUserId}
+              onSelectUserId={setSelectedProfileUserId}
+              orders={orders}
+              followupHistory={followupHistory}
+            />
           )}
 
 

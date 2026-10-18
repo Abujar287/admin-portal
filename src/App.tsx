@@ -12,13 +12,7 @@ export function App() {
         return JSON.parse(saved);
       }
     } catch {}
-    // Default to logged-in manager so the user instantly sees the portal and can manage orders/agents
-    return {
-      user: '1',
-      pass: '01410089771',
-      name: 'Manager',
-      role: 'Manager'
-    };
+    return null;
   });
 
   const [agents, setAgents] = useState<AgentUser[]>([]);
