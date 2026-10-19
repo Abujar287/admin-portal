@@ -1,1 +1,102 @@
-[]
+[
+  {
+    "user": "100",
+    "pass": "superadmin123",
+    "name": "superadmin",
+    "role": "Team Leader",
+    "team": "All",
+    "email": "superadmin@gmail.com",
+    "status": "active",
+    "teamLeaderId": "Manager (Admin)",
+    "permissions": {
+      "canCreate": true,
+      "canUpdateStatus": true,
+      "canChangeSchedule": true,
+      "canChangeValue": true,
+      "canAddProfit": true,
+      "allowedOrderStatuses": ["Pending","In Progress","Confirmed","Follow-up","Delivered","Cancelled","Returned"],
+      "allowedTabs": ["orders","followup","agent-performance","profiles","summary"],
+      "orderScope": "all_orders"
+    }
+  },
+  {
+    "user": "2",
+    "pass": "123456",
+    "name": "Rahim Ahmed",
+    "role": "Agent",
+    "team": "Acquisition",
+    "email": "rahim@gmail.com",
+    "status": "active",
+    "teamLeaderId": "TL Karim",
+    "permissions": {
+      "canCreate": true,
+      "canUpdateStatus": false,
+      "canChangeSchedule": false,
+      "canChangeValue": false,
+      "canAddProfit": false,
+      "allowedOrderStatuses": [],
+      "allowedTabs": ["summary","orders","profiles"],
+      "orderScope": "my_orders"
+    }
+  },
+  {
+    "user": "3",
+    "pass": "123456",
+    "name": "Karim Ahmed",
+    "role": "Sr Agent",
+    "team": "All",
+    "email": "karim@gmail.com",
+    "status": "active",
+    "teamLeaderId": "TL Karim",
+    "permissions": {
+      "canCreate": true,
+      "canUpdateStatus": true,
+      "canChangeSchedule": true,
+      "canChangeValue": true,
+      "canAddProfit": true,
+      "allowedOrderStatuses": ["Pending","In Progress","Confirmed","Follow-up","Delivered","Cancelled","Returned"],
+      "allowedTabs": ["summary","orders","followup","agent-performance","profiles"],
+      "orderScope": "all_orders"
+    }
+  },
+  {
+    "user": "4",
+    "pass": "123456",
+    "name": "Abdul",
+    "role": "Sr Agent",
+    "team": "All",
+    "email": "abdul@gmail.com",
+    "status": "active",
+    "teamLeaderId": "superadmin",
+    "permissions": {
+      "canCreate": true,
+      "canUpdateStatus": true,
+      "canChangeSchedule": true,
+      "canChangeValue": true,
+      "canAddProfit": true,
+      "allowedOrderStatuses": ["Pending","Delivered","In Progress","Cancelled"],
+      "allowedTabs": ["summary","orders","followup","agent-performance","profiles"],
+      "orderScope": "all_orders"
+    }
+  },
+  {
+    "user": "5",
+    "pass": "123456",
+    "name": "Jolil",
+    "role": "Agent",
+    "team": "Call-Center",
+    "email": "jolil@gmail.com",
+    "status": "active",
+    "teamLeaderId": "superadmin",
+    "permissions": {
+      "canCreate": true,
+      "canUpdateStatus": true,
+      "canChangeSchedule": false,
+      "canChangeValue": false,
+      "canAddProfit": false,
+      "allowedOrderStatuses": [],
+      "allowedTabs": ["orders","summary"],
+      "orderScope": "my_orders"
+    }
+  }
+]

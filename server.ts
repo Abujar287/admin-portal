@@ -205,11 +205,24 @@ async function startServer() {
         }
       }
 
+      const agentJsonStr = {
+        user: newAgent.user,
+        pass: newAgent.pass,
+        name: newAgent.name || `Agent ${newAgent.user}`,
+        role: newAgent.role || 'Agent',
+        team: newAgent.team || 'Acquisition',
+        email: newAgent.email || '',
+        status: newAgent.status || 'active', // Ensure status is preserved
+        permissions: newAgent.permissions || undefined,
+        teamLeaders: newAgent.teamLeaders || undefined,
+        teamLeaderId: newAgent.teamLeaderId || undefined
+      };
+
       const existingIdx = users.findIndex(u => String(u.user) === String(newAgent.user));
       if (existingIdx !== -1) {
-        users[existingIdx] = newAgent;
+        users[existingIdx] = agentJsonStr;
       } else {
-        users.push(newAgent);
+        users.push(agentJsonStr);
       }
 
       fs.writeFileSync(filePath, JSON.stringify(users, null, 2), 'utf8');

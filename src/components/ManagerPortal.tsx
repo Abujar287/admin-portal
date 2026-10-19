@@ -1803,6 +1803,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               name: newAgentName.trim() || agent.name || `Agent ${u}`,
               role: newAgentRole,
               email: email,
+              status: agent.status || 'active',
+              failedAttempts: agent.failedAttempts ?? 0,
               permissions: permissions
             }
           : agent
@@ -1830,7 +1832,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       } else {
         updated = [
           ...users,
-          {
+            {
             user: u,
             pass: p,
             team: newAgentTeam,
