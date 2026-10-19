@@ -106,7 +106,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
   // Use the actual current user details without hardcoding to 'Manager'
   const actorUserId = currentUser.user || '1';
   const actorUserName = currentUser.name || currentUser.user || 'User';
-  const userDisplayName = `${actorUserName} (${actorUserId})`;
+  const userDisplayName = actorUserName;
 
   const currentFStatus = (order.followup_status || order.followupStatus || '').toLowerCase();
   const currentOStatus = (order.order_status || order.orderStatus || '').toLowerCase();

@@ -5112,7 +5112,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                   className="hover:underline text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer font-bold"
                                   title="Click to open order details"
                                 >
-                                  <span>#{ord.order_id || ord.id}</span>
+                                  <span>{ord.order_id || ord.id}</span>
                                 </button>
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-medium text-[#E2E8F0]">
@@ -6193,7 +6193,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         )}
                       </tbody>
                       {sortedChannelSummary.length > 0 && (
-                        <tfoot className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300">
+                        <tfoot className="font-black">
                           <tr className="whitespace-nowrap">
                             <td className="py-3.5 px-3.5 font-black uppercase text-slate-900">Grand Total</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-indigo-700">{summaryStats.channelGrandTotal.createOrders}</td>
@@ -6415,7 +6415,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         )}
                       </tbody>
                       {sortedCategorySummary.length > 0 && (
-                        <tfoot className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300">
+                        <tfoot className="font-black">
                           <tr className="whitespace-nowrap">
                             <td className="py-3.5 px-3.5 font-black uppercase text-slate-900">Grand Total</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-indigo-700">{summaryStats.categoryGrandTotal.createOrders}</td>
@@ -6637,7 +6637,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         )}
                       </tbody>
                       {sortedCitySummary.length > 0 && (
-                        <tfoot className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300">
+                        <tfoot className="font-black">
                           <tr className="whitespace-nowrap">
                             <td className="py-3.5 px-3.5 font-black uppercase text-slate-900">Grand Total</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-indigo-700">{summaryStats.cityGrandTotal.createOrders}</td>
@@ -6892,7 +6892,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         )}
                       </tbody>
                       {sortedDateSummary.length > 0 && (
-                        <tfoot className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300">
+                        <tfoot className="font-black">
                           <tr className="whitespace-nowrap">
                             <td className="py-3.5 px-3.5 font-black uppercase text-slate-900">Grand Total</td>
                             <td className="py-3.5 px-3.5 text-right font-black text-indigo-700">{summaryStats.dateGrandTotal.createOrders}</td>
@@ -7156,25 +7156,25 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     </tbody>
                     {/* Frozen Bottom Row Summary (Grand Total) - Always visible and locked at bottom on scroll */}
                     {filteredAgentPerformance.length > 0 && (
-                      <tfoot className="sticky bottom-0 z-20 bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300 shadow-[0_-4px_12px_rgba(0,0,0,0.12)]">
+                      <tfoot className="sticky bottom-0 z-20 font-black">
                         <tr className="whitespace-nowrap">
-                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 font-black uppercase text-slate-900 border-t-2 border-slate-300">Grand Total</td>
-                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 font-bold text-slate-500 border-t-2 border-slate-300">-</td>
-                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 font-bold text-slate-500 border-t-2 border-slate-300">-</td>
-                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 font-bold text-slate-500 border-t-2 border-slate-300">-</td>
-                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-indigo-700 border-t-2 border-slate-300">{filteredAgentGrandTotal.createOrders}</td>
-                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-emerald-700 border-t-2 border-slate-300">{filteredAgentGrandTotal.servedOrders}</td>
-                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-red-700 border-t-2 border-slate-300">{filteredAgentGrandTotal.cancelledOrders}</td>
-                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-amber-700 border-t-2 border-slate-300">{filteredAgentGrandTotal.pendingOrders}</td>
-                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black border-t-2 border-slate-300">{(filteredAgentGrandTotal.orderValue || 0).toLocaleString()}</td>
-                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-emerald-700 border-t-2 border-slate-300">{(filteredAgentGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
-                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-emerald-600 border-t-2 border-slate-300">{(filteredAgentGrandTotal.profit || 0).toLocaleString()}</td>
-                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-blue-700 border-t-2 border-slate-300">{(filteredAgentGrandTotal.bucketSize || 0).toLocaleString()}</td>
-                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-emerald-700 border-t-2 border-slate-300">{filteredAgentGrandTotal.deliveredRatio}%</td>
-                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-red-700 border-t-2 border-slate-300">{filteredAgentGrandTotal.cancelledRatio}%</td>
-                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-right font-black text-purple-700 border-t-2 border-slate-300">{filteredAgentGrandTotal.nrRatio}%</td>
-                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-center font-black text-slate-900 border-t-2 border-slate-300">{filteredAgentGrandTotal.followupCount}</td>
-                          <td className="sticky bottom-0 z-20 bg-slate-100 py-3.5 px-3.5 text-center font-bold text-slate-500 border-t-2 border-slate-300">-</td>
+                          <td className="sticky bottom-0 z-20 py-3.5 px-3.5 font-black uppercase">Grand Total</td>
+                          <td className="sticky bottom-0 z-20 py-3.5 px-3.5 font-bold">-</td>
+                          <td className="sticky bottom-0 z-20 py-3.5 px-3.5 font-bold">-</td>
+                          <td className="sticky bottom-0 z-20 py-3.5 px-3.5 font-bold">-</td>
+                          <td className="sticky bottom-0 z-20 py-3.5 px-3.5 text-right font-black">{filteredAgentGrandTotal.createOrders}</td>
+                          <td className="sticky bottom-0 z-20 py-3.5 px-3.5 text-right font-black">{filteredAgentGrandTotal.servedOrders}</td>
+                          <td className="sticky bottom-0 z-20 py-3.5 px-3.5 text-right font-black">{filteredAgentGrandTotal.cancelledOrders}</td>
+                          <td className="sticky bottom-0 z-20 py-3.5 px-3.5 text-right font-black">{filteredAgentGrandTotal.pendingOrders}</td>
+                          <td className="sticky bottom-0 z-20 py-3.5 px-3.5 text-right font-black">{(filteredAgentGrandTotal.orderValue || 0).toLocaleString()}</td>
+                          <td className="sticky bottom-0 z-20 py-3.5 px-3.5 text-right font-black">{(filteredAgentGrandTotal.deliveredOrderValue || 0).toLocaleString()}</td>
+                          <td className="sticky bottom-0 z-20 py-3.5 px-3.5 text-right font-black">{(filteredAgentGrandTotal.profit || 0).toLocaleString()}</td>
+                          <td className="sticky bottom-0 z-20 py-3.5 px-3.5 text-right font-black">{(filteredAgentGrandTotal.bucketSize || 0).toLocaleString()}</td>
+                          <td className="sticky bottom-0 z-20 py-3.5 px-3.5 text-right font-black">{filteredAgentGrandTotal.deliveredRatio}%</td>
+                          <td className="sticky bottom-0 z-20 py-3.5 px-3.5 text-right font-black">{filteredAgentGrandTotal.cancelledRatio}%</td>
+                          <td className="sticky bottom-0 z-20 py-3.5 px-3.5 text-right font-black">{filteredAgentGrandTotal.nrRatio}%</td>
+                          <td className="sticky bottom-0 z-20 py-3.5 px-3.5 text-center font-black">{filteredAgentGrandTotal.followupCount}</td>
+                          <td className="sticky bottom-0 z-20 py-3.5 px-3.5 text-center font-bold">-</td>
                         </tr>
                       </tfoot>
                     )}
