@@ -246,23 +246,23 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
   };
 
   const modalContent = (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 select-none">
       <div 
-        className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92vh] overflow-hidden"
+        className="bg-[#111C3D] w-full max-w-5xl rounded-2xl shadow-2xl border border-[#1E2C58] flex flex-col max-h-[92vh] overflow-hidden text-[#E2E8F0]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* MODAL HEADER */}
-        <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+        <div className="px-5 py-4 bg-[#0E1736] text-[#E2E8F0] flex items-center justify-between border-b border-[#1E2C58]">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white font-bold shadow-md shrink-0">
-              <User className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-xl bg-[#0E1736] border border-[#1E2C58] flex items-center justify-center text-[#E2E8F0] font-bold shadow-md shrink-0">
+              <User className="w-5 h-5 text-[#E2E8F0]" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base sm:text-lg font-bold text-white truncate">
+                <h3 className="text-base sm:text-lg font-bold text-[#E2E8F0] truncate">
                   {primaryInfo.name}
                 </h3>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#080E21] text-[#E2E8F0] border border-[#1E2C58]">
                   ID: {primaryInfo.id}
                   <button 
                     type="button" 
@@ -274,34 +274,34 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
                   </button>
                 </span>
                 {summaryMetrics.delivered_orders >= 3 && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#080E21] text-[#E2E8F0] border border-[#1E2C58]">
                     <Sparkles className="w-3 h-3" /> VIP Customer
                   </span>
                 )}
                 {summaryMetrics.create_orders > 1 && summaryMetrics.delivered_orders < 3 && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#080E21] text-[#E2E8F0] border border-[#1E2C58]">
                     Repeat Buyer
                   </span>
                 )}
                 {masterCategoryInfo.category !== 'N/A' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-200 border border-purple-400/30" title="Lifetime Master Category">
-                    <Tag className="w-3 h-3 text-purple-300" />
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#080E21] text-[#E2E8F0] border border-[#1E2C58]" title="Lifetime Master Category">
+                    <Tag className="w-3 h-3 text-[#E2E8F0]" />
                     <span>Master Category: {masterCategoryInfo.category}</span>
                   </span>
                 )}
               </div>
               
-              <div className="flex items-center gap-3 text-xs text-slate-300 mt-1 flex-wrap font-sans">
+              <div className="flex items-center gap-3 text-xs text-[#94A3B8] mt-1 flex-wrap font-sans">
                 {primaryInfo.phone && (
                   <span className="flex items-center gap-1 font-mono">
-                    <Phone className="w-3.5 h-3.5 text-indigo-400" />
-                    <a href={`tel:${primaryInfo.phone}`} className="hover:underline text-indigo-300 font-semibold">
+                    <Phone className="w-3.5 h-3.5 text-[#E2E8F0]" />
+                    <a href={`tel:${primaryInfo.phone}`} className="hover:underline text-[#E2E8F0] font-semibold">
                       {primaryInfo.phone}
                     </a>
                     <button 
                       type="button" 
                       onClick={handleCopyPhone} 
-                      className="hover:text-white ml-0.5 cursor-pointer text-slate-400"
+                      className="hover:text-white ml-0.5 cursor-pointer text-[#94A3B8]"
                       title="Copy Mobile Number"
                     >
                       {copiedPhone ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
@@ -309,13 +309,13 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
                   </span>
                 )}
                 {primaryInfo.gender && (
-                  <span className="text-slate-400">
+                  <span className="text-[#94A3B8]">
                     • {primaryInfo.gender}
                   </span>
                 )}
                 {(primaryInfo.city || primaryInfo.address) && (
-                  <span className="flex items-center gap-1 text-slate-300 truncate max-w-sm">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="flex items-center gap-1 text-[#94A3B8] truncate max-w-sm">
+                    <MapPin className="w-3.5 h-3.5 text-[#94A3B8] shrink-0" />
                     <span className="truncate">
                       {[primaryInfo.address, primaryInfo.thana, primaryInfo.city].filter(Boolean).join(', ')}
                     </span>
@@ -328,7 +328,7 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#16234D] transition-colors cursor-pointer"
             title="Close (Esc)"
           >
             <X className="w-5 h-5" />
@@ -336,33 +336,33 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
         </div>
 
         {/* BODY SCROLL CONTAINER */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 bg-slate-50/50 dark:bg-slate-900/50">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 bg-[#0B132B] text-[#E2E8F0]">
           {/* 10-METRICS SHORT SUMMARY */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <PieChart className="w-3.5 h-3.5 text-indigo-600" />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-[#94A3B8] flex items-center gap-1.5">
+                <PieChart className="w-3.5 h-3.5 text-[#E2E8F0]" />
                 Customer Performance Summary
               </h4>
-              <span className="text-[11px] text-slate-500 font-medium font-mono">
+              <span className="text-[11px] text-[#94A3B8] font-medium font-mono">
                 {customerOrders.length} Lifetime Orders Found
               </span>
             </div>
 
             {/* MASTER CATEGORY HIGHLIGHT CARD */}
-            <div className="bg-gradient-to-r from-purple-50 via-indigo-50/70 to-purple-50 dark:from-purple-950/40 dark:via-indigo-950/30 dark:to-purple-950/20 p-4 rounded-2xl border border-purple-200 dark:border-purple-800/60 shadow-2xs mb-3 flex items-center justify-between gap-3">
+            <div className="bg-[#111C3D] p-4 rounded-2xl border border-[#1E2C58] shadow-2xs mb-3 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <div className="w-10 h-10 rounded-xl bg-[#0E1736] border border-[#1E2C58] text-[#E2E8F0] flex items-center justify-center shrink-0 shadow-xs">
                   <Tag className="w-5 h-5" />
                 </div>
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <span className="text-xs font-bold text-[#E2E8F0]">
                     Master Category:
                   </span>
-                  <span className="text-base sm:text-lg font-black text-purple-900 dark:text-purple-100">
+                  <span className="text-base sm:text-lg font-black text-[#E2E8F0]">
                     {masterCategoryInfo.category}
                   </span>
-                  <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-purple-200/90 text-purple-900 dark:bg-purple-900 dark:text-purple-200 shadow-2xs">
+                  <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-[#080E21] text-[#E2E8F0] border border-[#1E2C58] shadow-2xs">
                     {masterCategoryInfo.count} {masterCategoryInfo.count === 1 ? 'Order' : 'Orders'}
                   </span>
                 </div>

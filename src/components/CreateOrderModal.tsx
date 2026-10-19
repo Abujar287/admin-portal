@@ -307,23 +307,23 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const todayDateStr = new Date().toLocaleDateString('en-CA');
 
   return ReactDOM.createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-2xs overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 my-8 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm overflow-y-auto select-none">
+      <div className="bg-[#111C3D] rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-[#1E2C58] my-8 space-y-4 max-h-[90vh] overflow-y-auto text-[#E2E8F0]">
+        <div className="flex items-center justify-between pb-3 border-b border-[#1E2C58]">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Create New Order</h2>
+            <h2 className="text-lg font-bold text-[#E2E8F0]">Create New Order</h2>
             <div className="flex flex-wrap items-center gap-2 mt-1">
-              <span className="text-xs text-slate-500">
-                Agent: <span className="font-semibold text-blue-700">{currentAgent.user}</span>
+              <span className="text-xs text-[#94A3B8]">
+                Agent: <span className="font-semibold text-[#E2E8F0]">{currentAgent.user}</span>
               </span>
-              <span className="text-slate-300">•</span>
-              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-mono text-[11px] font-bold rounded-md border border-blue-200">
+              <span className="text-[#1E2C58]">•</span>
+              <span className="px-2 py-0.5 bg-[#080E21] text-[#E2E8F0] font-mono text-[11px] font-bold rounded-md border border-[#1E2C58]">
                 Auto Order ID: #{previewOrderId}
               </span>
               <span className={`px-2 py-0.5 font-mono text-[11px] font-bold rounded-md border ${
                 isExistingCustomer 
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                  : 'bg-purple-50 text-purple-700 border-purple-200'
+                  ? 'bg-emerald-950/70 text-emerald-300 border-emerald-800/60' 
+                  : 'bg-blue-950/70 text-blue-300 border-blue-800/60'
               }`}>
                 {isExistingCustomer ? 'Existing Customer ID' : 'Auto Customer ID'}: #{previewCustomerId}
               </span>
@@ -331,9 +331,9 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#0E1736] transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5 text-[#E2E8F0]" />
           </button>
         </div>
 
@@ -341,14 +341,14 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           <div
             className={`p-3 rounded-xl border flex items-center gap-2 text-xs font-semibold ${
               statusMessage.type === 'success'
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                : 'bg-red-50 text-red-800 border-red-200'
+                ? 'bg-emerald-950/70 text-emerald-300 border-emerald-800/60'
+                : 'bg-rose-950/70 text-rose-300 border-rose-800/60'
             }`}
           >
             {statusMessage.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             ) : (
-              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
             )}
             <span>{statusMessage.text}</span>
           </div>
@@ -356,13 +356,13 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Customer details */}
-          <div className="bg-slate-50/70 rounded-xl p-4 border border-slate-200/60 space-y-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-900 block">
+          <div className="bg-[#0E1736] rounded-xl p-4 border border-[#1E2C58] space-y-3">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-400 block">
               Customer Details
             </span>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-[#E2E8F0] mb-1">
                   Customer Name *
                 </label>
                 <input
@@ -371,19 +371,19 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   value={customer_name}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="Full name"
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#1E2C58] focus:outline-hidden focus:border-blue-500 bg-[#080E21] text-[#E2E8F0] placeholder-[#64748B]"
                 />
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-semibold text-slate-700">
+                  <label className="block text-xs font-semibold text-[#E2E8F0]">
                     Customer Contact *
                   </label>
                   {customerContact.trim() && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${
                       isExistingCustomer 
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                        : 'bg-purple-50 text-purple-700 border border-purple-200'
+                        ? 'bg-emerald-950/70 text-emerald-300 border-emerald-800/60' 
+                        : 'bg-purple-950/70 text-purple-300 border-purple-800/60'
                     }`}>
                       {isExistingCustomer ? `✓ Existing #${previewCustomerId}` : `New #${previewCustomerId}`}
                     </span>
@@ -395,18 +395,18 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   value={customer_mobile}
                   onChange={(e) => handleContactChange(e.target.value)}
                   placeholder="e.g. 01711223344"
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#1E2C58] focus:outline-hidden focus:border-blue-500 bg-[#080E21] text-[#E2E8F0] placeholder-[#64748B]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-[#E2E8F0] mb-1">
                   Gender *
                 </label>
                 <select
                   required
                   value={gender}
                   onChange={(e) => setGender(e.target.value as any)}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#1E2C58] focus:outline-hidden focus:border-blue-500 bg-[#080E21] text-[#E2E8F0]"
                 >
                   <option value="">Select</option>
                   <option value="Male">Male</option>
@@ -418,20 +418,20 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           </div>
 
           {/* Product and Channel */}
-          <div className="bg-slate-50/70 rounded-xl p-4 border border-slate-200/60 space-y-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-900 block">
-              Product & Source Channel
+          <div className="bg-[#0E1736] rounded-xl p-4 border border-[#1E2C58] space-y-3">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-400 block">
+              Product &amp; Source Channel
             </span>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-[#E2E8F0] mb-1">
                   Channel *
                 </label>
                 <select
                   required
                   value={order_channel}
                   onChange={(e) => setOrderChannel(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#1E2C58] focus:outline-hidden focus:border-blue-500 bg-[#080E21] text-[#E2E8F0]"
                 >
                   {ORDER_CHANNELS.map((ch, idx) => (
                     <option key={`create-ch-${ch}-${idx}`} value={ch}>{ch}</option>
@@ -439,14 +439,14 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-[#E2E8F0] mb-1">
                   Product Category *
                 </label>
                 <select
                   required
                   value={product_category}
                   onChange={(e) => setProductCategory(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#1E2C58] focus:outline-hidden focus:border-blue-500 bg-[#080E21] text-[#E2E8F0]"
                 >
                   <option key="create-cat-empty" value="">Select Category</option>
                   {PRODUCT_CATEGORIES.map((cat, idx) => (
@@ -455,7 +455,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-[#E2E8F0] mb-1">
                   Product Name *
                 </label>
                 <input
@@ -464,25 +464,25 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   value={product_name}
                   onChange={(e) => setProductName(e.target.value)}
                   placeholder="Item name"
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#1E2C58] focus:outline-hidden focus:border-blue-500 bg-[#080E21] text-[#E2E8F0] placeholder-[#64748B]"
                 />
               </div>
             </div>
           </div>
 
           {/* Delivery Location */}
-          <div className="bg-slate-50/70 rounded-xl p-4 border border-slate-200/60 space-y-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-900 block">
+          <div className="bg-[#0E1736] rounded-xl p-4 border border-[#1E2C58] space-y-3">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-400 block">
               Delivery Location
             </span>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">City *</label>
+                <label className="block text-xs font-semibold text-[#E2E8F0] mb-1">City *</label>
                 <select
                   required
                   value={city}
                   onChange={handleCityChange}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#1E2C58] focus:outline-hidden focus:border-blue-500 bg-[#080E21] text-[#E2E8F0]"
                 >
                   <option value="">Select City</option>
                   <option value="Dhaka">Dhaka</option>
@@ -497,18 +497,18 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     value={customCity}
                     onChange={(e) => setCustomCity(e.target.value)}
                     placeholder="Enter City"
-                    className="mt-2 w-full px-2.5 py-1.5 text-xs rounded-md border border-slate-300"
+                    className="mt-2 w-full px-2.5 py-1.5 text-xs rounded-md border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0]"
                   />
                 )}
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Area *</label>
+                <label className="block text-xs font-semibold text-[#E2E8F0] mb-1">Area *</label>
                 <select
                   required
                   value={deliveryArea}
                   onChange={handleAreaChange}
                   disabled={!city}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white disabled:bg-slate-100"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#1E2C58] focus:outline-hidden focus:border-blue-500 bg-[#080E21] text-[#E2E8F0] disabled:opacity-40"
                 >
                   <option key="create-area-empty" value="">{city ? 'Select Area' : 'Select City First'}</option>
                   {availableAreas.map((ar, idx) => (
@@ -522,12 +522,12 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     value={customArea}
                     onChange={(e) => setCustomArea(e.target.value)}
                     placeholder="Enter Area"
-                    className="mt-2 w-full px-2.5 py-1.5 text-xs rounded-md border border-slate-300"
+                    className="mt-2 w-full px-2.5 py-1.5 text-xs rounded-md border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0]"
                   />
                 )}
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-[#E2E8F0] mb-1">
                   Address (Flat, House, Road, Block)
                 </label>
                 <div className="grid grid-cols-4 gap-1">
@@ -536,28 +536,28 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     value={flat}
                     onChange={(e) => setFlat(e.target.value)}
                     placeholder="Flat"
-                    className="px-1.5 py-1 text-xs border rounded-sm bg-white"
+                    className="px-1.5 py-1 text-xs border border-[#1E2C58] rounded-sm bg-[#080E21] text-[#E2E8F0] placeholder-[#64748B]"
                   />
                   <input
                     type="text"
                     value={house}
                     onChange={(e) => setHouse(e.target.value)}
                     placeholder="House"
-                    className="px-1.5 py-1 text-xs border rounded-sm bg-white"
+                    className="px-1.5 py-1 text-xs border border-[#1E2C58] rounded-sm bg-[#080E21] text-[#E2E8F0] placeholder-[#64748B]"
                   />
                   <input
                     type="text"
                     value={road}
                     onChange={(e) => setRoad(e.target.value)}
                     placeholder="Road"
-                    className="px-1.5 py-1 text-xs border rounded-sm bg-white"
+                    className="px-1.5 py-1 text-xs border border-[#1E2C58] rounded-sm bg-[#080E21] text-[#E2E8F0] placeholder-[#64748B]"
                   />
                   <input
                     type="text"
                     value={block}
                     onChange={(e) => setBlock(e.target.value)}
                     placeholder="Block"
-                    className="px-1.5 py-1 text-xs border rounded-sm bg-white"
+                    className="px-1.5 py-1 text-xs border border-[#1E2C58] rounded-sm bg-[#080E21] text-[#E2E8F0] placeholder-[#64748B]"
                   />
                 </div>
               </div>
@@ -565,13 +565,13 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           </div>
 
           {/* Schedule & Financials */}
-          <div className="bg-slate-50/70 rounded-xl p-4 border border-slate-200/60 space-y-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-900 block">
-              Schedule & Financials
+          <div className="bg-[#0E1736] rounded-xl p-4 border border-[#1E2C58] space-y-3">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-400 block">
+              Schedule &amp; Financials
             </span>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-[#E2E8F0] mb-1">
                   Schedule Date *
                 </label>
                 <input
@@ -580,18 +580,18 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   min={todayDateStr}
                   value={scheduleDate}
                   onChange={(e) => setScheduleDate(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-[#E2E8F0] mb-1">
                   Time Slot *
                 </label>
                 <select
                   required
                   value={scheduledTime}
                   onChange={(e) => setScheduledTime(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0]"
                 >
                   <option key="create-slot-empty" value="">Time Slot</option>
                   {getTimeSlots().map((slot, idx) => (
@@ -600,7 +600,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-[#E2E8F0] mb-1">
                   Order Value () *
                 </label>
                 <input
@@ -611,7 +611,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   value={orderValue}
                   onChange={(e) => setOrderValue(e.target.value)}
                   placeholder="0.00"
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white font-bold text-slate-900"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#1E2C58] bg-[#080E21] font-bold text-[#E2E8F0] placeholder-[#64748B]"
                 />
               </div>
             </div>
@@ -621,14 +621,14 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 cursor-pointer"
+              className="px-4 py-2 text-xs font-semibold text-[#94A3B8] hover:text-[#E2E8F0] cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="py-2.5 px-6 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/15 disabled:opacity-70 transition-all flex items-center gap-2 cursor-pointer"
+              className="py-2.5 px-6 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/30 disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
             >
               {submitting ? (
                 <>

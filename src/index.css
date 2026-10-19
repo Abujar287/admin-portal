@@ -6,39 +6,48 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background-color: #0B132B;
+    color: #E2E8F0;
+    color-scheme: dark;
   }
 
   body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    color: #0f172a;
-    background-color: #f8fafc;
+    color: #E2E8F0;
+    background-color: #0B132B;
+    color-scheme: dark;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Poppins', 'Inter', sans-serif;
+    color: #E2E8F0;
+  }
+
+  label {
+    color: #E2E8F0;
   }
 }
 
-/* Custom scrollbars for clean UI */
+/* Custom scrollbars for clean midnight navy dark theme */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #080E21;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #1E2C58;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #2D3E72;
 }
 
 /* Sleek translucent scrollbars for dark sidebars */
 .sidebar-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+  scrollbar-color: rgba(226, 232, 240, 0.2) transparent;
 }
 .sidebar-scroll::-webkit-scrollbar {
   width: 5px;
@@ -48,10 +57,202 @@
   background: transparent;
 }
 .sidebar-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(226, 232, 240, 0.2);
   border-radius: 9999px;
 }
 .sidebar-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(226, 232, 240, 0.35);
 }
 
+/* UNIVERSAL HIGH CONTRAST TEXT OVERRIDES (#E2E8F0 everywhere as requested) */
+.text-slate-900,
+.text-slate-800,
+.text-slate-700,
+.text-slate-600,
+.text-slate-500,
+.text-gray-900,
+.text-gray-800,
+.text-gray-700,
+.text-gray-600,
+.text-gray-500,
+.text-neutral-900,
+.text-neutral-800,
+.text-neutral-700,
+.text-neutral-600,
+.text-neutral-500,
+.text-zinc-900,
+.text-zinc-800,
+.text-zinc-700,
+.text-zinc-600,
+.text-black {
+  color: #E2E8F0 !important;
+}
+
+.text-slate-400,
+.text-slate-300,
+.text-gray-400,
+.text-gray-300,
+.text-neutral-400 {
+  color: #94A3B8 !important;
+}
+
+/* UNIFORM MIDNIGHT NAVY CARD & POPUP BACKGROUNDS (#0B132B / #111C3D) */
+.bg-white,
+.bg-slate-50,
+.bg-slate-100,
+.bg-slate-200,
+.bg-slate-300,
+.bg-gray-50,
+.bg-gray-100,
+.bg-neutral-50,
+.bg-neutral-100,
+.bg-zinc-50,
+.bg-zinc-100 {
+  background-color: #111C3D !important;
+  color: #E2E8F0 !important;
+}
+
+/* Borders */
+.border-slate-100,
+.border-slate-200,
+.border-slate-300,
+.border-slate-400,
+.border-slate-700,
+.border-gray-100,
+.border-gray-200,
+.border-gray-300,
+.border-neutral-200 {
+  border-color: #1E2C58 !important;
+}
+
+/* Form Inputs, textareas, selects */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  background-color: #080E21 !important;
+  color: #E2E8F0 !important;
+  border-color: #1E2C58 !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #64748B !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #3B82F6 !important;
+  outline: none !important;
+}
+
+/* Table rows & headers & footers */
+table thead tr,
+table thead th {
+  background-color: #0E1736 !important;
+  color: #E2E8F0 !important;
+  border: 1px solid #3B82F6 !important;
+  border-top: 2px solid #3B82F6 !important;
+  border-bottom: 2px solid #3B82F6 !important;
+  font-weight: 800 !important;
+}
+
+table tfoot tr,
+table tfoot td {
+  background-color: #080E21 !important;
+  color: #E2E8F0 !important;
+  border: 1px solid #3B82F6 !important;
+  border-top: 2px solid #3B82F6 !important;
+  border-bottom: 2px solid #3B82F6 !important;
+  font-weight: 900 !important;
+}
+
+table tbody tr {
+  background-color: #111C3D !important;
+  color: #E2E8F0 !important;
+}
+
+table tbody tr:hover {
+  background-color: #16234D !important;
+}
+
+table tbody td {
+  border-color: #182449 !important;
+  border-bottom: 1px solid #182449 !important;
+  border-right: 1px solid #182449 !important;
+  color: #E2E8F0 !important;
+}
+
+table th,
+table td {
+  border-color: #182449 !important;
+  color: #E2E8F0 !important;
+}
+
+table tbody tr {
+  background-color: #111C3D !important;
+  color: #E2E8F0 !important;
+}
+
+table tbody tr:hover {
+  background-color: #16234D !important;
+}
+
+table th,
+table td {
+  border-color: #1E2C58 !important;
+  color: #E2E8F0 !important;
+}
+
+/* UNIFORM HARMONIOUS HIGHLIGHTS (#111C3D card background, #E2E8F0 text) */
+.bg-indigo-50,
+.bg-indigo-100,
+.bg-blue-50,
+.bg-blue-100,
+.dark\:bg-indigo-950\/30,
+.dark\:bg-indigo-950\/40,
+.bg-purple-50,
+.bg-purple-100,
+.dark\:bg-purple-950\/40,
+.dark\:bg-purple-950\/20,
+.bg-emerald-50,
+.bg-emerald-100,
+.bg-amber-50,
+.bg-amber-100,
+.bg-rose-50,
+.bg-rose-100,
+.bg-red-50,
+.bg-red-100 {
+  background-color: #111C3D !important;
+  color: #E2E8F0 !important;
+  border-color: #1E2C58 !important;
+}
+
+.text-indigo-700,
+.text-indigo-600,
+.text-indigo-800,
+.text-blue-700,
+.text-blue-600,
+.text-purple-700,
+.text-purple-600,
+.text-purple-800,
+.text-purple-900,
+.text-emerald-700,
+.text-emerald-600,
+.text-emerald-800,
+.text-amber-700,
+.text-amber-600,
+.text-amber-800,
+.text-rose-700,
+.text-rose-600,
+.text-rose-800,
+.text-red-700,
+.text-red-600 {
+  color: #E2E8F0 !important;
+}
+
+/* Modals & Popups backdrop & card uniformity */
+.fixed.inset-0:has(> div) {
+  backdrop-filter: blur(5px);
+  background-color: rgba(3, 7, 18, 0.85);
+}

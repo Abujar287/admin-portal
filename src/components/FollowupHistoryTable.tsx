@@ -98,18 +98,18 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
   return (
     <div className="space-y-4">
       {/* 1. Filters & Search Control Card - Universal Compact Design */}
-      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs">
+      <div className="bg-[#242936] rounded-2xl p-4 sm:p-5 border border-slate-700 shadow-xs text-white">
         {/* Filters Row - Same design as Orders Table */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Timestamp Date Filter */}
           <div className="flex-1 min-w-[150px]">
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-white mb-1">
               Date
             </label>
             <select
               value={dateFilter}
               onChange={(e) => onDateFilterChange(e.target.value as DateFilterType)}
-              className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 font-medium focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100"
+              className="w-full px-3 py-2 text-xs rounded-lg border border-slate-600 bg-[#1a1e27] text-white font-medium focus:outline-hidden focus:border-white focus:ring-1 focus:ring-white"
             >
               <option value="all">All Time</option>
               <option value="today">Today</option>
@@ -284,18 +284,18 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
       </div>
 
       {/* 2. Followup Data Table Card */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+      <div className="bg-[#242936] rounded-2xl border border-slate-700 shadow-xs overflow-hidden text-white">
         {/* Table Top Toolbar */}
-        <div className="p-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between text-slate-700">
-          <span className="text-xs font-bold">
+        <div className="p-3 border-b border-slate-700 bg-[#1e2330] flex items-center justify-between text-white">
+          <span className="text-xs font-bold text-white">
             Showing {recordsCount} followup record(s)
           </span>
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-500 font-medium">Rows per page:</span>
+            <span className="text-white font-medium">Rows per page:</span>
             <select
               value={pageSize}
               onChange={(e) => onPageSizeChange(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-              className="px-2 py-1 text-xs rounded border border-slate-300 bg-white font-medium"
+              className="px-2 py-1 text-xs rounded border border-slate-600 bg-[#1a1e27] text-white font-medium focus:outline-hidden"
             >
               <option value={25}>25</option>
               <option value={50}>50</option>
@@ -307,26 +307,26 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
 
         {/* Scrollable Table Viewport */}
         <div className="overflow-x-auto max-h-[60vh]">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse text-xs text-white">
             <thead>
-              <tr className="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10 uppercase tracking-wider text-[11px]">
-                <th className="py-3 px-3.5 whitespace-nowrap">Order ID</th>
-                <th className="py-3 px-3.5 whitespace-nowrap">Date</th>
-                <th className="py-3 px-3.5 whitespace-nowrap">Customer Name</th>
-                <th className="py-3 px-3.5 whitespace-nowrap">Contact</th>
-                <th className="py-3 px-3.5 whitespace-nowrap">Previous Status</th>
-                <th className="py-3 px-3.5 whitespace-nowrap">New Status</th>
-                <th className="py-3 px-3.5 whitespace-nowrap">Order Status</th>
-                <th className="py-3 px-3.5 whitespace-nowrap">Order Value</th>
-                <th className="py-3 px-3.5 whitespace-nowrap">Schedule</th>
-                <th className="py-3 px-3.5 whitespace-nowrap">Updated By</th>
-                <th className="py-3 px-3.5 whitespace-nowrap">Updated By Name</th>
-                <th className="py-3 px-3.5 whitespace-nowrap text-purple-700">Action Name</th>
-                <th className="py-3 px-3.5 whitespace-nowrap">Remarks / Notes</th>
-                <th className="py-3 px-3.5 whitespace-nowrap text-center">Actions</th>
+              <tr className="bg-[#1e2330] text-white font-bold border-b border-slate-700 sticky top-0 z-10 uppercase tracking-wider text-[11px]">
+                <th className="py-3 px-3.5 whitespace-nowrap text-white">Order ID</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-white">Date</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-white">Customer Name</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-white">Contact</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-white">Previous Status</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-white">New Status</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-white">Order Status</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-white">Order Value</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-white">Schedule</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-white">Updated By</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-white">Updated By Name</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-white">Action Name</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-white">Remarks / Notes</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-center text-white">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-800">
+            <tbody className="divide-y divide-slate-700 text-white bg-[#242936]">
               {paginatedRecords.length === 0 ? (
                 <tr>
                   <td colSpan={14} className="text-center py-12 text-slate-400 font-semibold">

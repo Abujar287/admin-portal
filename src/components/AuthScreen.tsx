@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 import { AgentUser, ManagerUser } from '../types';
-import { Lock } from 'lucide-react';
-
-
-// IMPORTANT: Please enable Email/Password provider in your Firebase Console authentication settings!
+import { Lock, Eye, EyeOff, ShieldCheck, Mail, ArrowRight } from 'lucide-react';
 
 interface AuthScreenProps {
   agents: AgentUser[];
@@ -20,8 +17,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [userId, setUserId] = useState('');
-  const [userName, setUserName] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
@@ -119,47 +115,81 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4 select-none">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-100 p-7 transition-all">
-        <div className="text-center mb-6">
-          <div className="w-11 h-11 mx-auto rounded-xl flex items-center justify-center mb-2.5 shadow-md bg-indigo-600 text-white shadow-indigo-600/20">
-            <Lock className="w-5 h-5" />
+    <div className="min-h-screen flex items-center justify-center bg-[#0B132B] p-4 select-none text-[#E2E8F0]">
+      {/* Login Card - Clean Professional Midnight Navy */}
+      <div className="w-full max-w-sm bg-[#111C3D] rounded-2xl shadow-2xl border border-[#1E2C58] p-7 sm:p-8 transition-all">
+        {/* Header */}
+        <div className="flex flex-col items-center text-center mb-6">
+          <div className="w-12 h-12 rounded-xl bg-[#0E1736] border border-[#1E2C58] flex items-center justify-center mb-3 shadow-inner">
+            <Lock className="w-5 h-5 text-[#E2E8F0]" />
           </div>
-          <h2 className="text-lg font-bold text-slate-900">Order Admin Portal</h2>
+          <h1 className="text-xl font-bold tracking-tight text-[#E2E8F0]">Admin Portal</h1>
         </div>
 
-        {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-bold">{error}</div>}
-        {message && <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700 font-bold">{message}</div>}
+        {error && (
+          <div className="mb-4 p-3 bg-red-950/60 border border-red-800/80 rounded-xl text-xs text-red-200 font-medium leading-relaxed">
+            {error}
+          </div>
+        )}
+        {message && (
+          <div className="mb-4 p-3 bg-emerald-950/60 border border-emerald-800/80 rounded-xl text-xs text-emerald-200 font-medium leading-relaxed">
+            {message}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">email</label>
-            <input 
-              type="text" 
-              required 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-indigo-600 focus:outline-hidden" 
-              placeholder="enter your email" 
-            />
+            <label className="block text-xs font-bold text-[#E2E8F0] mb-1.5 uppercase tracking-wider">
+              Email / Username
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#94A3B8]">
+                <Mail className="w-4 h-4 text-[#94A3B8]" />
+              </div>
+              <input 
+                type="text" 
+                required 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#1E2C58] bg-[#080E21] text-sm text-[#E2E8F0] placeholder-[#64748B] focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:outline-hidden transition-colors" 
+                placeholder="Enter email or username" 
+              />
+            </div>
           </div>
+
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">password</label>
-            <input 
-              type="password" 
-              required 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-indigo-600 focus:outline-hidden" 
-              placeholder="Enter Your Password" 
-            />
+            <label className="block text-xs font-bold text-[#E2E8F0] mb-1.5 uppercase tracking-wider">
+              Password
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#94A3B8]">
+                <Lock className="w-4 h-4 text-[#94A3B8]" />
+              </div>
+              <input 
+                type={showPassword ? 'text' : 'password'} 
+                required 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+                className="w-full pl-10 pr-11 py-2.5 rounded-xl border border-[#1E2C58] bg-[#080E21] text-sm text-[#E2E8F0] placeholder-[#64748B] focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:outline-hidden transition-colors" 
+                placeholder="Enter password" 
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#E2E8F0] transition-colors p-1 cursor-pointer"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4 text-[#E2E8F0]" /> : <Eye className="w-4 h-4 text-[#E2E8F0]" />}
+              </button>
+            </div>
           </div>
 
           <button 
             type="submit" 
-            className="w-full py-2.5 bg-indigo-600 text-white rounded-lg font-bold text-sm shadow-md cursor-pointer hover:bg-indigo-700 transition-colors"
+            className="w-full mt-2 py-3 px-4 rounded-xl bg-[#1E2C58] hover:bg-[#2A3E78] text-[#E2E8F0] font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] border border-[#2D3E72] group"
           >
-            Login
+            <span className="text-[#E2E8F0]">Login</span>
+            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 text-[#E2E8F0]" />
           </button>
         </form>
       </div>

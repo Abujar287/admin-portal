@@ -384,13 +384,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setTimeout(() => setManagerToast(null), 3000);
   };
 
-  const cardBg = 'bg-white border-slate-200 text-slate-900';
-  const cardHeaderBg = 'bg-slate-50 border-slate-100 text-slate-800';
-  const tableHeaderBg = 'bg-slate-100 text-slate-700 border-slate-200';
-  const tableRowBg = 'divide-slate-100 text-slate-800 hover:bg-amber-100/50';
-  const inputBg = 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-indigo-600';
-  const isDark = false;
-  const theme = 'light';
+  const cardBg = 'bg-[#111C3D] border-[#1E2C58] text-[#E2E8F0] shadow-sm';
+  const cardHeaderBg = 'bg-[#0E1736] border-[#1E2C58] text-[#E2E8F0]';
+  const tableHeaderBg = 'bg-[#0E1736] text-[#E2E8F0] border-[#1E2C58] font-bold';
+  const tableRowBg = 'divide-[#1E2C58]/80 text-[#E2E8F0] hover:bg-[#16234D]';
+  const inputBg = 'bg-[#080E21] border-[#1E2C58] text-[#E2E8F0] placeholder-[#64748B] focus:border-[#3B82F6]';
+  const isDark = true;
+  const theme = 'dark';
 
   // Followup History Filter & Search States
   const [followupDateFilter, setFollowupDateFilter] = useState<DateFilterType>('all');
@@ -2833,34 +2833,34 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   }, [filteredAgentPerformance]);
 
   return (
-    <div className="flex h-screen font-sans antialiased overflow-hidden select-none bg-slate-50 text-slate-900">
+    <div className="flex h-screen font-sans antialiased overflow-hidden select-none bg-[#0B132B] text-[#E2E8F0]">
       {managerToast && (
-        <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xl flex items-center gap-2 border border-slate-700 animate-fadeIn">
+        <div className="fixed top-5 right-5 z-50 bg-[#111C3D] text-[#E2E8F0] px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xl flex items-center gap-2 border border-[#1E2C58] animate-fadeIn">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{managerToast}</span>
         </div>
       )}
       {/* Manager Sidebar */}
-      <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} h-screen max-h-screen bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col p-4 border-r border-white/10 shrink-0 transition-all duration-300 z-10 overflow-hidden`}>
-        <div className="flex items-center justify-between pb-4 mb-3 border-b border-white/10 shrink-0">
+      <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} h-screen max-h-screen bg-[#0B132B] text-[#E2E8F0] flex flex-col p-4 border-r border-[#1E2C58] shrink-0 transition-all duration-300 z-10 overflow-hidden`}>
+        <div className="flex items-center justify-between pb-4 mb-3 border-b border-[#1E2C58] shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white shadow-lg shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-[#111C3D] flex items-center justify-center font-bold text-[#E2E8F0] shadow-sm shrink-0 border border-[#1E2C58]">
               📊
             </div>
             {isSidebarOpen && (
               <div className="min-w-0">
-                <h2 className="font-extrabold text-sm tracking-tight text-white truncate max-w-[130px]" title={currentManager.name || currentManager.user}>
+                <h2 className="font-extrabold text-sm tracking-tight text-[#E2E8F0] truncate max-w-[130px]" title={currentManager.name || currentManager.user}>
                   {currentManager.name || currentManager.user}
                 </h2>
                 <div className="mt-0.5">
-                  <span className="text-[11px] font-bold text-indigo-200 font-mono">
+                  <span className="text-[11px] font-bold text-[#94A3B8] font-mono">
                     user_id: {currentManager.user}
                   </span>
                 </div>
               </div>
             )}
           </div>
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-white/10 rounded-lg shrink-0 cursor-pointer" title={isSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
+          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-[#111C3D] text-[#94A3B8] hover:text-[#E2E8F0] rounded-lg shrink-0 cursor-pointer" title={isSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
             <span className="text-xl">⋮</span>
           </button>
         </div>
@@ -2868,7 +2868,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         <nav className="flex-1 min-h-0 space-y-1.5 overflow-y-auto overflow-x-hidden pr-1 -mr-1 sidebar-scroll">
           {/* Operations Section */}
           {isSidebarOpen && (isTabAllowed('summary') || isTabAllowed('orders') || isTabAllowed('followup') || isTabAllowed('agent-performance')) && (
-            <div className="px-3 pt-1 pb-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+            <div className="px-3 pt-1 pb-1 text-[10px] font-bold tracking-wider text-[#94A3B8] uppercase">
               Operations
             </div>
           )}
@@ -2880,13 +2880,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               title="Summary"
               className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
                 activeTab === 'summary'
-                  ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
-                  : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
+                  ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-xs font-bold border border-[#2D3E72]'
+                  : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D] font-semibold'
               }`}
             >
-              <BarChart2 className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'summary' ? 'text-sky-300 scale-110' : 'text-slate-400'}`} />
+              <BarChart2 className={`w-4 h-4 shrink-0 transition-transform duration-150 text-[#E2E8F0] ${activeTab === 'summary' ? 'scale-110' : ''}`} />
               {isSidebarOpen && (
-                <span className="truncate text-left font-semibold">
+                <span className="truncate text-left font-semibold text-[#E2E8F0]">
                   Summary
                 </span>
               )}
@@ -2900,18 +2900,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               title={`Orders (${scopedOrders.length} records)`}
               className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
                 activeTab === 'orders'
-                  ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
-                  : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
+                  ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-xs font-bold border border-[#2D3E72]'
+                  : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D] font-semibold'
               }`}
             >
-              <FileText className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'orders' ? 'text-amber-300 scale-110' : 'text-slate-400'}`} />
+              <FileText className={`w-4 h-4 shrink-0 transition-transform duration-150 text-[#E2E8F0] ${activeTab === 'orders' ? 'scale-110' : ''}`} />
               {isSidebarOpen && (
-                <span className="truncate text-left font-semibold">
+                <span className="truncate text-left font-semibold text-[#E2E8F0]">
                   Orders
                 </span>
               )}
               {isSidebarOpen && (
-                <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-150 ${activeTab === 'orders' ? 'bg-white text-indigo-900' : 'bg-white/10 text-white'}`}>
+                <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-[#080E21] text-[#E2E8F0] border border-[#1E2C58]">
                   {scopedOrders.length}
                 </span>
               )}
@@ -2925,18 +2925,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               title={`Followup History (${scopedFollowupHistory.length} logs)`}
               className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
                 activeTab === 'followup'
-                  ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
-                  : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
+                  ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-xs font-bold border border-[#2D3E72]'
+                  : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D] font-semibold'
               }`}
             >
-              <History className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'followup' ? 'text-indigo-300 scale-110' : 'text-slate-400'}`} />
+              <History className={`w-4 h-4 shrink-0 transition-transform duration-150 text-[#E2E8F0] ${activeTab === 'followup' ? 'scale-110' : ''}`} />
               {isSidebarOpen && (
-                <span className="truncate text-left font-semibold">
+                <span className="truncate text-left font-semibold text-[#E2E8F0]">
                   Followup History
                 </span>
               )}
               {isSidebarOpen && (
-                <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-150 ${activeTab === 'followup' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
+                <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-[#080E21] text-[#E2E8F0] border border-[#1E2C58]">
                   {scopedFollowupHistory.length}
                 </span>
               )}
@@ -2950,13 +2950,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               title="Agent Performance"
               className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
                 activeTab === 'agent-performance'
-                  ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
-                  : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
+                  ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-xs font-bold border border-[#2D3E72]'
+                  : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D] font-semibold'
               }`}
             >
-              <TrendingUp className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'agent-performance' ? 'text-amber-300 scale-110' : 'text-amber-400'}`} />
+              <TrendingUp className={`w-4 h-4 shrink-0 transition-transform duration-150 text-[#E2E8F0] ${activeTab === 'agent-performance' ? 'scale-110' : ''}`} />
               {isSidebarOpen && (
-                <span className="truncate text-left font-semibold">
+                <span className="truncate text-left font-semibold text-[#E2E8F0]">
                   Agent Performance
                 </span>
               )}
@@ -2967,7 +2967,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {(isTabAllowed('users') || isTabAllowed('category-mapping')) && (
             <>
               {isSidebarOpen && (
-                <div className="px-3 pt-3 pb-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase border-t border-white/10 mt-2">
+                <div className="px-3 pt-3 pb-1 text-[10px] font-bold tracking-wider text-[#94A3B8] uppercase border-t border-[#1E2C58] mt-2">
                   Administration
                 </div>
               )}
@@ -2979,18 +2979,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   title={`User Details (${agents.length} users)`}
                   className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
                     activeTab === 'users'
-                      ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
-                      : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
+                      ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-xs font-bold border border-[#2D3E72]'
+                      : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D] font-semibold'
                   }`}
                 >
-                  <Users className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'users' ? 'text-purple-300 scale-110' : 'text-slate-400'}`} />
+                  <Users className={`w-4 h-4 shrink-0 transition-transform duration-150 text-[#E2E8F0] ${activeTab === 'users' ? 'scale-110' : ''}`} />
                   {isSidebarOpen && (
-                    <span className="truncate text-left font-semibold">
+                    <span className="truncate text-left font-semibold text-[#E2E8F0]">
                       User Details
                     </span>
                   )}
                   {isSidebarOpen && (
-                    <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-all duration-150 ${activeTab === 'users' ? 'bg-white text-indigo-900' : 'bg-white/20 text-white'}`}>
+                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-[#080E21] text-[#E2E8F0] border border-[#1E2C58]">
                       {agents.length}
                     </span>
                   )}
@@ -3004,13 +3004,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   title="Category Mapping"
                   className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
                     activeTab === 'category-mapping'
-                      ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
-                      : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
+                      ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-xs font-bold border border-[#2D3E72]'
+                      : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D] font-semibold'
                   }`}
                 >
-                  <Layers className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'category-mapping' ? 'text-purple-300 scale-110' : 'text-purple-400'}`} />
+                  <Layers className={`w-4 h-4 shrink-0 transition-transform duration-150 text-[#E2E8F0] ${activeTab === 'category-mapping' ? 'scale-110' : ''}`} />
                   {isSidebarOpen && (
-                    <span className="truncate text-left font-semibold">
+                    <span className="truncate text-left font-semibold text-[#E2E8F0]">
                       Category Mapping
                     </span>
                   )}
@@ -3019,20 +3019,19 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             </>
           )}
 
-
         </nav>
       </aside>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Top Header */}
-        <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#121212] px-6 flex items-center justify-between shrink-0 shadow-xs">
+        <header className="h-16 border-b border-[#1E2C58] bg-[#0B132B] px-6 flex items-center justify-between shrink-0 shadow-sm text-[#E2E8F0]">
           <div className="flex items-center gap-2.5">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#94A3B8]">
               Manager Desk
             </span>
-            <span className="text-slate-300 dark:text-slate-700">•</span>
-            <h1 className="text-lg font-extrabold text-slate-900 dark:text-white capitalize">
+            <span className="text-[#1E2C58]">•</span>
+            <h1 className="text-lg font-extrabold text-[#E2E8F0] capitalize">
               {activeTab === 'summary' && 'Analytics & Summary'}
               {activeTab === 'orders' && (userOrderScope === 'my_orders' ? 'My Orders Database' : 'All Orders Database')}
               {activeTab === 'followup' && 'All Followup History & Audit Logs'}
@@ -3047,15 +3046,15 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           <div className="flex items-center gap-3">
             {/* 1. Last Sync Indicator */}
             <div 
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs shadow-2xs"
+              className="flex items-center gap-2 px-3 py-1.5 bg-[#111C3D] border border-[#1E2C58] rounded-xl text-xs shadow-2xs"
               title="Automatically updates when Google Sheet refreshes"
             >
               <span className="relative flex h-2 w-2">
                 <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isRefreshing ? 'bg-amber-400 opacity-75' : 'bg-emerald-400 opacity-75'}`}></span>
-                <span className={`relative inline-flex rounded-full h-2 w-2 ${isRefreshing ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${isRefreshing ? 'bg-amber-500' : 'bg-emerald-400'}`}></span>
               </span>
-              <span className="text-slate-500 dark:text-slate-400 text-[11px] font-semibold whitespace-nowrap">Last Sync:</span>
-              <span className="font-mono font-bold text-slate-800 dark:text-slate-100 text-xs whitespace-nowrap">
+              <span className="text-[#94A3B8] text-[11px] font-semibold whitespace-nowrap">Last Sync:</span>
+              <span className="font-mono font-bold text-[#E2E8F0] text-xs whitespace-nowrap">
                 {lastSyncTime}
               </span>
             </div>
@@ -3064,18 +3063,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             <button
               onClick={() => onRefreshOrders()}
               disabled={isRefreshing}
-              className="min-w-[120px] px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-200 transition-colors cursor-pointer"
+              className="min-w-[120px] px-3 py-1.5 bg-[#111C3D] hover:bg-[#16234D] text-[#E2E8F0] rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border border-[#1E2C58] transition-colors cursor-pointer"
             >
-              <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-indigo-600' : ''}`} />
+              <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#E2E8F0]' : ''}`} />
               <span>{isRefreshing ? 'Refreshing...' : 'Refresh Sheet'}</span>
             </button>
 
             {/* 3. Add Order */}
             <button
               onClick={() => setIsManagerCreateOrderOpen(true)}
-              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+              className="px-3.5 py-2 bg-[#1E2C58] hover:bg-[#2A3E78] text-[#E2E8F0] rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-[#2D3E72]"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-4 h-4 text-[#E2E8F0]" />
               <span>Add Order</span>
             </button>
 
@@ -3084,10 +3083,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               <button
                 type="button"
                 onClick={() => setIsUserMenuOpen(prev => !prev)}
-                className="flex items-center gap-2 pl-2 pr-3 py-1.5 bg-slate-100 hover:bg-slate-200/90 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-2xs select-none"
+                className="flex items-center gap-2 pl-2 pr-3 py-1.5 bg-[#111C3D] hover:bg-[#16234D] rounded-xl border border-[#1E2C58] transition-all cursor-pointer shadow-xs select-none"
                 title="Account Menu"
               >
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 text-white font-black text-xs flex items-center justify-center shadow-xs shrink-0">
+                <div className="w-7 h-7 rounded-lg bg-[#080E21] text-[#E2E8F0] font-bold text-xs flex items-center justify-center shadow-xs shrink-0 border border-[#1E2C58]">
                   {(managerProfile.name || managerProfile.user || 'M')
                     .split(' ')
                     .filter(Boolean)
@@ -3096,22 +3095,22 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     .join('') || 'M'}
                 </div>
                 <div className="flex flex-col text-left leading-tight max-w-[120px] sm:max-w-[160px]">
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                  <span className="text-xs font-bold text-[#E2E8F0] truncate">
                     {managerProfile.name || managerProfile.user || 'Manager'}
                   </span>
-                  <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 truncate">
+                  <span className="text-[10px] font-semibold text-[#94A3B8] truncate">
                     {managerProfile.role || 'Manager'}
                   </span>
                 </div>
-                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180 text-indigo-600' : ''}`} />
+                <ChevronDown className={`w-3.5 h-3.5 text-[#94A3B8] transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180 text-[#E2E8F0]' : ''}`} />
               </button>
 
               {/* Dropdown Menu */}
               {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 py-2 z-[9999] animate-in fade-in zoom-in-95 duration-150">
+                <div className="absolute right-0 mt-2 w-64 bg-[#222734] rounded-2xl shadow-2xl border border-slate-700 py-2 z-[9999] animate-in fade-in zoom-in-95 duration-150">
                   {/* Account Summary Header */}
-                  <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 text-white font-black text-sm flex items-center justify-center shadow-sm shrink-0">
+                  <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-3 bg-[#1a1e27] rounded-t-2xl">
+                    <div className="w-10 h-10 rounded-xl bg-slate-800 text-white font-bold text-sm flex items-center justify-center shadow-xs shrink-0 border border-slate-700">
                       {(managerProfile.name || managerProfile.user || 'M')
                         .split(' ')
                         .filter(Boolean)
@@ -3120,14 +3119,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         .join('') || 'M'}
                     </div>
                     <div className="overflow-hidden min-w-0 flex-1">
-                      <p className="text-xs font-black text-slate-900 dark:text-white truncate">
+                      <p className="text-xs font-black text-white truncate">
                         {managerProfile.name || managerProfile.user || 'Manager'}
                       </p>
-                      <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 truncate">
+                      <p className="text-[11px] font-mono text-slate-300 truncate">
                         ID: #{managerProfile.user} • {managerProfile.role || 'Manager'}
                       </p>
                       {managerProfile.email && (
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                        <p className="text-[10px] text-slate-400 truncate">
                           {managerProfile.email}
                         </p>
                       )}
@@ -3143,15 +3142,15 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         setActiveTab('profiles');
                         setIsUserMenuOpen(false);
                       }}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer text-left"
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:text-white hover:bg-slate-700/60 transition-colors cursor-pointer text-left"
                     >
-                      <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                      <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0">
                         <User className="w-4 h-4" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <span>My Account</span>
-                          <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-100/70 dark:bg-indigo-900/60 px-1.5 py-0.5 rounded-md">Profile</span>
+                          <span className="text-[10px] font-bold text-slate-300 bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded-md">Profile</span>
                         </div>
                         <span className="block text-[10px] font-normal text-slate-400 truncate">
                           Manage account credentials &amp; details
@@ -3167,15 +3166,15 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           setActiveTab('sheet-connection');
                           setIsUserMenuOpen(false);
                         }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer text-left"
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:text-white hover:bg-slate-700/60 transition-colors cursor-pointer text-left"
                       >
-                        <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0">
                           <FileSpreadsheet className="w-4 h-4" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
                             <span>Google Sheet &amp; Tabs</span>
-                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100/70 dark:bg-emerald-900/60 px-1.5 py-0.5 rounded-md">Sheet</span>
+                            <span className="text-[10px] font-bold text-slate-300 bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded-md">Sheet</span>
                           </div>
                           <span className="block text-[10px] font-normal text-slate-400 truncate">
                             Connect sheet &amp; manage tabs
@@ -3193,9 +3192,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         setUnlockPassword('');
                         setUnlockError('');
                       }}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer text-left"
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:text-amber-400 hover:bg-slate-700/60 transition-colors cursor-pointer text-left"
                     >
-                      <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/60 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                      <div className="w-7 h-7 rounded-lg bg-amber-950/40 border border-amber-800/50 flex items-center justify-center text-amber-400 shrink-0">
                         <Lock className="w-4 h-4" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -3206,7 +3205,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       </div>
                     </button>
 
-                    <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
+                    <div className="h-px bg-slate-700 my-1" />
 
                     {/* 4. Logout */}
                     <button
@@ -3215,9 +3214,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         setIsUserMenuOpen(false);
                         onLogout();
                       }}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer text-left"
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-rose-500 hover:bg-rose-950/30 transition-colors cursor-pointer text-left"
                     >
-                      <div className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-950/60 flex items-center justify-center text-rose-600 shrink-0">
+                      <div className="w-7 h-7 rounded-lg bg-rose-950/40 border border-rose-800/50 flex items-center justify-center text-rose-400 shrink-0">
                         <LogOut className="w-4 h-4" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -3239,23 +3238,22 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           {/* TAB: GOOGLE SHEET & DYNAMIC TABS */}
           {activeTab === 'sheet-connection' && (
             <div className="space-y-6 max-w-5xl mx-auto">
-              <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-                <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="bg-[#111C3D] border border-[#1E2C58] rounded-3xl p-6 sm:p-8 text-[#E2E8F0] shadow-xl relative overflow-hidden">
                 <div className="relative z-10 space-y-5">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold border border-emerald-500/30 shadow-inner">
+                    <div className="w-12 h-12 rounded-2xl bg-[#0E1736] text-[#E2E8F0] flex items-center justify-center font-bold border border-[#1E2C58] shadow-inner">
                       <FileSpreadsheet className="w-6 h-6" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-extrabold tracking-tight">Google Sheet &amp; Tabs</h2>
-                      <p className="text-xs text-indigo-200 mt-0.5">
+                      <h2 className="text-xl font-extrabold tracking-tight text-[#E2E8F0]">Google Sheet &amp; Tabs</h2>
+                      <p className="text-xs text-[#94A3B8] mt-0.5">
                         Connect Google Sheet or Apps Script Web App URL and manage sheet tabs.
                       </p>
                     </div>
                   </div>
 
                   <form onSubmit={handleConnectSheet} className="pt-2">
-                    <label className="block text-xs font-bold text-indigo-200 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-bold text-[#E2E8F0] uppercase tracking-wider mb-2">
                       Google Sheet Link / Apps Script Web App URL
                     </label>
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
@@ -3265,7 +3263,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         placeholder="https://script.google.com/macros/s/.../exec or Google Sheet URL"
                         value={sheetUrlInput}
                         onChange={(e) => setSheetUrlInput(e.target.value)}
-                        className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-xs font-mono text-white placeholder-indigo-300/50 focus:outline-hidden focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all"
+                        className="flex-1 px-4 py-3 bg-[#080E21] border border-[#1E2C58] rounded-xl text-xs font-mono text-[#E2E8F0] placeholder-[#64748B] focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
                       />
 
                       {/* 1. Connected / Connect Sheet Button */}
@@ -3275,7 +3273,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         className={`px-5 py-3 ${
                           connectedSheetStatus === 'connected'
                             ? 'bg-emerald-600 hover:bg-emerald-500'
-                            : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500'
+                            : 'bg-blue-600 hover:bg-blue-500'
                         } text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 disabled:opacity-50`}
                       >
                         <RotateCw className={`w-4 h-4 ${isConnectingSheet ? 'animate-spin' : ''}`} />
@@ -4271,15 +4269,15 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               </div>
 
               {/* USER DETAILS DIRECTORY TABLE (MATCHING COLUMNS) */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-                <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-2">
+              <div className="bg-[#111C3D] rounded-2xl border border-[#1E2C58] shadow-xs overflow-hidden text-[#E2E8F0]">
+                <div className="p-4 border-b border-[#1E2C58] bg-[#0E1736] flex flex-wrap items-center justify-between gap-2 text-[#E2E8F0]">
                   <div>
-                    <h3 className="font-extrabold text-slate-900 text-sm">User Details &amp; Directory</h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
+                    <h3 className="font-extrabold text-[#E2E8F0] text-sm">User Details &amp; Directory</h3>
+                    <p className="text-[11px] text-[#94A3B8] mt-0.5">
                       Overview of registered agent credentials, assigned roles, team leaders, and action controls.
                     </p>
                   </div>
-                  <span className="text-xs font-bold bg-indigo-100 text-indigo-800 px-2.5 py-1 rounded-full">
+                  <span className="text-xs font-bold bg-[#080E21] text-[#E2E8F0] border border-[#1E2C58] px-2.5 py-1 rounded-full">
                     {agents.length} Accounts Registered
                   </span>
                 </div>
@@ -4962,13 +4960,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             setViewJourneyOrder(filteredOrders[0]);
                           }
                         }}
-                        className="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-300 focus:border-indigo-600 focus:outline-hidden"
+                        className="flex-1 px-3 py-2 text-xs rounded-lg border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0] placeholder-[#64748B] focus:border-blue-500 focus:outline-hidden"
                       />
                       {searchValue.trim() && filteredOrders.length > 0 && (
                         <button
                           type="button"
                           onClick={() => setViewJourneyOrder(filteredOrders[0])}
-                          className="px-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0 transition-transform active:scale-95"
+                          className="px-3 py-2 bg-[#1E2C58] hover:bg-[#2A3E78] text-[#E2E8F0] border border-[#2D3E72] rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0 transition-transform active:scale-95"
                           title="Open Order Details & Full Journey"
                         >
                           <History className="w-3.5 h-3.5" />
@@ -4979,13 +4977,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 pt-2 border-t border-slate-100">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#94A3B8] pt-2 border-t border-[#1E2C58]">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-700">
+                    <span className="font-semibold text-[#E2E8F0]">
                       Showing <strong>{filteredOrders.length === 0 ? 0 : (orderPage - 1) * (orderPageSize === 'all' ? filteredOrders.length : (orderPageSize as number)) + 1}</strong> - <strong>{orderPageSize === 'all' ? filteredOrders.length : Math.min(orderPage * (orderPageSize as number), filteredOrders.length)}</strong> of <strong>{filteredOrders.length}</strong> orders
                     </span>
-                    <span className="text-slate-300">•</span>
-                    <span className="text-slate-500 font-mono text-[11px] bg-indigo-50 text-indigo-700 font-bold px-2.5 py-0.5 rounded-full border border-indigo-200">
+                    <span className="text-[#1E2C58]">•</span>
+                    <span className="text-[#E2E8F0] font-mono text-[11px] bg-[#0E1736] font-bold px-2.5 py-0.5 rounded-full border border-[#1E2C58]">
                       {userOrderScope === 'my_orders'
                         ? `My Orders (${currentManager.user}): ${scopedOrders.length}`
                         : `Sheet Total: ${orders.length}`}
@@ -4994,7 +4992,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] font-bold text-slate-500 uppercase">Rows:</span>
+                      <span className="text-[11px] font-bold text-[#94A3B8] uppercase">Rows:</span>
                       <select
                         value={orderPageSize}
                         onChange={(e) => {
@@ -5002,7 +5000,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           setOrderPageSize(val);
                           setOrderPage(1);
                         }}
-                        className="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 shadow-2xs"
+                        className="px-2.5 py-1 bg-[#080E21] border border-[#1E2C58] rounded-lg text-xs font-semibold text-[#E2E8F0] shadow-2xs"
                       >
                         <option value={50}>50 / page</option>
                         <option value={100}>100 / page</option>
@@ -5018,7 +5016,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           type="button"
                           disabled={orderPage <= 1}
                           onClick={() => setOrderPage(1)}
-                          className="px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 disabled:opacity-30 text-xs font-bold text-slate-700 cursor-pointer"
+                          className="px-2 py-1 rounded-md bg-[#111C3D] hover:bg-[#16234D] disabled:opacity-30 text-xs font-bold text-[#E2E8F0] border border-[#1E2C58] cursor-pointer"
                           title="First Page"
                         >
                           «
@@ -5027,18 +5025,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           type="button"
                           disabled={orderPage <= 1}
                           onClick={() => setOrderPage(p => Math.max(1, p - 1))}
-                          className="px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 disabled:opacity-30 text-xs font-bold text-slate-700 cursor-pointer"
+                          className="px-2.5 py-1 rounded-md bg-[#111C3D] hover:bg-[#16234D] disabled:opacity-30 text-xs font-bold text-[#E2E8F0] border border-[#1E2C58] cursor-pointer"
                         >
                           Prev
                         </button>
-                        <span className="px-2 text-xs font-medium text-slate-600">
+                        <span className="px-2 text-xs font-medium text-[#E2E8F0]">
                           <strong>{orderPage}</strong> / {totalOrderPages}
                         </span>
                         <button
                           type="button"
                           disabled={orderPage >= totalOrderPages}
                           onClick={() => setOrderPage(p => Math.min(totalOrderPages, p + 1))}
-                          className="px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 disabled:opacity-30 text-xs font-bold text-slate-700 cursor-pointer"
+                          className="px-2.5 py-1 rounded-md bg-[#111C3D] hover:bg-[#16234D] disabled:opacity-30 text-xs font-bold text-[#E2E8F0] border border-[#1E2C58] cursor-pointer"
                         >
                           Next
                         </button>
@@ -5046,7 +5044,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           type="button"
                           disabled={orderPage >= totalOrderPages}
                           onClick={() => setOrderPage(totalOrderPages)}
-                          className="px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 disabled:opacity-30 text-xs font-bold text-slate-700 cursor-pointer"
+                          className="px-2 py-1 rounded-md bg-[#111C3D] hover:bg-[#16234D] disabled:opacity-30 text-xs font-bold text-[#E2E8F0] border border-[#1E2C58] cursor-pointer"
                           title="Last Page"
                         >
                           »
@@ -5058,40 +5056,40 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               </div>
 
               {/* All 19 Columns Sticky Table */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="bg-[#111C3D] rounded-2xl border border-[#1E2C58] shadow-xs overflow-hidden">
                 <div className="overflow-x-auto overflow-y-auto max-h-[60vh]">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="bg-gradient-to-r from-indigo-700 to-purple-800 text-white sticky top-0 z-20 font-bold">
-                        <th className="py-3.5 px-3.5 whitespace-nowrap sticky left-0 z-30 bg-indigo-800 border-r border-indigo-600">order_id</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">customer_id</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">customer_mobile</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">customer_name</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">gender</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">create_date</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">order_channel</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">agent_id</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">agent_name</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">product_category</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">product_name</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">city</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">delivery_area</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">address_details</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">schedule_date</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">schedule_time</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">order_value</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">order_status</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">followup_status</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">profit</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">delivered_date</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">cancelled_date</th>
-                        <th className="py-3.5 px-3.5 whitespace-nowrap">followup_date</th>
+                      <tr className="bg-[#0E1736] text-[#E2E8F0] border-b border-[#1E2C58] sticky top-0 z-20 font-bold">
+                        <th className="py-3.5 px-3.5 whitespace-nowrap sticky left-0 z-30 bg-[#0E1736] border-r border-[#1E2C58] text-[#E2E8F0]">order_id</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">customer_id</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">customer_mobile</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">customer_name</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">gender</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">create_date</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">order_channel</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">agent_id</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">agent_name</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">product_category</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">product_name</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">city</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">delivery_area</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">address_details</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">schedule_date</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">schedule_time</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">order_value</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">order_status</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">followup_status</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">profit</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">delivered_date</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">cancelled_date</th>
+                        <th className="py-3.5 px-3.5 whitespace-nowrap text-[#E2E8F0]">followup_date</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-800">
+                    <tbody className="divide-y divide-[#1E2C58]/60 text-[#E2E8F0] bg-[#111C3D]">
                       {filteredOrders.length === 0 ? (
                         <tr>
-                          <td colSpan={23} className="text-center py-12 text-slate-400 font-semibold">
+                          <td colSpan={23} className="text-center py-12 text-[#94A3B8] font-semibold">
                             No orders found matching filters.
                           </td>
                         </tr>
@@ -5102,22 +5100,22 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             <tr
                               key={`manager-ord-${ord.order_id || ord.id || idx}-${idx}`}
                               onClick={() => setViewJourneyOrder(ord)}
-                              className="group hover:bg-amber-100/90 transition-all duration-150 cursor-pointer"
+                              className="group hover:bg-[#16234D] transition-colors duration-150 cursor-pointer"
                             >
-                              <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-indigo-700 sticky left-0 z-10 bg-white group-hover:bg-amber-100/90 border-r border-slate-200/90 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.08)] transition-colors duration-150">
+                              <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-blue-400 sticky left-0 z-10 bg-[#111C3D] group-hover:bg-[#16234D] border-r border-[#1E2C58] transition-colors duration-150">
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setViewJourneyOrder(ord);
                                   }}
-                                  className="hover:underline text-indigo-700 hover:text-indigo-900 flex items-center gap-1 cursor-pointer font-bold"
+                                  className="hover:underline text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer font-bold"
                                   title="Click to open order details"
                                 >
                                   <span>#{ord.order_id || ord.id}</span>
                                 </button>
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-800">
+                              <td className="py-3 px-3.5 whitespace-nowrap font-medium text-[#E2E8F0]">
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -5125,17 +5123,17 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                     const cId = String(ord.customer_id || ord.customerId || '');
                                     if (cId) setSelectedCustomerId(cId);
                                   }}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-xs font-bold text-indigo-700 bg-indigo-50/90 hover:bg-indigo-100 hover:text-indigo-900 border border-indigo-200/70 transition-all cursor-pointer shadow-2xs group-hover:border-indigo-400"
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-xs font-bold text-[#E2E8F0] bg-[#080E21] hover:bg-[#0E1736] border border-[#1E2C58] transition-all cursor-pointer shadow-2xs"
                                   title="Click to view Customer 360 profile, metrics & all orders"
                                 >
-                                  <User className="w-3.5 h-3.5 text-indigo-500" />
+                                  <User className="w-3.5 h-3.5 text-blue-400" />
                                   <span>{ord.customer_id || ord.customerId || '-'}</span>
                                 </button>
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-slate-600">
+                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[#94A3B8]">
                                 {ord.customer_mobile || ord.customerContact}
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-900">
+                              <td className="py-3 px-3.5 whitespace-nowrap font-medium text-[#E2E8F0]">
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -5143,57 +5141,57 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                     const cId = String(ord.customer_id || ord.customerId || '');
                                     if (cId) setSelectedCustomerId(cId);
                                   }}
-                                  className="hover:underline text-slate-900 hover:text-indigo-600 cursor-pointer font-bold text-left transition-colors"
+                                  className="hover:underline text-[#E2E8F0] hover:text-blue-400 cursor-pointer font-bold text-left transition-colors"
                                   title="Click to view customer details"
                                 >
                                   {ord.customer_name || ord.customerName}
                                 </button>
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">
+                              <td className="py-3 px-3.5 whitespace-nowrap text-[#94A3B8]">
                                 {ord.gender}
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-slate-600">
+                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-[#94A3B8]">
                                 {OrderService.formatDateTime(ord.create_date)}
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap">
-                                <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700">
+                                <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#080E21] text-[#94A3B8] border border-[#1E2C58]">
                                   {ord.order_channel}
                                 </span>
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-indigo-900 font-semibold">
+                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[#E2E8F0] font-semibold">
                                 {ord.agent_id}
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">
+                              <td className="py-3 px-3.5 whitespace-nowrap text-[#E2E8F0]">
                                 {ord.agent_name}
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">
+                              <td className="py-3 px-3.5 whitespace-nowrap text-[#E2E8F0]">
                                 {ord.product_category}
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-medium text-slate-800 max-w-[200px] truncate" title={ord.product_name}>
+                              <td className="py-3 px-3.5 whitespace-nowrap font-medium text-[#E2E8F0] max-w-[200px] truncate" title={ord.product_name}>
                                 {ord.product_name}
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">
+                              <td className="py-3 px-3.5 whitespace-nowrap text-[#E2E8F0]">
                                 {ord.city}
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap text-slate-700">
+                              <td className="py-3 px-3.5 whitespace-nowrap text-[#E2E8F0]">
                                 {ord.delivery_area}
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap text-slate-500 max-w-[200px] truncate" title={ord.address_details}>
+                              <td className="py-3 px-3.5 whitespace-nowrap text-[#94A3B8] max-w-[200px] truncate" title={ord.address_details}>
                                 {ord.address_details}
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-slate-700">
+                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-[#94A3B8]">
                                 {OrderService.formatDateTime(ord.schedule_date)}
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap text-slate-600">
+                              <td className="py-3 px-3.5 whitespace-nowrap text-[#94A3B8]">
                                 {ord.schedule_time}
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-bold text-slate-900">
+                              <td className="py-3 px-3.5 whitespace-nowrap font-bold text-[#E2E8F0]">
                                  {(ord.order_value || 0).toLocaleString()}
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap">
                                 <span
-                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                    isDelivered ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                    isDelivered ? 'bg-emerald-950/70 text-emerald-300 border-emerald-800/60' : 'bg-amber-950/70 text-amber-300 border-amber-800/60'
                                   }`}
                                 >
                                   {ord.order_status}
@@ -5202,28 +5200,28 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               <td className="py-2.5 px-3.5 whitespace-nowrap">
                                 <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold border ${
                                     ord.followup_status === 'Delivered'
-                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                      ? 'bg-emerald-950/70 text-emerald-300 border-emerald-800/60'
                                       : ord.followup_status === 'Cancelled'
-                                      ? 'bg-red-50 text-red-800 border-red-300'
+                                      ? 'bg-rose-950/70 text-rose-300 border-rose-800/60'
                                       : ord.followup_status === 'Confirmed'
-                                      ? 'bg-blue-50 text-blue-800 border-blue-300'
+                                      ? 'bg-blue-950/70 text-blue-300 border-blue-800/60'
                                       : ord.followup_status === 'Follow-up'
-                                      ? 'bg-purple-50 text-purple-800 border-purple-300'
-                                      : 'bg-amber-50 text-amber-800 border-amber-300'
+                                      ? 'bg-purple-950/70 text-purple-300 border-purple-800/60'
+                                      : 'bg-amber-950/70 text-amber-300 border-amber-800/60'
                                   }`}>
                                   {ord.followup_status || 'Pending'}
                                 </span>
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-bold text-emerald-600">
+                              <td className="py-3 px-3.5 whitespace-nowrap font-bold text-emerald-400">
                                 {ord.profit && ord.profit > 0 ? ` ${(ord.profit || 0).toLocaleString()}` : '-'}
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-emerald-700 font-medium">
+                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-emerald-400 font-medium">
                                 {ord.delivered_date ? OrderService.formatDateTime(ord.delivered_date) : '-'}
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-red-700 font-medium">
+                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-rose-400 font-medium">
                                 {ord.cancelled_date ? OrderService.formatDateTime(ord.cancelled_date) : '-'}
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-blue-700 font-medium">
+                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[11px] text-blue-400 font-medium">
                                 {ord.followup_date || ord.followupDate ? OrderService.formatDateTime(ord.followup_date || ord.followupDate || '') : '-'}
                               </td>
                             </tr>
@@ -5236,8 +5234,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
                 {/* Bottom Pagination Bar */}
                 {totalOrderPages > 1 && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 bg-slate-50 border-t border-slate-200 text-xs">
-                    <span className="text-slate-600 font-medium">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 bg-[#0E1736] border-t border-[#1E2C58] text-xs">
+                    <span className="text-[#94A3B8] font-medium">
                       Showing page <strong>{orderPage}</strong> of <strong>{totalOrderPages}</strong> ({filteredOrders.length} total orders)
                     </span>
                     <div className="flex items-center gap-1.5">
@@ -5308,14 +5306,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               </div>
 
               {/* Quick Status Updater Card */}
-              <div className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 shadow-md border border-indigo-800/40">
+              <div className="bg-[#111C3D] text-[#E2E8F0] rounded-2xl p-6 shadow-md border border-[#1E2C58]">
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold">
+                  <div className="w-8 h-8 rounded-lg bg-[#0E1736] text-[#E2E8F0] border border-[#1E2C58] flex items-center justify-center font-bold">
                     ⚡
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-sm text-white">Order Followup Status &amp; Schedule Updater</h3>
-                    <p className="text-[11px] text-indigo-200">
+                    <h3 className="font-extrabold text-sm text-[#E2E8F0]">Order Followup Status &amp; Schedule Updater</h3>
+                    <p className="text-[11px] text-[#94A3B8]">
                       Pick any Order ID, update its Followup Status, Order Value, Schedule Date &amp; Time dropdown, and log remarks.
                     </p>
                   </div>
@@ -5374,7 +5372,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 >
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
                     <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-[#E2E8F0] mb-1">
                         Select Order
                       </label>
                       <select
@@ -5392,7 +5390,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           }
                         }}
                         required
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-400/30 bg-slate-900 text-white font-medium focus:border-indigo-400"
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0] font-medium focus:border-blue-500"
                       >
                         <option key="opt-quick-choose" value="">-- Choose Order ID --</option>
                         {orders.map((ord, idx) => {
@@ -5414,7 +5412,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             const ord = orders.find((o) => String(o.order_id || o.id) === String(quickUpdateOrderId));
                             if (ord) setViewJourneyOrder(ord);
                           }}
-                          className="mt-1.5 text-[11px] font-bold text-amber-300 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                          className="mt-1.5 text-[11px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer transition-colors"
                         >
                           <History className="w-3.5 h-3.5" />
                           <span>View #{quickUpdateOrderId} Journey &amp; History ➔</span>
@@ -5423,7 +5421,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-[#E2E8F0] mb-1">
                         Order Value ()
                       </label>
                       <input
@@ -5433,12 +5431,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         value={quickUpdateOrderValue}
                         onChange={(e) => setQuickUpdateOrderValue(e.target.value)}
                         placeholder="e.g. 1500"
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-400/30 bg-slate-900 text-white font-medium focus:border-indigo-400"
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0] font-medium focus:border-blue-500"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-[#E2E8F0] mb-1">
                         Profit Amount ()
                       </label>
                       <input
@@ -5448,12 +5446,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         value={quickUpdateProfit}
                         onChange={(e) => setQuickUpdateProfit(e.target.value)}
                         placeholder="e.g. 300 (0 if cancelled)"
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-400/30 bg-slate-900 text-emerald-400 font-bold focus:border-indigo-400"
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-[#1E2C58] bg-[#080E21] text-emerald-400 font-bold focus:border-blue-500"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-[#E2E8F0] mb-1">
                         Followup Status
                       </label>
                       <select
@@ -5465,7 +5463,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             setQuickUpdateProfit('0');
                           }
                         }}
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-400/30 bg-slate-900 text-white font-medium focus:border-indigo-400"
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0] font-medium focus:border-blue-500"
                       >
                         <option value="Pending">Pending</option>
                         <option value="Confirmed">Confirmed</option>
@@ -5476,25 +5474,25 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-[#E2E8F0] mb-1">
                         Schedule Date
                       </label>
                       <input
                         type="date"
                         value={quickUpdateScheduleDate}
                         onChange={(e) => setQuickUpdateScheduleDate(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-400/30 bg-slate-900 text-white font-medium focus:border-indigo-400"
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0] font-medium focus:border-blue-500"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-[#E2E8F0] mb-1">
                         Scheduled Time (Slot)
                       </label>
                       <select
                         value={quickUpdateScheduledTime}
                         onChange={(e) => setQuickUpdateScheduledTime(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-400/30 bg-slate-900 text-white font-medium focus:border-indigo-400 cursor-pointer"
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0] font-medium focus:border-blue-500 cursor-pointer"
                       >
                         <option key="quick-slot-default" value="">-- Select Time Slot --</option>
                         {quickUpdateScheduledTime && !getTimeSlots().includes(quickUpdateScheduledTime) && (
@@ -5511,7 +5509,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-1">
                     <div className="md:col-span-3">
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-200 mb-1">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-[#E2E8F0] mb-1">
                         Audit Note / Remarks (Stored in 'Followup' sheet)
                       </label>
                       <input
@@ -5519,7 +5517,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         value={quickUpdateNotes}
                         onChange={(e) => setQuickUpdateNotes(e.target.value)}
                         placeholder="e.g. Schedule updated by customer request, confirmed delivery time."
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-400/30 bg-slate-900 text-white font-medium placeholder:text-slate-500 focus:border-indigo-400"
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0] font-medium placeholder-[#64748B] focus:border-blue-500"
                       />
                     </div>
 
@@ -5535,7 +5533,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           setQuickUpdateScheduledTime('');
                           setQuickUpdateNotes('');
                         }}
-                        className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition-all cursor-pointer border border-slate-700"
+                        className="py-2.5 px-3 bg-[#080E21] hover:bg-[#0E1736] text-[#94A3B8] hover:text-[#E2E8F0] rounded-xl text-xs font-bold transition-all cursor-pointer border border-[#1E2C58]"
                         title="Clear / Reset fields"
                       >
                         Reset
@@ -7614,39 +7612,39 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
       {/* CSV Preview Modal */}
       {csvPreviewModal && (
-        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 animate-fadeIn">
-            <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 select-none">
+          <div className="bg-[#111C3D] rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-[#1E2C58] animate-fadeIn text-[#E2E8F0]">
+            <div className="p-5 border-b border-[#1E2C58] bg-[#0E1736] flex items-center justify-between text-[#E2E8F0]">
               <div>
-                <h3 className="font-extrabold text-slate-900 text-base">{csvPreviewModal.title}</h3>
-                <p className="text-xs text-slate-500">Showing first {Math.min(csvPreviewModal.data.length, 50)} records of {csvPreviewModal.data.length} total rows</p>
+                <h3 className="font-extrabold text-[#E2E8F0] text-base">{csvPreviewModal.title}</h3>
+                <p className="text-xs text-[#94A3B8]">Showing first {Math.min(csvPreviewModal.data.length, 50)} records of {csvPreviewModal.data.length} total rows</p>
               </div>
               <button
                 onClick={() => setCsvPreviewModal(null)}
-                className="w-8 h-8 rounded-lg bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-700 font-bold cursor-pointer"
+                className="w-8 h-8 rounded-lg bg-[#111C3D] hover:bg-[#16234D] flex items-center justify-center text-[#E2E8F0] font-bold cursor-pointer border border-[#1E2C58] transition-colors"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4 text-[#E2E8F0]" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-4 bg-[#0B132B]">
               {csvPreviewModal.data.length === 0 ? (
-                <div className="text-center py-12 text-slate-400 font-semibold">No data available to preview.</div>
+                <div className="text-center py-12 text-[#94A3B8] font-semibold">No data available to preview.</div>
               ) : (
-                <div className="overflow-x-auto border rounded-xl border-slate-200">
+                <div className="overflow-x-auto border rounded-xl border-[#1E2C58]">
                   <table className="w-full text-xs text-left">
                     <thead>
-                      <tr className="bg-slate-100 font-bold border-b border-slate-200">
+                      <tr className="bg-[#0E1736] text-[#E2E8F0] font-bold border-b border-[#1E2C58]">
                         {Object.keys(csvPreviewModal.data[0]).map((key, kIdx) => (
-                          <th key={`csv-col-head-${key || kIdx}-${kIdx}`} className="py-2.5 px-3 whitespace-nowrap">{key}</th>
+                          <th key={`csv-col-head-${key || kIdx}-${kIdx}`} className="py-2.5 px-3 whitespace-nowrap text-[#E2E8F0]">{key}</th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-[#1E2C58] bg-[#111C3D]">
                       {csvPreviewModal.data.slice(0, 50).map((row, idx) => (
-                        <tr key={`csv-row-${idx}`} className="hover:bg-slate-50 whitespace-nowrap">
+                        <tr key={`csv-row-${idx}`} className="hover:bg-[#16234D] whitespace-nowrap text-[#E2E8F0]">
                           {Object.values(row).map((val, i) => (
-                            <td key={`csv-cell-${idx}-${i}`} className="py-2.5 px-3 text-slate-700 max-w-[200px] truncate" title={String(val ?? '')}>
+                            <td key={`csv-cell-${idx}-${i}`} className="py-2.5 px-3 text-[#E2E8F0] max-w-[200px] truncate" title={String(val ?? '')}>
                               {String(val ?? '-')}
                             </td>
                           ))}
@@ -7658,10 +7656,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               )}
             </div>
 
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
+            <div className="p-4 border-t border-[#1E2C58] bg-[#0E1736] flex justify-end gap-3 text-[#E2E8F0]">
               <button
                 onClick={() => setCsvPreviewModal(null)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+                className="px-4 py-2 bg-[#1E2C58] hover:bg-[#2A3E78] text-[#E2E8F0] rounded-xl text-xs font-bold cursor-pointer border border-[#2D3E72] transition-colors"
               >
                 Close Preview
               </button>
@@ -7670,7 +7668,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   handleExportCsv(csvPreviewModal.data, csvPreviewModal.filename);
                   setCsvPreviewModal(null);
                 }}
-                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 shadow-md"
+                className="px-5 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 shadow-md border border-slate-600 transition-colors"
               >
                 <span>Download CSV File</span>
               </button>
@@ -7725,27 +7723,27 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
       {/* Modal: Full Agent Details Card */}
       {selectedAgentDetails && (
-        <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs transition-all duration-300 ${
+        <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm transition-all duration-300 ${
           isSidebarOpen ? 'pl-4 sm:pl-72' : 'pl-4 sm:pl-24'
         }`}>
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="bg-[#111C3D] rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#1E2C58] space-y-4 max-h-[92vh] overflow-y-auto text-[#E2E8F0] select-none">
+            <div className="flex items-center justify-between pb-3 border-b border-[#1E2C58]">
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
+                <div className="w-9 h-9 rounded-xl bg-[#0E1736] border border-[#1E2C58] text-[#E2E8F0] flex items-center justify-center font-bold">
                   {selectedAgentDetails.user.slice(0, 2).toUpperCase()}
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-slate-900 text-sm">
+                  <h3 className="font-extrabold text-[#E2E8F0] text-sm">
                     {selectedAgentDetails.name || selectedAgentDetails.user}
                   </h3>
-                  <p className="text-[11px] text-slate-400">Agent ID: {selectedAgentDetails.user}</p>
+                  <p className="text-[11px] text-[#94A3B8]">Agent ID: {selectedAgentDetails.user}</p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedAgentDetails(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+                className="p-1 rounded-lg text-[#E2E8F0] hover:bg-[#16234D] transition-colors cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4 text-[#E2E8F0]" />
               </button>
             </div>
 
@@ -7942,21 +7940,21 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
       {/* Modal: Edit Agent Profile & Permissions Popup */}
       {editingUserModal && (
-        <div className={`fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-2xs overflow-y-auto transition-all duration-300 ${
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm overflow-y-auto transition-all duration-300 ${
           isSidebarOpen ? 'pl-4 sm:pl-72' : 'pl-4 sm:pl-24'
         }`}>
-          <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-100 overflow-hidden animate-fadeIn my-6 max-h-[92vh] flex flex-col">
-            <div className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between">
+          <div className="bg-[#111C3D] rounded-3xl max-w-xl w-full shadow-2xl border border-[#1E2C58] overflow-hidden animate-fadeIn my-6 max-h-[92vh] flex flex-col text-[#E2E8F0]">
+            <div className="p-5 bg-[#0E1736] border-b border-[#1E2C58] text-[#E2E8F0] flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-white">
-                  <Edit2 className="w-5 h-5 text-indigo-300" />
+                <div className="w-10 h-10 rounded-xl bg-[#111C3D] border border-[#1E2C58] flex items-center justify-center text-[#E2E8F0]">
+                  <Edit2 className="w-5 h-5 text-[#E2E8F0]" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-white text-base">
+                  <h3 className="font-extrabold text-[#E2E8F0] text-base">
                     Edit Agent Profile &amp; Permissions
                   </h3>
-                  <p className="text-xs text-indigo-200">
-                    Modifying configuration for <span className="font-bold text-white">{editingUserModal.user}</span>
+                  <p className="text-xs text-[#94A3B8]">
+                    Modifying configuration for <span className="font-bold text-[#E2E8F0]">{editingUserModal.user}</span>
                   </p>
                 </div>
               </div>
@@ -7966,7 +7964,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   setEditingAgentModal(null);
                   setEditModalIndex(null);
                 }}
-                className="p-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="p-1.5 rounded-xl text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -8533,41 +8531,37 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         orders={orders}
       />
 
-      {/* FULL-PAGE LOCK SCREEN MODAL ("lock maney just password dite hobe") */}
+      {/* FULL-PAGE LOCK SCREEN MODAL */}
       {isLocked && (
-        <div className="fixed inset-0 z-[99999] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200 select-none">
-          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-8 text-center space-y-6 relative overflow-hidden">
-            {/* Ambient accent light */}
-            <div className="absolute -top-20 -right-20 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-20 -left-20 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
-
+        <div className="fixed inset-0 z-[99999] bg-[#080E21]/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200 select-none">
+          <div className="w-full max-w-md bg-[#111C3D] rounded-3xl shadow-2xl border border-[#1E2C58] p-8 text-center space-y-6 relative overflow-hidden text-[#E2E8F0]">
             <div className="space-y-3 relative z-10">
               {/* Avatar Monogram */}
-              <div className="relative mx-auto w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 text-white font-black text-2xl flex items-center justify-center shadow-lg border-2 border-indigo-400/30">
+              <div className="relative mx-auto w-20 h-20 rounded-2xl bg-[#0E1736] text-[#E2E8F0] font-black text-2xl flex items-center justify-center shadow-md border-2 border-[#1E2C58]">
                 {(managerProfile.name || managerProfile.user || 'M')
                   .split(' ')
                   .filter(Boolean)
                   .slice(0, 2)
                   .map(w => w[0].toUpperCase())
                   .join('') || 'M'}
-                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-amber-500 border-2 border-white dark:border-slate-900 flex items-center justify-center text-white shadow-xs">
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#080E21] border-2 border-[#1E2C58] flex items-center justify-center text-[#E2E8F0] shadow-xs">
                   <Lock className="w-3 h-3" />
                 </div>
               </div>
 
               <div>
-                <h2 className="text-xl font-black text-slate-900 dark:text-white">
+                <h2 className="text-xl font-black text-[#E2E8F0]">
                   {managerProfile.name || managerProfile.user || 'Manager'}
                 </h2>
                 <div className="flex items-center justify-center gap-2 mt-1">
-                  <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2 py-0.5 rounded-md">
+                  <span className="text-xs font-mono font-bold text-[#E2E8F0] bg-[#0E1736] border border-[#1E2C58] px-2 py-0.5 rounded-md">
                     ID: #{managerProfile.user}
                   </span>
-                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                  <span className="text-xs font-bold text-[#94A3B8]">
                     • {managerProfile.role || 'Manager'}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                <p className="text-xs text-[#94A3B8] mt-2">
                   Session is locked. Enter your password to resume work.
                 </p>
               </div>
@@ -8576,14 +8570,14 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             {/* Unlock Form */}
             <form onSubmit={handleUnlockSession} className="space-y-4 relative z-10 text-left">
               {unlockError && (
-                <div className="p-3 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 rounded-xl text-xs font-bold flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
+                <div className="p-3 bg-rose-950/60 border border-rose-900 text-rose-300 rounded-xl text-xs font-bold flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
                   <span>{unlockError}</span>
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                <label className="block text-xs font-bold text-slate-200 mb-1.5 uppercase tracking-wider">
                   Enter Password
                 </label>
                 <div className="relative">
@@ -8597,12 +8591,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       if (unlockError) setUnlockError('');
                     }}
                     placeholder="Enter your password"
-                    className="w-full pl-4 pr-11 py-3 text-sm font-bold font-mono rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900/40 transition-all"
+                    className="w-full pl-4 pr-11 py-3 text-sm font-bold font-mono rounded-xl border border-slate-600 bg-[#1a1e27] text-white focus:outline-hidden focus:border-slate-300 focus:ring-1 focus:ring-slate-300 transition-all placeholder-slate-400"
                   />
                   <button
                     type="button"
                     onClick={() => setShowUnlockPassword(prev => !prev)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-1"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer p-1"
                     title={showUnlockPassword ? 'Hide password' : 'Show password'}
                   >
                     {showUnlockPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -8612,16 +8606,15 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
               <button
                 type="submit"
-                className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                className="w-full py-3 bg-white hover:bg-slate-100 text-slate-900 rounded-xl font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99]"
               >
-                <Lock className="w-4 h-4" />
+                <Lock className="w-4 h-4 text-slate-900" />
                 <span>Unlock Session</span>
               </button>
             </form>
 
             {/* Full logout option */}
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 relative z-10 flex items-center justify-between text-xs">
-              <span className="text-slate-400">Not you?</span>
+            <div className="pt-2 border-t border-slate-700 relative z-10 flex items-center justify-center text-xs">
               <button
                 type="button"
                 onClick={() => {
@@ -8629,7 +8622,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   sessionStorage.removeItem('portal_screen_locked');
                   onLogout();
                 }}
-                className="font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer transition-colors"
+                className="font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer transition-colors"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span>Sign Out Completely</span>
