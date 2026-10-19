@@ -170,9 +170,9 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
               onChange={(e) => onUpdatedByNameFilterChange(e.target.value)}
               className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 font-medium focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100"
             >
-              <option value="All">All Operators / Managers</option>
-              {availableUpdatedByNames.map((name) => (
-                <option key={`fol-up-name-${name}`} value={name}>
+              <option key="fol-up-name-all" value="All">All Operators / Managers</option>
+              {availableUpdatedByNames.map((name, nIdx) => (
+                <option key={`fol-up-name-${name}-${nIdx}`} value={name}>
                   {name}
                 </option>
               ))}
@@ -189,7 +189,7 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
               onChange={(e) => onStatusFilterChange(e.target.value)}
               className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800 font-medium focus:outline-hidden focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100"
             >
-              <option value="all">All Statuses</option>
+              <option key="fol-st-all" value="all">All Statuses</option>
               {availableStatuses.map((s, idx) => (
                 <option key={`fol-st-${s}-${idx}`} value={s}>
                   {s}

@@ -162,7 +162,6 @@ export const ALL_SIDEBAR_TABS: { id: AgentNavTab; label: string; description: st
   { id: 'orders', label: 'Orders', description: 'Orders database, search, and order items', section: 'operations' },
   { id: 'followup', label: 'Followup History', description: 'Customer followup tracking & audit log', section: 'operations' },
   { id: 'agent-performance', label: 'Agent Performance', description: 'Individual and team stats', section: 'operations' },
-  { id: 'category-distribution', label: 'Category Distribution', description: 'Live category distribution & volume breakdown', section: 'operations' },
   { id: 'profiles', label: 'Profile', description: 'User profile details', section: 'admin' },
   { id: 'users', label: 'User Details', description: 'Agent directory & access management', section: 'admin' },
   { id: 'category-mapping', label: 'Category Mapping', description: 'Category, team & status rules', section: 'admin' },
@@ -289,11 +288,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   // Allowed tabs for the active user session
   const userAllowedTabs: AgentNavTab[] = useMemo(() => {
     if (isSuperAdminOrFullManager) {
-      return ['summary', 'orders', 'followup', 'agent-performance', 'category-distribution', 'users', 'category-mapping', 'sheet-connection', 'profiles'];
+      return ['summary', 'orders', 'followup', 'agent-performance', 'users', 'category-mapping', 'sheet-connection', 'profiles'];
     }
     const baseTabs = currentUserPermissions?.allowedTabs && currentUserPermissions.allowedTabs.length > 0
       ? currentUserPermissions.allowedTabs
-      : ['summary', 'orders', 'followup', 'agent-performance', 'category-distribution', 'profiles'];
+      : ['summary', 'orders', 'followup', 'agent-performance', 'profiles'];
     
     // Strictly strip out manager/admin tabs ('users' for user details, 'category-mapping', 'sheet-connection' for Google Sheet & tabs) for non-manager users
     return baseTabs.filter(t => t !== 'users' && t !== 'category-mapping' && t !== 'sheet-connection') as AgentNavTab[];
@@ -1870,11 +1869,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
     const savedAgent = updated.find(a => a && a.user && String(a.user).toLowerCase() === u.toLowerCase());
     if (savedAgent) {
+      OrderService.saveAgentToCode(savedAgent);
       OrderService.saveAgentToSheet(savedAgent).then((sheetRes) => {
         if (sheetRes.success) {
-          showToast(`✓ Agent ${u} synced to Google Sheet ('users' tab)!`);
+          showToast(`✓ Agent ${u} synced to Google Sheet & Codebase ('users' tab)!`);
         } else {
-          showToast(`⚠️ Saved locally, but Sheet sync failed: ${sheetRes.error}`);
+          showToast(`⚠️ Saved to Codebase, but Sheet sync failed: ${sheetRes.error}`);
         }
       }).catch(() => {});
     }
@@ -1972,11 +1972,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
     const updatedAgent = updated.find(a => a && a.user && String(a.user).toLowerCase() === u.toLowerCase());
     if (updatedAgent) {
+      OrderService.saveAgentToCode(updatedAgent);
       OrderService.saveAgentToSheet(updatedAgent).then((sheetRes) => {
         if (sheetRes.success) {
-          showToast(`✓ Agent ${u} updated in Google Sheet ('users' tab)!`);
+          showToast(`✓ Agent ${u} updated in Google Sheet & Codebase ('users' tab)!`);
         } else {
-          showToast(`⚠️ Updated locally, but Sheet sync failed: ${sheetRes.error}`);
+          showToast(`⚠️ Updated in Codebase, but Sheet sync failed: ${sheetRes.error}`);
         }
       }).catch(() => {});
     }
@@ -2960,26 +2961,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             </button>
           )}
 
-          {/* 5. Category Distribution (New Tab) */}
-          {isTabAllowed('category-distribution') && (
-            <button
-              onClick={() => setActiveTab('category-distribution')}
-              title="Category Distribution"
-              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
-                activeTab === 'category-distribution'
-                  ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg font-extrabold border-l-4 border-l-indigo-300'
-                  : 'text-slate-300 hover:text-white hover:bg-white/10 font-semibold'
-              }`}
-            >
-              <PieChart className={`w-4 h-4 shrink-0 transition-transform duration-150 ${activeTab === 'category-distribution' ? 'text-indigo-300 scale-110' : 'text-indigo-400'}`} />
-              {isSidebarOpen && (
-                <span className="truncate text-left font-semibold">
-                  Category Distribution
-                </span>
-              )}
-            </button>
-          )}
-
           {/* Administration Section */}
           {(isTabAllowed('users') || isTabAllowed('category-mapping')) && (
             <>
@@ -3054,7 +3035,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               {activeTab === 'orders' && (userOrderScope === 'my_orders' ? 'My Orders Database' : 'All Orders Database')}
               {activeTab === 'followup' && 'All Followup History & Audit Logs'}
               {activeTab === 'agent-performance' && 'Agent Performance Report'}
-              {activeTab === 'category-distribution' && 'Live Category Distribution & Order Volume'}
               {activeTab === 'users' && 'User Details (Agent Directory)'}
               {activeTab === 'category-mapping' && 'Category, Team & Status Mapping'}
               {activeTab === 'sheet-connection' && 'Google Sheet & Dynamic Tabs Hub'}
@@ -3336,7 +3316,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           <span className="text-[11px] text-indigo-300/80 font-bold uppercase tracking-wider mr-1">Tabs:</span>
                           {connectedSheetTabs.map((tName, tIdx) => (
                             <span 
-                              key={tIdx} 
+                              key={`sheet-tab-${tName}-${tIdx}`} 
                               className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 border border-white/20 text-white font-mono text-[11px] transition-colors"
                               title={tName}
                             >
@@ -5663,9 +5643,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         onChange={(e) => setFollowupFilterName(e.target.value)}
                         className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800"
                       >
-                        <option value="All">All Operators / Managers</option>
-                        {availableUpdatedByNames.map((name) => (
-                          <option key={`orders-fol-name-${name}`} value={name}>{name}</option>
+                        <option key="orders-fol-name-all" value="All">All Operators / Managers</option>
+                        {availableUpdatedByNames.map((name, nIdx) => (
+                          <option key={`orders-fol-name-${name}-${nIdx}`} value={name}>{name}</option>
                         ))}
                       </select>
                     </div>
@@ -5680,7 +5660,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         onChange={(e) => setFollowupStatusFilter(e.target.value)}
                         className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-800"
                       >
-                        <option value="all">All Statuses</option>
+                        <option key="orders-fol-st-all" value="all">All Statuses</option>
                         {availableFollowupStatuses.map((s, idx) => (
                           <option key={`orders-fol-st-${s}-${idx}`} value={s}>{s}</option>
                         ))}
@@ -6195,8 +6175,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             </td>
                           </tr>
                         ) : (
-                          sortedChannelSummary.map((row) => (
-                            <tr key={row.name} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
+                          sortedChannelSummary.map((row, idx) => (
+                            <tr key={`channel-row-${row.name || idx}-${idx}`} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
                               <td className="py-3 px-3.5 font-bold text-slate-900">{row.name}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-indigo-700">{row.createOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
@@ -6417,8 +6397,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             </td>
                           </tr>
                         ) : (
-                          sortedCategorySummary.map((row) => (
-                            <tr key={row.name} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
+                          sortedCategorySummary.map((row, idx) => (
+                            <tr key={`category-row-${row.name || idx}-${idx}`} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
                               <td className="py-3 px-3.5 font-bold text-slate-900">{row.name}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-indigo-700">{row.createOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
@@ -6639,8 +6619,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             </td>
                           </tr>
                         ) : (
-                          sortedCitySummary.map((row) => (
-                            <tr key={row.name} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
+                          sortedCitySummary.map((row, idx) => (
+                            <tr key={`city-row-${row.name || idx}-${idx}`} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
                               <td className="py-3 px-3.5 font-bold text-slate-900">{row.name}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-indigo-700">{row.createOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
@@ -6893,8 +6873,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                             </td>
                           </tr>
                         ) : (
-                          sortedDateSummary.map((row) => (
-                            <tr key={row.name} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
+                          sortedDateSummary.map((row, idx) => (
+                            <tr key={`date-row-${row.name || idx}-${idx}`} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
                               <td className="py-3 px-3.5 font-bold font-mono text-slate-900">{row.name}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-indigo-700">{row.createOrders}</td>
                               <td className="py-3 px-3.5 text-right font-bold text-emerald-700">{row.servedOrders}</td>
@@ -7625,420 +7605,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   })()}
                 </div>
               </div>
-
-              {/* CATEGORY TO TEAM OPERATIONAL RULE MAPPING TABLE (Full Page Utilization) */}
-              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-5 sm:p-7">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
-                  <div>
-                    <h4 className="text-base font-extrabold text-slate-900">
-                      Category-to-Team Operational Rule Mapping
-                    </h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Assign designated operational teams, default status, marketing channel, supervisor, and delivery time slot per category
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">
-                      {categoryMappings.length} Active Rules Configured
-                    </span>
-                  </div>
-                </div>
-
-                {/* Quick Add Row & Filter */}
-                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
-                    Add New Operational Rule
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2.5 items-end">
-                    <div className="lg:col-span-2">
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Category</label>
-                      <input
-                        type="text"
-                        list="master-cat-list"
-                        placeholder="Select or enter category"
-                        value={newMappingCategory}
-                        onChange={(e) => setNewMappingCategory(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-semibold focus:outline-hidden focus:border-indigo-600"
-                      />
-                      <datalist id="master-cat-list">
-                        {categories.map((c, idx) => (
-                          <option key={`cat-${c}-${idx}`} value={c} />
-                        ))}
-                      </datalist>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Team</label>
-                      <select
-                        value={newMappingTeam}
-                        onChange={(e) => setNewMappingTeam(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-semibold focus:outline-hidden focus:border-indigo-600"
-                      >
-                        {teamsList.map((t, idx) => (
-                          <option key={`team-${t}-${idx}`} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Status</label>
-                      <select
-                        value={newMappingStatus}
-                        onChange={(e) => setNewMappingStatus(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-semibold focus:outline-hidden focus:border-indigo-600"
-                      >
-                        {orderStatuses.map((s, idx) => (
-                          <option key={`status-${s}-${idx}`} value={s}>{s}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Channel</label>
-                      <select
-                        value={newMappingChannel}
-                        onChange={(e) => setNewMappingChannel(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-semibold focus:outline-hidden focus:border-indigo-600"
-                      >
-                        {channelsList.map((ch, idx) => (
-                          <option key={`channel-${ch}-${idx}`} value={ch}>{ch}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Leader</label>
-                      <select
-                        value={newMappingTeamLeader}
-                        onChange={(e) => setNewMappingTeamLeader(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-semibold focus:outline-hidden focus:border-indigo-600"
-                      >
-                        {teamLeadersList.map((tl, idx) => (
-                          <option key={`tl-${tl}-${idx}`} value={tl}>{tl}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <button
-                        type="button"
-                        onClick={handleAddNewMapping}
-                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add Rule</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Filter and Search Box */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-                  <div className="relative flex-1 max-w-sm">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      placeholder="Search category mapping rules..."
-                      value={mappingSearchQuery}
-                      onChange={(e) => setMappingSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-hidden focus:border-indigo-600 transition-colors"
-                    />
-                  </div>
-                  <span className="text-xs text-slate-400 font-semibold">
-                    Showing {filteredCategoryMappings.length} of {categoryMappings.length} rules
-                  </span>
-                </div>
-
-                {/* Rules Table */}
-                <div className="overflow-x-auto border border-slate-200 rounded-2xl">
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 whitespace-nowrap">
-                      <tr>
-                        <th className="py-3 px-3.5">#</th>
-                        <th className="py-3 px-3.5">Category</th>
-                        <th className="py-3 px-3.5">Operational Team</th>
-                        <th className="py-3 px-3.5">Default Status</th>
-                        <th className="py-3 px-3.5">Channel</th>
-                        <th className="py-3 px-3.5">Team Leader</th>
-                        <th className="py-3 px-3.5">Time Slot</th>
-                        <th className="py-3 px-3.5 text-center">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-800">
-                      {filteredCategoryMappings.length === 0 ? (
-                        <tr>
-                          <td colSpan={8} className="text-center py-10 text-slate-400 font-medium">
-                            No mapping rules found matching your query.
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredCategoryMappings.map((rule, idx) => (
-                          <tr key={rule.id} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
-                            <td className="py-3 px-3.5 font-mono text-slate-400 font-bold">{idx + 1}</td>
-                            <td className="py-3 px-3.5 font-bold text-slate-900">{rule.category}</td>
-                            <td className="py-3 px-3.5">
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800">
-                                {rule.team}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3.5">
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                                {rule.orderStatus || (rule as any).status || 'Pending'}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3.5 font-medium text-slate-600">
-                              {rule.channel || 'Facebook'}
-                            </td>
-                            <td className="py-3 px-3.5 font-medium text-purple-700">
-                              {rule.teamLeader || 'MD Abujar'}
-                            </td>
-                            <td className="py-3 px-3.5 font-mono text-slate-500 text-[11px]">
-                              {rule.timeSlot || '10AM to 11AM'}
-                            </td>
-                            <td className="py-3 px-3.5 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteMapping(rule.id || String(idx))}
-                                className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
-                                title="Delete Rule"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB: LIVE CATEGORY DISTRIBUTION & ORDER VOLUME (New Dedicated Tab) */}
-          {activeTab === 'category-distribution' && (
-            <div className="w-full space-y-6 pb-20">
-              {/* Header card with KPI stats and export */}
-              <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 shadow-inner shrink-0">
-                      <PieChart className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-base sm:text-lg text-slate-900">
-                        Live Database Category Distribution &amp; Order Volume
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Real-time order count, delivered fulfillment, order value, and profit breakdown across all product categories
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const catMap = new Map<string, { total: number; delivered: number; value: number; profit: number }>();
-                        categories.forEach(c => {
-                          const k = c.trim();
-                          if (k) catMap.set(k, { total: 0, delivered: 0, value: 0, profit: 0 });
-                        });
-                        orders.forEach(o => {
-                          const cat = String(o.product_category || (o as any).productCategory || (o as any).category || 'Other').trim();
-                          const val = Number(o.order_value || (o as any).orderValue || 0);
-                          const pr = Number(o.profit || 0);
-                          const st = String(o.order_status || (o as any).orderStatus || '').toLowerCase();
-                          const isDeliv = st === 'delivered' || st === 'complete' || st === 'completed';
-                          const curr = catMap.get(cat) || { total: 0, delivered: 0, value: 0, profit: 0 };
-                          curr.total += 1;
-                          if (isDeliv) curr.delivered += 1;
-                          curr.value += val;
-                          curr.profit += pr;
-                          catMap.set(cat, curr);
-                        });
-                        const exportData = Array.from(catMap.entries()).map(([cat, s], idx) => ({
-                          rank: idx + 1,
-                          category: cat,
-                          master_configured: categories.some(c => c.trim().toLowerCase() === cat.toLowerCase()) ? 'Yes' : 'No',
-                          total_orders: s.total,
-                          delivered_orders: s.delivered,
-                          delivery_ratio: s.total > 0 ? `${Math.round((s.delivered / s.total) * 100)}%` : '0%',
-                          order_value: s.value,
-                          profit: s.profit
-                        }));
-                        handleExportCsv(exportData, `category_distribution_report_${new Date().toISOString().slice(0, 10)}.csv`);
-                      }}
-                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-2 transition-all cursor-pointer"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Export CSV Report</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 4 Summary KPI Cards */}
-                {(() => {
-                  const catMap = new Map<string, { total: number; delivered: number; value: number; profit: number }>();
-                  categories.forEach(c => {
-                    const k = c.trim();
-                    if (k) catMap.set(k, { total: 0, delivered: 0, value: 0, profit: 0 });
-                  });
-                  orders.forEach(o => {
-                    const cat = String(o.product_category || (o as any).productCategory || (o as any).category || 'Other').trim();
-                    const val = Number(o.order_value || (o as any).orderValue || 0);
-                    const pr = Number(o.profit || 0);
-                    const st = String(o.order_status || (o as any).orderStatus || '').toLowerCase();
-                    const isDeliv = st === 'delivered' || st === 'complete' || st === 'completed';
-                    const curr = catMap.get(cat) || { total: 0, delivered: 0, value: 0, profit: 0 };
-                    curr.total += 1;
-                    if (isDeliv) curr.delivered += 1;
-                    curr.value += val;
-                    curr.profit += pr;
-                    catMap.set(cat, curr);
-                  });
-                  const totalCategories = catMap.size;
-                  let totalOrdersAllCats = 0;
-                  let totalDeliveredAllCats = 0;
-                  let totalValueAllCats = 0;
-                  let totalProfitAllCats = 0;
-                  catMap.forEach(v => {
-                    totalOrdersAllCats += v.total;
-                    totalDeliveredAllCats += v.delivered;
-                    totalValueAllCats += v.value;
-                    totalProfitAllCats += v.profit;
-                  });
-                  const overallDeliveryRate = totalOrdersAllCats > 0 ? Math.round((totalDeliveredAllCats / totalOrdersAllCats) * 100) : 0;
-
-                  return (
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Total Categories</span>
-                        <p className="text-2xl font-black text-slate-900 mt-1 font-mono">{totalCategories}</p>
-                        <span className="text-[11px] text-slate-400 mt-0.5 block">{categories.length} in Master Classification</span>
-                      </div>
-                      <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 block">Total Category Orders</span>
-                        <p className="text-2xl font-black text-indigo-700 mt-1 font-mono">{totalOrdersAllCats.toLocaleString()}</p>
-                        <span className="text-[11px] text-indigo-600 mt-0.5 block">{totalDeliveredAllCats.toLocaleString()} Delivered</span>
-                      </div>
-                      <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 block">Category Revenue</span>
-                        <p className="text-2xl font-black text-emerald-700 mt-1 font-mono">{totalValueAllCats.toLocaleString()}</p>
-                        <span className="text-[11px] text-emerald-600 mt-0.5 block">Profit: {totalProfitAllCats.toLocaleString()}</span>
-                      </div>
-                      <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-purple-700 block">Delivered Ratio</span>
-                        <p className="text-2xl font-black text-purple-700 mt-1 font-mono">{overallDeliveryRate}%</p>
-                        <span className="text-[11px] text-purple-600 mt-0.5 block">Overall Delivery Success</span>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Table Card */}
-              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-indigo-600" />
-                    <h4 className="text-xs sm:text-sm font-extrabold text-slate-900">
-                      Category Breakdown &amp; Order Distribution Table
-                    </h4>
-                  </div>
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 self-start sm:self-auto">
-                    {categories.length} Master Categories Configured
-                  </span>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 whitespace-nowrap">
-                      <tr>
-                        <th className="py-3 px-4">#</th>
-                        <th className="py-3 px-4">Category Name</th>
-                        <th className="py-3 px-4 text-center">Master Mapping Status</th>
-                        <th className="py-3 px-4 text-right text-indigo-700">Total Orders</th>
-                        <th className="py-3 px-4 text-right text-emerald-700">Delivered Orders</th>
-                        <th className="py-3 px-4 text-right text-purple-700">Delivered Ratio</th>
-                        <th className="py-3 px-4 text-right">Order Value</th>
-                        <th className="py-3 px-4 text-right text-emerald-600">Net Profit</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-800">
-                      {(() => {
-                        const catMap = new Map<string, { total: number; delivered: number; value: number; profit: number }>();
-                        categories.forEach(c => {
-                          const k = c.trim();
-                          if (k) catMap.set(k, { total: 0, delivered: 0, value: 0, profit: 0 });
-                        });
-                        orders.forEach(o => {
-                          const cat = String(o.product_category || (o as any).productCategory || (o as any).category || 'Other').trim();
-                          const val = Number(o.order_value || (o as any).orderValue || 0);
-                          const pr = Number(o.profit || 0);
-                          const st = String(o.order_status || (o as any).orderStatus || '').toLowerCase();
-                          const isDeliv = st === 'delivered' || st === 'complete' || st === 'completed';
-                          const curr = catMap.get(cat) || { total: 0, delivered: 0, value: 0, profit: 0 };
-                          curr.total += 1;
-                          if (isDeliv) curr.delivered += 1;
-                          curr.value += val;
-                          curr.profit += pr;
-                          catMap.set(cat, curr);
-                        });
-                        const entries = Array.from(catMap.entries()).sort((a, b) => b[1].total - a[1].total);
-                        if (entries.length === 0) {
-                          return (
-                            <tr>
-                              <td colSpan={8} className="text-center py-8 text-slate-400 font-medium">
-                                No categories recorded in current database.
-                              </td>
-                            </tr>
-                          );
-                        }
-                        const totalOrdersAll = entries.reduce((sum, e) => sum + e[1].total, 0);
-
-                        return entries.map(([catName, stats], idx) => {
-                          const isMasterConfigured = categories.some(c => c.trim().toLowerCase() === catName.toLowerCase());
-                          const delivRatio = stats.total > 0 ? Math.round((stats.delivered / stats.total) * 100) : 0;
-                          const sharePct = totalOrdersAll > 0 ? Math.round((stats.total / totalOrdersAll) * 100) : 0;
-
-                          return (
-                            <tr key={catName} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
-                              <td className="py-3 px-4 font-mono text-slate-400 font-bold">{idx + 1}</td>
-                              <td className="py-3 px-4 font-bold text-slate-900">{catName}</td>
-                              <td className="py-3 px-4 text-center">
-                                {isMasterConfigured ? (
-                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                    Configured in Master List
-                                  </span>
-                                ) : (
-                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                                    Unmapped (Detected in Orders)
-                                  </span>
-                                )}
-                              </td>
-                              <td className="py-3 px-4 text-right font-mono font-bold text-indigo-700">
-                                {stats.total} <span className="text-[10px] font-normal text-slate-400">({sharePct}%)</span>
-                              </td>
-                              <td className="py-3 px-4 text-right font-mono font-bold text-emerald-700">{stats.delivered}</td>
-                              <td className="py-3 px-4 text-right">
-                                <div className="inline-flex items-center gap-1.5">
-                                  <div className="w-12 bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                                    <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${delivRatio}%` }} />
-                                  </div>
-                                  <span className="font-mono font-bold text-slate-700 text-[11px]">{delivRatio}%</span>
-                                </div>
-                              </td>
-                              <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">{stats.value.toLocaleString()}</td>
-                              <td className="py-3 px-4 text-right font-mono font-bold text-emerald-600">{stats.profit.toLocaleString()}</td>
-                            </tr>
-                          );
-                        });
-                      })()}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
             </div>
           )}
         </main>
@@ -8069,16 +7635,16 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   <table className="w-full text-xs text-left">
                     <thead>
                       <tr className="bg-slate-100 font-bold border-b border-slate-200">
-                        {Object.keys(csvPreviewModal.data[0]).map((key) => (
-                          <th key={key} className="py-2.5 px-3 whitespace-nowrap">{key}</th>
+                        {Object.keys(csvPreviewModal.data[0]).map((key, kIdx) => (
+                          <th key={`csv-col-head-${key || kIdx}-${kIdx}`} className="py-2.5 px-3 whitespace-nowrap">{key}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {csvPreviewModal.data.slice(0, 50).map((row, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50 whitespace-nowrap">
+                        <tr key={`csv-row-${idx}`} className="hover:bg-slate-50 whitespace-nowrap">
                           {Object.values(row).map((val, i) => (
-                            <td key={i} className="py-2.5 px-3 text-slate-700 max-w-[200px] truncate" title={String(val ?? '')}>
+                            <td key={`csv-cell-${idx}-${i}`} className="py-2.5 px-3 text-slate-700 max-w-[200px] truncate" title={String(val ?? '')}>
                               {String(val ?? '-')}
                             </td>
                           ))}
@@ -8305,7 +7871,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 <div className="flex flex-wrap items-center gap-1.5">
                   {selectedAgentDetails.teamLeaders && selectedAgentDetails.teamLeaders.length > 0 ? (
                     selectedAgentDetails.teamLeaders.map((tl, i) => (
-                      <span key={i} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                      <span key={`sel-agent-tl-${tl}-${i}`} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
                         👔 {tl}
                       </span>
                     ))
@@ -8468,7 +8034,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     onChange={(e) => setEditTeam(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-hidden focus:border-indigo-600 bg-white"
                   >
-                    <option value="All">All (All Teams / All Select)</option>
+                    <option key="team-edit-all" value="All">All (All Teams / All Select)</option>
                     {ORDER_CHANNELS.map((team, idx) => (
                       <option key={`team-edit-${team}-${idx}`} value={team}>
                         {team}
@@ -8510,9 +8076,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   {editTeamLeaders.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1.5 mb-2.5 p-2 bg-white rounded-xl border border-indigo-100">
                       <span className="text-[11px] font-bold text-slate-500 mr-1">Assigned:</span>
-                      {editTeamLeaders.map((tl) => (
+                      {editTeamLeaders.map((tl, tlIdx) => (
                         <span
-                          key={tl}
+                          key={`edit-assigned-tl-${tl}-${tlIdx}`}
                           className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200"
                         >
                           <span>👔 {tl}</span>
@@ -8537,11 +8103,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   )}
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
-                    {availableTeamLeaders.map((tl) => {
+                    {availableTeamLeaders.map((tl, tlIdx) => {
                       const isSelected = editTeamLeaders.includes(tl);
                       return (
                         <label
-                          key={tl}
+                          key={`edit-avail-tl-${tl}-${tlIdx}`}
                           className={`flex items-center gap-2 p-2 rounded-xl border text-xs cursor-pointer transition-all select-none ${
                             isSelected
                               ? 'bg-purple-100/70 border-purple-300 text-purple-950 font-bold'

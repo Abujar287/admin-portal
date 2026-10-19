@@ -660,7 +660,7 @@ export const AgentProfileView: React.FC<AgentProfileViewProps> = ({
                       </tr>
                     ) : (
                       agentRecentOrders.map((ord, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
+                        <tr key={`profile-ord-${ord.order_id || ord.id || idx}-${idx}`} className="hover:bg-slate-50 transition-colors whitespace-nowrap">
                           <td className="py-3 px-3.5 font-bold font-mono text-indigo-700">
                             #{ord.order_id || ord.id}
                           </td>

@@ -23,8 +23,8 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({ title, options, 
         </div>
         
         <div className="space-y-2 mb-6">
-          {options.map(option => (
-            <button key={option} onClick={() => { onSelect(option); onClose(); }} className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm ${selected === option ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-800 hover:bg-slate-100'}`}>
+          {options.map((option, idx) => (
+            <button key={`sel-modal-opt-${option}-${idx}`} onClick={() => { onSelect(option); onClose(); }} className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm ${selected === option ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-800 hover:bg-slate-100'}`}>
               {option}
             </button>
           ))}

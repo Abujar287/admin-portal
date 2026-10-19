@@ -660,9 +660,9 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                         onChange={(e) => setSingleScheduleTime(e.target.value)}
                         className="w-full px-2 py-1 text-xs font-bold rounded-lg border border-slate-300 bg-white cursor-pointer"
                       >
-                        <option value="">-- Slot --</option>
-                        {getTimeSlots().map((slot) => (
-                          <option key={slot} value={slot}>{slot}</option>
+                        <option key="single-slot-empty" value="">-- Slot --</option>
+                        {getTimeSlots().map((slot, sIdx) => (
+                          <option key={`single-slot-opt-${slot}-${sIdx}`} value={slot}>{slot}</option>
                         ))}
                       </select>
                     </div>
@@ -760,7 +760,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
               ].map((item, idx) => {
                 const isCustomerField = (item.label === 'Customer ID' || item.label === 'Customer') && onViewCustomer;
                 return (
-                  <div key={idx} className={`flex items-baseline gap-1.5 py-0.5 border-b border-slate-50 ${item.span || ''}`}>
+                  <div key={`order-detail-field-${item.label}-${idx}`} className={`flex items-baseline gap-1.5 py-0.5 border-b border-slate-50 ${item.span || ''}`}>
                     <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap min-w-[70px]">{item.label}:</span>
                     {isCustomerField ? (
                       <button
@@ -796,7 +796,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                   {followupHistory
                     .filter(h => String(h.orderId) === orderId)
                     .map((h, i) => (
-                      <tr key={i} className="text-slate-700 hover:bg-slate-50">
+                      <tr key={`journey-fol-hist-${h.id || h.followupId || i}-${i}`} className="text-slate-700 hover:bg-slate-50">
                         <td className="py-2 px-3 font-mono whitespace-nowrap">{h.timestamp}</td>
                         <td className="py-2 px-3 whitespace-nowrap font-medium">
                           <span className="font-bold text-indigo-700">{h.updatedByName || h.updatedBy || 'System'}</span>

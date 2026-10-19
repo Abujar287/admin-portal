@@ -293,7 +293,7 @@ export class OrderService {
       }
     }
 
-    return this.getAgents();
+    return await this.getAgents();
   }
 
   static async saveAgentToSheet(agent: AgentUser): Promise<{ success: boolean; error?: string; rawResponse?: any }> {
@@ -358,6 +358,21 @@ export class OrderService {
     } catch (e: any) {
       console.error('saveAgentToSheet error:', e);
       return { success: false, error: e.message || 'Network error' };
+    }
+  }
+
+  static async saveAgentToCode(agent: AgentUser): Promise<void> {
+    try {
+      console.log('Sending agent sync request to /api/save-agent-code:', agent);
+      const res = await fetch('/api/save-agent-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(agent)
+      });
+      const data = await res.json();
+      console.log('Agent sync response:', data);
+    } catch (e) {
+      console.warn('Failed to save agent to code fallback:', e);
     }
   }
 
@@ -517,7 +532,7 @@ export class OrderService {
     return '';
   }
 
-  static getAgents(): AgentUser[] {
+  static async getAgents(): Promise<AgentUser[]> {
     let storedAgents: AgentUser[] = [];
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.AGENTS);
@@ -529,6 +544,17 @@ export class OrderService {
       }
     } catch {}
 
+    // Load from persistent file
+    let fileAgents: AgentUser[] = [];
+    try {
+        const res = await fetch('/user_details.json');
+        if (res.ok) {
+            fileAgents = await res.json();
+        }
+    } catch (e) {
+        console.warn('Failed to fetch user_details.json', e);
+    }
+
     const map = new Map<string, AgentUser>();
     // Pre-populate with INITIAL_AGENTS
     if (Array.isArray(INITIAL_AGENTS)) {
@@ -538,7 +564,13 @@ export class OrderService {
       });
     }
 
-    // Merge stored agents (stored agents take precedence)
+    // Merge persistent agents
+    fileAgents.forEach(a => {
+      const k = String(a.user || '').trim().toLowerCase();
+      if (k) map.set(k, { ...(map.get(k) || {}), ...a });
+    });
+
+    // Merge stored agents (local storage takes precedence)
     storedAgents.forEach(a => {
       const k = String(a.user || '').trim().toLowerCase();
       if (k) {
@@ -962,8 +994,8 @@ export class OrderService {
   /**
    * Automatically extracts and updates agents based on orders present in the Google Sheet.
    */
-  static syncAgentsFromOrders(orders: OrderItem[]): void {
-    const currentAgents = this.getAgents();
+  static async syncAgentsFromOrders(orders: OrderItem[]): Promise<void> {
+    const currentAgents = await this.getAgents();
     const agentMap = new Map<string, AgentUser>();
 
     // Seed existing
@@ -1542,7 +1574,8 @@ export class OrderService {
 
     // Try to resolve matching agent's proper name if uByName was just the ID or empty
     if (uById && (!uByName || uByName === uById || uByName === '1')) {
-      const foundAgent = (this.getAgents() || []).find(a => 
+      const agents = await this.getAgents();
+      const foundAgent = (agents || []).find((a: AgentUser) => 
         String(a.user || '').trim().toLowerCase() === uById.toLowerCase() ||
         String(a.email || '').trim().toLowerCase() === uById.toLowerCase()
       );

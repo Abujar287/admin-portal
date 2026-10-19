@@ -433,8 +433,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   onChange={(e) => setOrderChannel(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white"
                 >
-                  {ORDER_CHANNELS.map((ch) => (
-                    <option key={ch} value={ch}>{ch}</option>
+                  {ORDER_CHANNELS.map((ch, idx) => (
+                    <option key={`create-ch-${ch}-${idx}`} value={ch}>{ch}</option>
                   ))}
                 </select>
               </div>
@@ -448,9 +448,9 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   onChange={(e) => setProductCategory(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white"
                 >
-                  <option value="">Select Category</option>
-                  {PRODUCT_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
+                  <option key="create-cat-empty" value="">Select Category</option>
+                  {PRODUCT_CATEGORIES.map((cat, idx) => (
+                    <option key={`create-cat-${cat}-${idx}`} value={cat}>{cat}</option>
                   ))}
                 </select>
               </div>
@@ -510,9 +510,9 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   disabled={!city}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:border-blue-600 bg-white disabled:bg-slate-100"
                 >
-                  <option value="">{city ? 'Select Area' : 'Select City First'}</option>
-                  {availableAreas.map((ar) => (
-                    <option key={ar} value={ar}>{ar}</option>
+                  <option key="create-area-empty" value="">{city ? 'Select Area' : 'Select City First'}</option>
+                  {availableAreas.map((ar, idx) => (
+                    <option key={`create-area-${ar}-${idx}`} value={ar}>{ar}</option>
                   ))}
                 </select>
                 {deliveryArea === 'Others' && (
@@ -593,9 +593,9 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   onChange={(e) => setScheduledTime(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"
                 >
-                  <option value="">Time Slot</option>
-                  {getTimeSlots().map((slot) => (
-                    <option key={slot} value={slot}>{slot}</option>
+                  <option key="create-slot-empty" value="">Time Slot</option>
+                  {getTimeSlots().map((slot, idx) => (
+                    <option key={`create-slot-${slot}-${idx}`} value={slot}>{slot}</option>
                   ))}
                 </select>
               </div>

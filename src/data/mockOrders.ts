@@ -228,14 +228,19 @@ export interface CategoryTeamMapping {
 export const getCategoryMappings = (): CategoryTeamMapping[] => {
   try {
     const saved = localStorage.getItem('agent_portal_category_mappings');
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((m, idx) => ({ ...m, id: m.id || `mapping-${m.category || idx}-${idx}` }));
+      }
+    }
   } catch {}
   return [
-    { category: 'Electronics', team: 'Acquisition' },
-    { category: 'Room Accessories', team: 'Sales' },
-    { category: 'Cloths', team: 'Acquisition' },
-    { category: 'Medicines', team: 'Support' },
-    { category: 'Appliance', team: 'Sales' }
+    { id: 'cat-map-1', category: 'Electronics', team: 'Acquisition' },
+    { id: 'cat-map-2', category: 'Room Accessories', team: 'Sales' },
+    { id: 'cat-map-3', category: 'Cloths', team: 'Acquisition' },
+    { id: 'cat-map-4', category: 'Medicines', team: 'Support' },
+    { id: 'cat-map-5', category: 'Appliance', team: 'Sales' }
   ];
 };
 

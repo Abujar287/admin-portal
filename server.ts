@@ -182,6 +182,45 @@ async function startServer() {
     }
   });
 
+  // API Endpoint to save/sync newly created or edited agents to user_details.json
+  app.post('/api/save-agent-code', async (req, res) => {
+    try {
+      const newAgent = req.body;
+      console.log('Received agent sync request:', newAgent);
+      if (!newAgent || !newAgent.user) {
+        return res.status(400).json({ success: false, error: 'Invalid agent data' });
+      }
+
+      const filePath = path.join(__dirname, 'user_details.json');
+      console.log('Attempting to save to:', filePath);
+      
+      let users: any[] = [];
+      
+      if (fs.existsSync(filePath)) {
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        try {
+          users = JSON.parse(fileContent);
+        } catch (e) {
+          users = [];
+        }
+      }
+
+      const existingIdx = users.findIndex(u => String(u.user) === String(newAgent.user));
+      if (existingIdx !== -1) {
+        users[existingIdx] = newAgent;
+      } else {
+        users.push(newAgent);
+      }
+
+      fs.writeFileSync(filePath, JSON.stringify(users, null, 2), 'utf8');
+      console.log('Successfully wrote to file.');
+      return res.json({ success: true, message: 'Agent synced successfully to user_details.json' });
+    } catch (err: any) {
+      console.error('Save agent code error:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.join(__dirname, 'dist')));
     app.use((req, res) => {

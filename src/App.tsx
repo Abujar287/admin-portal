@@ -32,7 +32,7 @@ export function App() {
   const loadInitialData = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const initialAgents = OrderService.getAgents();
+      const initialAgents = await OrderService.getAgents();
       setAgents(initialAgents);
 
       const res = await OrderService.fetchOrders();
