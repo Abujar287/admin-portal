@@ -3106,130 +3106,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 <ChevronDown className={`w-3.5 h-3.5 text-[#94A3B8] transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180 text-[#E2E8F0]' : ''}`} />
               </button>
 
-              {/* Dropdown Menu */}
-              {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-[#222734] rounded-2xl shadow-2xl border border-slate-700 py-2 z-[9999] animate-in fade-in zoom-in-95 duration-150">
-                  {/* Account Summary Header */}
-                  <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-3 bg-[#1a1e27] rounded-t-2xl">
-                    <div className="w-10 h-10 rounded-xl bg-slate-800 text-white font-bold text-sm flex items-center justify-center shadow-xs shrink-0 border border-slate-700">
-                      {(managerProfile.name || managerProfile.user || 'M')
-                        .split(' ')
-                        .filter(Boolean)
-                        .slice(0, 2)
-                        .map(w => w[0].toUpperCase())
-                        .join('') || 'M'}
-                    </div>
-                    <div className="overflow-hidden min-w-0 flex-1">
-                      <p className="text-xs font-black text-white truncate">
-                        {managerProfile.name || managerProfile.user || 'Manager'}
-                      </p>
-                      <p className="text-[11px] font-mono text-slate-300 truncate">
-                        ID: #{managerProfile.user} • {managerProfile.role || 'Manager'}
-                      </p>
-                      {managerProfile.email && (
-                        <p className="text-[10px] text-slate-400 truncate">
-                          {managerProfile.email}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Menu Options: My Account, Google Sheet & Tabs, Lock, Logout */}
-                  <div className="p-1.5 space-y-1">
-                    {/* 1. My Account (Profile) */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveTab('profiles');
-                        setIsUserMenuOpen(false);
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:text-white hover:bg-slate-700/60 transition-colors cursor-pointer text-left"
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0">
-                        <User className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span>My Account</span>
-                          <span className="text-[10px] font-bold text-slate-300 bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded-md">Profile</span>
-                        </div>
-                        <span className="block text-[10px] font-normal text-slate-400 truncate">
-                          Manage account credentials &amp; details
-                        </span>
-                      </div>
-                    </button>
-
-                    {/* 2. Google Sheet & Tabs (only if allowed) */}
-                    {isTabAllowed('sheet-connection') && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveTab('sheet-connection');
-                          setIsUserMenuOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:text-white hover:bg-slate-700/60 transition-colors cursor-pointer text-left"
-                      >
-                        <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0">
-                          <FileSpreadsheet className="w-4 h-4" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <span>Google Sheet &amp; Tabs</span>
-                            <span className="text-[10px] font-bold text-slate-300 bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded-md">Sheet</span>
-                          </div>
-                          <span className="block text-[10px] font-normal text-slate-400 truncate">
-                            Connect sheet &amp; manage tabs
-                          </span>
-                        </div>
-                      </button>
-                    )}
-
-                    {/* 3. Lock */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsLocked(true);
-                        setIsUserMenuOpen(false);
-                        setUnlockPassword('');
-                        setUnlockError('');
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:text-amber-400 hover:bg-slate-700/60 transition-colors cursor-pointer text-left"
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-amber-950/40 border border-amber-800/50 flex items-center justify-center text-amber-400 shrink-0">
-                        <Lock className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <span>Lock Screen</span>
-                        <span className="block text-[10px] font-normal text-slate-400 truncate">
-                          Quick lock session with password
-                        </span>
-                      </div>
-                    </button>
-
-                    <div className="h-px bg-slate-700 my-1" />
-
-                    {/* 4. Logout */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsUserMenuOpen(false);
-                        setShowLogoutConfirmModal(true);
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-rose-500 hover:bg-rose-950/30 transition-colors cursor-pointer text-left"
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-rose-950/40 border border-rose-800/50 flex items-center justify-center text-rose-400 shrink-0">
-                        <LogOut className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <span>Log Out</span>
-                        <span className="block text-[10px] font-normal text-rose-400 truncate">
-                          Sign out completely (confirmation required)
-                        </span>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </header>
@@ -8673,6 +8549,147 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           </div>
         </div>
       )}
+      {/* User Profile & Logout Dropdown Menu - Root Level Absolute Top Layer */}
+      {isUserMenuOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-[99998] bg-black/20 cursor-default"
+            onClick={() => setIsUserMenuOpen(false)}
+          />
+          <div
+            style={{
+              position: 'fixed',
+              top: '70px',
+              right: '24px',
+              zIndex: 999999,
+              width: '270px'
+            }}
+            className="bg-[#111C3D] rounded-2xl shadow-2xl border border-[#1E2C58] py-2 animate-in fade-in zoom-in-95 duration-150 text-[#E2E8F0]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Account Summary Header */}
+            <div className="px-4 py-3 border-b border-[#1E2C58] flex items-center gap-3 bg-[#0E1736] rounded-t-2xl">
+              <div className="w-10 h-10 rounded-xl bg-[#111C3D] text-[#E2E8F0] font-bold text-sm flex items-center justify-center shadow-xs shrink-0 border border-[#1E2C58]">
+                {(managerProfile.name || managerProfile.user || 'M')
+                  .split(' ')
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map(w => w[0].toUpperCase())
+                  .join('') || 'M'}
+              </div>
+              <div className="overflow-hidden min-w-0 flex-1">
+                <p className="text-xs font-black text-[#E2E8F0] truncate">
+                  {managerProfile.name || managerProfile.user || 'Manager'}
+                </p>
+                <p className="text-[11px] font-mono text-[#94A3B8] truncate">
+                  ID: #{managerProfile.user} • {managerProfile.role || 'Manager'}
+                </p>
+                {managerProfile.email && (
+                  <p className="text-[10px] text-[#94A3B8] truncate">
+                    {managerProfile.email}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Menu Options: My Account, Google Sheet & Tabs, Lock, Logout */}
+            <div className="p-1.5 space-y-1">
+              {/* 1. My Account (Profile) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('profiles');
+                  setIsUserMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-[#E2E8F0] hover:text-white hover:bg-[#16234D] transition-colors cursor-pointer text-left"
+              >
+                <div className="w-7 h-7 rounded-lg bg-[#080E21] border border-[#1E2C58] flex items-center justify-center text-[#E2E8F0] shrink-0">
+                  <User className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span>My Account</span>
+                    <span className="text-[10px] font-bold text-[#E2E8F0] bg-[#080E21] border border-[#1E2C58] px-1.5 py-0.5 rounded-md">Profile</span>
+                  </div>
+                  <span className="block text-[10px] font-normal text-[#94A3B8] truncate">
+                    Manage account credentials &amp; details
+                  </span>
+                </div>
+              </button>
+
+              {/* 2. Google Sheet & Tabs (only if allowed) */}
+              {isTabAllowed('sheet-connection') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('sheet-connection');
+                    setIsUserMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-[#E2E8F0] hover:text-white hover:bg-[#16234D] transition-colors cursor-pointer text-left"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-[#080E21] border border-[#1E2C58] flex items-center justify-center text-[#E2E8F0] shrink-0">
+                    <FileSpreadsheet className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span>Google Sheet &amp; Tabs</span>
+                      <span className="text-[10px] font-bold text-[#E2E8F0] bg-[#080E21] border border-[#1E2C58] px-1.5 py-0.5 rounded-md">Sheet</span>
+                    </div>
+                    <span className="block text-[10px] font-normal text-[#94A3B8] truncate">
+                      Connect sheet &amp; manage tabs
+                    </span>
+                  </div>
+                </button>
+              )}
+
+              {/* 3. Lock */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLocked(true);
+                  setIsUserMenuOpen(false);
+                  setUnlockPassword('');
+                  setUnlockError('');
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-[#E2E8F0] hover:text-amber-400 hover:bg-[#16234D] transition-colors cursor-pointer text-left"
+              >
+                <div className="w-7 h-7 rounded-lg bg-amber-950/40 border border-amber-800/50 flex items-center justify-center text-amber-400 shrink-0">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span>Lock Screen</span>
+                  <span className="block text-[10px] font-normal text-[#94A3B8] truncate">
+                    Quick lock session with password
+                  </span>
+                </div>
+              </button>
+
+              <div className="h-px bg-[#1E2C58] my-1" />
+
+              {/* 4. Logout */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsUserMenuOpen(false);
+                  setShowLogoutConfirmModal(true);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer text-left"
+              >
+                <div className="w-7 h-7 rounded-lg bg-rose-950/40 border border-rose-800/50 flex items-center justify-center text-rose-400 shrink-0">
+                  <LogOut className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span>Log Out</span>
+                  <span className="block text-[10px] font-normal text-rose-400 truncate">
+                    Sign out completely (confirmation required)
+                  </span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
+
