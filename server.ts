@@ -261,10 +261,32 @@ async function startServer() {
     console.log('Vite middleware attached successfully');
   }
 
-  const PORT = 3000;
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  let PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  let HOST = process.env.HOST || '0.0.0.0';
+
+  const args = process.argv.slice(2);
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--port' && args[i + 1]) {
+      PORT = parseInt(args[i + 1], 10);
+      i++;
+    } else if (args[i] === '--host' && args[i + 1]) {
+      HOST = args[i + 1];
+      i++;
+    }
+  }
+
+  app.listen(PORT, HOST, () => {
+    console.log(`Server running on http://${HOST}:${PORT}`);
   });
 }
 
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 startServer();
+

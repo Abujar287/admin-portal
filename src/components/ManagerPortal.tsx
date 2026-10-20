@@ -214,6 +214,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [managerProfile, setManagerProfile] = useState<ManagerUser>(currentManager);
   const [selectedProfileUserId, setSelectedProfileUserId] = useState<string>('');
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
   const [isLocked, setIsLocked] = useState<boolean>(() => {
     return sessionStorage.getItem('portal_screen_locked') === 'true';
   });
@@ -3025,7 +3026,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Top Header */}
-        <header className="h-16 border-b border-[#1E2C58] bg-[#0B132B] px-6 flex items-center justify-between shrink-0 shadow-sm text-[#E2E8F0]">
+        <header className="h-16 border-b border-[#1E2C58] bg-[#0B132B] px-6 flex items-center justify-between shrink-0 shadow-sm text-[#E2E8F0] sticky top-0 z-40">
           <div className="flex items-center gap-2.5">
             <span className="text-xs font-bold uppercase tracking-wider text-[#94A3B8]">
               Manager Desk
@@ -3212,7 +3213,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       type="button"
                       onClick={() => {
                         setIsUserMenuOpen(false);
-                        onLogout();
+                        setShowLogoutConfirmModal(true);
                       }}
                       className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold text-rose-500 hover:bg-rose-950/30 transition-colors cursor-pointer text-left"
                     >
@@ -3222,7 +3223,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       <div className="flex-1 min-w-0">
                         <span>Log Out</span>
                         <span className="block text-[10px] font-normal text-rose-400 truncate">
-                          Sign out completely (email &amp; password required)
+                          Sign out completely (confirmation required)
                         </span>
                       </div>
                     </button>
@@ -8620,12 +8621,53 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 onClick={() => {
                   setIsLocked(false);
                   sessionStorage.removeItem('portal_screen_locked');
-                  onLogout();
+                  setShowLogoutConfirmModal(true);
                 }}
                 className="font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer transition-colors"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span>Sign Out Completely</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Logout Confirmation Popup Modal */}
+      {showLogoutConfirmModal && (
+        <div className="fixed inset-0 z-[99999] bg-[#080E21]/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200 select-none">
+          <div className="w-full max-w-md bg-[#111C3D] rounded-3xl shadow-2xl border border-[#1E2C58] p-8 text-center space-y-6 relative overflow-hidden text-[#E2E8F0]">
+            <div className="w-16 h-16 rounded-2xl bg-rose-950/60 border border-rose-800/50 flex items-center justify-center mx-auto text-rose-400 shadow-md">
+              <LogOut className="w-8 h-8" />
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-xl font-extrabold text-[#E2E8F0]">
+                Confirm Logout
+              </h3>
+              <p className="text-xs text-[#94A3B8] leading-relaxed">
+                Are you sure you want to sign out from the Manager Portal? You will need to enter your login credentials to access the system again.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirmModal(false)}
+                className="flex-1 py-3 bg-[#080E21] hover:bg-[#16234D] text-[#E2E8F0] rounded-xl font-bold text-xs border border-[#1E2C58] transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLogoutConfirmModal(false);
+                  onLogout();
+                }}
+                className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow-lg shadow-rose-600/30 transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Yes, Log Out</span>
               </button>
             </div>
           </div>
