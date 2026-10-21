@@ -24,7 +24,7 @@ import {
   Tag
 } from 'lucide-react';
 import { OrderItem, FollowupHistoryItem } from '../types';
-import { OrderService } from '../services/orderService';
+import { OrderService, formatActorUsernameId } from '../services/orderService';
 
 export interface CustomerDetailsModalProps {
   customerId: string | null;
@@ -691,8 +691,8 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
                             <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600 whitespace-nowrap">
                               {hist.scheduleDate ? `${hist.scheduleDate} ${hist.scheduledTime || ''}` : '-'}
                             </td>
-                            <td className="py-2.5 px-3 whitespace-nowrap font-medium text-slate-700">
-                              {hist.updatedByName || hist.updatedBy || '-'}
+                            <td className="py-2.5 px-3 whitespace-nowrap font-mono font-medium text-[#E2E8F0]">
+                              {formatActorUsernameId(hist.updatedByName, hist.updatedBy)}
                             </td>
                             <td className="py-2.5 px-3 text-slate-600 max-w-sm truncate" title={hist.notes || ''}>
                               {hist.notes || '-'}

@@ -10,7 +10,7 @@ import {
   AgentPermissions, 
   AgentNavTab 
 } from '../types';
-import { OrderService } from '../services/orderService';
+import { OrderService, formatActorUsernameId } from '../services/orderService';
 import { 
   User, 
   Users, 
@@ -5253,7 +5253,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           scheduledTime: quickUpdateScheduledTime,
                           schedule_time: quickUpdateScheduledTime
                         },
-                        currentManager ? `${currentManager.name || currentManager.user} (${currentManager.user})` : '1',
+                        currentManager ? formatActorUsernameId(currentManager.name || currentManager.user, currentManager.user) : 'manager_1',
                         quickUpdateNotes
                       );
                       const updatedOId = quickUpdateOrderId;
@@ -5684,15 +5684,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                 <td className="py-3 px-3.5 text-slate-600 text-[10px] whitespace-nowrap">
                                   {hist.scheduleDate}<br/>{hist.scheduledTime}
                                 </td>
-                                <td className="py-3 px-3.5 font-bold text-slate-700 whitespace-nowrap">
-                                  {hist.updatedBy === '1' || hist.updatedBy?.toLowerCase() === 'manager'
-                                    ? '1'
-                                    : (hist.updatedBy?.replace(/\s*\(@.*\)/, '').replace(/^@/, '') || '1')}
+                                <td className="py-3 px-3.5 font-mono font-bold text-slate-700 whitespace-nowrap">
+                                  {formatActorUsernameId(hist.updatedByName, hist.updatedBy)}
                                 </td>
-                                <td className="py-3 px-3.5 text-slate-600 whitespace-nowrap">
-                                  {hist.updatedBy === '1' || hist.updatedByName?.toLowerCase() === 'manager' || hist.updatedBy?.toLowerCase() === 'manager'
-                                    ? 'Manager'
-                                    : (hist.updatedByName || '-')}
+                                <td className="py-3 px-3.5 font-mono text-slate-600 whitespace-nowrap">
+                                  {formatActorUsernameId(hist.updatedByName, hist.updatedBy)}
                                 </td>
                                 <td className="py-3 px-3.5 whitespace-nowrap">
                                   <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">

@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 import { OrderItem, FollowupHistoryItem } from '../types';
-import { OrderService } from '../services/orderService';
+import { OrderService, formatActorUsernameId } from '../services/orderService';
 import { TIME_SLOTS, getTimeSlots } from '../data/mockOrders';
 import {
   X,
@@ -103,10 +103,10 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
     currentUser.user === '1' ||
     currentUser.user?.toLowerCase() === 'manager';
 
-  // Use the actual current user details without hardcoding to 'Manager'
+  // Use formatActorUsernameId for standard username_id format (e.g. manager_1)
   const actorUserId = currentUser.user || '1';
   const actorUserName = currentUser.name || currentUser.user || 'User';
-  const userDisplayName = actorUserName;
+  const userDisplayName = formatActorUsernameId(actorUserName, actorUserId);
 
   const currentFStatus = (order.followup_status || order.followupStatus || '').toLowerCase();
   const currentOStatus = (order.order_status || order.orderStatus || '').toLowerCase();
@@ -638,8 +638,9 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                       <tr key={`journey-fol-hist-${h.id || h.followupId || i}-${i}`} className="text-[#E2E8F0] hover:bg-[#16234D]">
                         <td className="py-2 px-3 font-mono whitespace-nowrap text-[#94A3B8]">{h.timestamp}</td>
                         <td className="py-2 px-3 whitespace-nowrap font-medium">
-                          <span className="font-bold text-blue-400">{h.updatedByName || h.updatedBy || 'System'}</span>
-                          <span className="text-[10px] text-[#94A3B8] ml-1">({h.updatedBy || 'ID: ?'})</span>
+                          <span className="font-bold font-mono text-blue-400">
+                            {formatActorUsernameId(h.updatedByName, h.updatedBy)}
+                          </span>
                         </td>
                         <td className="py-2 px-3">
                            <div className="font-bold text-[#E2E8F0]">{h.action}</div>

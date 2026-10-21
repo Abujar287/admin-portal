@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ManagerUser, AgentUser, OrderItem, FollowupHistoryItem, SystemUser } from './types';
-import { OrderService } from './services/orderService';
+import { OrderService, formatActorUsernameId } from './services/orderService';
 import { AuthScreen } from './components/AuthScreen';
 import { ManagerPortal } from './components/ManagerPortal';
 
@@ -109,8 +109,8 @@ export function App() {
 
   const handleUpdateOrderStatus = async (orderId: string, updates: Partial<OrderItem>, updatedBy?: string, notes = '') => {
     try {
-      const defaultActor = currentManager ? `${currentManager.name || currentManager.user} (${currentManager.user})` : '1';
-      const effectiveUpdatedBy = (updatedBy && updatedBy.trim() !== '') ? updatedBy : defaultActor;
+      const defaultActor = currentManager ? formatActorUsernameId(currentManager.name || currentManager.user, currentManager.user) : 'manager_1';
+      const effectiveUpdatedBy = (updatedBy && updatedBy.trim() !== '') ? formatActorUsernameId(updatedBy, updatedBy) : defaultActor;
       const res = await OrderService.updateOrderStatus(
         orderId,
         updates,
@@ -147,8 +147,8 @@ export function App() {
   };
 
   const handleRevertFollowup = async (historyId: string, orderId: string, previousStatus: string, undoneBy?: string) => {
-    const defaultActor = currentManager ? `${currentManager.name || currentManager.user} (${currentManager.user})` : '1';
-    const actor = (undoneBy && undoneBy.trim() !== '') ? undoneBy : defaultActor;
+    const defaultActor = currentManager ? formatActorUsernameId(currentManager.name || currentManager.user, currentManager.user) : 'manager_1';
+    const actor = (undoneBy && undoneBy.trim() !== '') ? formatActorUsernameId(undoneBy, undoneBy) : defaultActor;
     await handleUpdateOrderStatus(orderId, { followup_status: previousStatus }, actor, `Reverted followup history #${historyId}`);
     const updatedHistory = followupHistory.map(h => {
       if (String(h.id) === String(historyId) || String(h.followupId) === String(historyId)) {

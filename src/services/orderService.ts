@@ -20,6 +20,69 @@ export function extractSheetId(input: string): string | null {
   return null;
 }
 
+/**
+ * Formats user identifiers into the standard `username_id` format (e.g. manager_1, agent_102)
+ */
+export function formatActorUsernameId(username?: string, userId?: string): string {
+  const rawUser = String(username || '').trim();
+  const rawId = String(userId || '').trim();
+
+  // If already in username_id format like manager_1, admin_1
+  if (/^[a-zA-Z0-9]+_[a-zA-Z0-9]+$/.test(rawUser)) {
+    return rawUser.toLowerCase();
+  }
+  if (/^[a-zA-Z0-9]+_[a-zA-Z0-9]+$/.test(rawId)) {
+    return rawId.toLowerCase();
+  }
+
+  // Strip parentheses e.g. "Manager (Manager)" or "Manager (1)" or "Rahim (102)"
+  let extractedName = rawUser;
+  let extractedId = rawId;
+
+  if (rawUser.includes('(')) {
+    const m = rawUser.match(/^(.*?)\s*\((?:@)?(.*)\)$/);
+    if (m) {
+      extractedName = m[1].trim();
+      if (!extractedId || extractedId === rawUser) {
+        extractedId = m[2].trim().replace(/^@/, '');
+      }
+    }
+  }
+
+  if (rawId.includes('(')) {
+    const m = rawId.match(/^(.*?)\s*\((?:@)?(.*)\)$/);
+    if (m) {
+      if (!extractedName || extractedName === rawId) {
+        extractedName = m[1].trim();
+      }
+      extractedId = m[2].trim().replace(/^@/, '');
+    }
+  }
+
+  let cleanName = extractedName.replace(/\s*\([^)]*\)/g, '').trim().toLowerCase();
+  let cleanId = extractedId.replace(/.*\(|\).*/g, '').trim().toLowerCase();
+
+  // Check if it is manager or admin or 1
+  const isManager = 
+    cleanName === 'manager' || cleanId === 'manager' || 
+    cleanName === 'admin' || cleanId === 'admin' ||
+    cleanName === '1' || cleanId === '1';
+
+  if (isManager) {
+    return 'manager_1';
+  }
+
+  // Clean characters for username_id
+  cleanName = cleanName.replace(/[^a-zA-Z0-9]/g, '');
+  cleanId = cleanId.replace(/[^a-zA-Z0-9]/g, '');
+
+  if (!cleanName && !cleanId) return 'manager_1';
+  if (!cleanName) cleanName = 'agent';
+  if (!cleanId || cleanId === cleanName) cleanId = '1';
+
+  return `${cleanName}_${cleanId}`;
+}
+
 const STORAGE_KEYS = {
   ORDERS: 'agent_portal_orders_v3',
   AGENTS: 'agentUsers_v3',
@@ -825,25 +888,11 @@ export class OrderService {
         }
 
         const rawTs = String(r[idxTs !== -1 ? idxTs : 0] || '');
-        let uBy = String(r[idxUpBy !== -1 ? idxUpBy : 11] || '').trim();
-        let uByName = String(r[idxUpByNm !== -1 ? idxUpByNm : 12] || '').trim();
-        if (uBy.includes('(')) {
-          const m = uBy.match(/^(.*?)\s*\((?:@)?(.*)\)$/);
-          if (m && m[1] && m[2]) {
-            if (!uByName) uByName = m[1].trim();
-            uBy = m[2].trim().replace(/^@/, '');
-          }
-        } else if (uBy.startsWith('@')) {
-          uBy = uBy.substring(1);
-        }
-
-        // Only default to '1' if user ID is genuinely blank/empty
-        if (!uBy) {
-          uBy = '1';
-        }
-        if (!uByName) {
-          uByName = uBy === '1' ? 'Manager' : uBy;
-        }
+        const rawUBy = String(r[idxUpBy !== -1 ? idxUpBy : 11] || '').trim();
+        const rawUByName = String(r[idxUpByNm !== -1 ? idxUpByNm : 12] || '').trim();
+        const formattedActor = formatActorUsernameId(rawUByName || rawUBy, rawUBy || rawUByName);
+        const uBy = formattedActor;
+        const uByName = formattedActor;
 
         parsedItems.push({
           id: String(fidRaw || i),
@@ -1492,7 +1541,8 @@ export class OrderService {
         orderValue: 1500,
         scheduleDate: new Date().toISOString().split('T')[0],
         scheduledTime: '11AM to 12PM',
-        updatedBy: '1',
+        updatedBy: 'manager_1',
+        updatedByName: 'manager_1',
         timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
         action: 'Status Change',
         notes: 'Customer confirmed delivery schedule.'
@@ -1509,7 +1559,8 @@ export class OrderService {
         orderValue: 2400,
         scheduleDate: new Date().toISOString().split('T')[0],
         scheduledTime: '2PM to 3PM',
-        updatedBy: 'manager',
+        updatedBy: 'manager_1',
+        updatedByName: 'manager_1',
         timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
         action: 'Status Change',
         notes: 'Order successfully delivered & paid.'
@@ -1544,47 +1595,10 @@ export class OrderService {
       return { updatedOrders: orders, historyItem: undefined, remoteSynced: false };
     }
 
-    // Resolve manager / agent user ID and name cleanly (strip '@')
-    let uById = '';
-    let uByName = '';
-
-    if (updatedBy) {
-      const trimmed = String(updatedBy).trim();
-      if (trimmed.includes('(')) {
-        const m = trimmed.match(/^(.*?)\s*\((?:@)?(.*)\)$/);
-        if (m && m[1] && m[2]) {
-          uByName = m[1].trim();
-          uById = m[2].trim().replace(/^@/, '');
-        } else {
-          uById = trimmed.replace(/^@/, '');
-          uByName = trimmed.replace(/^@/, '');
-        }
-      } else if (trimmed.startsWith('@')) {
-        uById = trimmed.substring(1);
-        uByName = trimmed.substring(1);
-      } else {
-        uById = trimmed;
-        uByName = trimmed;
-      }
-    }
-
-    if (!uById) {
-      uById = '1';
-    }
-
-    // Try to resolve matching agent's proper name if uByName was just the ID or empty
-    if (uById && (!uByName || uByName === uById || uByName === '1')) {
-      const agents = await this.getAgents();
-      const foundAgent = (agents || []).find((a: AgentUser) => 
-        String(a.user || '').trim().toLowerCase() === uById.toLowerCase() ||
-        String(a.email || '').trim().toLowerCase() === uById.toLowerCase()
-      );
-      if (foundAgent && foundAgent.name) {
-        uByName = foundAgent.name;
-      } else if (!uByName || uByName === '1') {
-        uByName = uById === '1' ? 'Manager' : `User ${uById}`;
-      }
-    }
+    // Resolve operator in standard username_id format (e.g. manager_1)
+    const formattedActor = formatActorUsernameId(updatedBy, updatedBy);
+    const uById = formattedActor;
+    const uByName = formattedActor;
 
     const finalOrderStatus = 'Pending';
     const finalFollowupStatus = updates.followup_status || updates.followupStatus || existingOrder?.followup_status || existingOrder?.followupStatus || 'Pending';

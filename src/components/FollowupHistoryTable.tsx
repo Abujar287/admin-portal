@@ -11,6 +11,7 @@ import {
   Search
 } from 'lucide-react';
 import { FollowupHistoryItem, OrderItem, DateFilterType } from '../types';
+import { formatActorUsernameId } from '../services/orderService';
 
 export interface FollowupHistoryTableProps {
   title?: string;
@@ -392,20 +393,11 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                       <td className="py-3 px-3.5 text-[11px] text-slate-600 whitespace-nowrap">
                         {hist.scheduledTime ? `${hist.scheduleDate || ''} (${hist.scheduledTime})` : (hist.scheduleDate || '-')}
                       </td>
-                      <td className="py-3 px-3.5 font-mono text-xs text-slate-600 whitespace-nowrap">
-                        {(() => {
-                          const val = String(hist.updatedBy || '').replace(/\s*\([^)]*\)/g, '').trim();
-                          if (val === '1' || val.toLowerCase() === 'manager') return 'Manager';
-                          return val || '-';
-                        })()}
+                      <td className="py-3 px-3.5 font-mono text-xs text-[#E2E8F0] whitespace-nowrap">
+                        {formatActorUsernameId(hist.updatedByName, hist.updatedBy)}
                       </td>
-                      <td className="py-3 px-3.5 font-bold text-slate-900 whitespace-nowrap">
-                        {(() => {
-                          const name = hist.updatedByName || hist.updatedBy || '';
-                          const clean = String(name).replace(/\s*\([^)]*\)/g, '').trim();
-                          if (clean === '1' || clean.toLowerCase() === 'manager') return 'Manager';
-                          return clean || '-';
-                        })()}
+                      <td className="py-3 px-3.5 font-mono font-bold text-blue-400 whitespace-nowrap">
+                        {formatActorUsernameId(hist.updatedByName, hist.updatedBy)}
                       </td>
                       <td className="py-3 px-3.5 font-bold text-purple-700 whitespace-nowrap">
                         {hist.action || 'Followup'}
