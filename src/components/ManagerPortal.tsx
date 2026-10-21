@@ -401,6 +401,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [followupStatusFilter, setFollowupStatusFilter] = useState<string>('all');
   const [followupSearchType, setFollowupSearchType] = useState<string>('order_id');
   const [followupSearchValue, setFollowupSearchValue] = useState<string>('');
+  const deferredFollowupSearchValue = React.useDeferredValue(followupSearchValue);
   const [followupPage, setFollowupPage] = useState<number>(1);
   const [followupPageSize, setFollowupPageSize] = useState<number | 'all'>(50);
 
@@ -793,6 +794,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const [contactSearch, setContactSearch] = useState('');
   const [searchType, setSearchType] = useState<string>('order_id');
   const [searchValue, setSearchValue] = useState('');
+  const deferredSearchValue = React.useDeferredValue(searchValue);
   const [orderPage, setOrderPage] = useState<number>(1);
   const [orderPageSize, setOrderPageSize] = useState<number | 'all'>(50);
 
@@ -1712,50 +1714,59 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     endDateVal: string
   ): boolean => {
     if (!dateVal || filterType === 'all' || !filterType) return true;
-    const targetDate = new Date(dateVal.split(' ')[0]);
-    if (isNaN(targetDate.getTime())) return false;
+    let clean = dateVal.trim();
+    if (clean.includes('T')) clean = clean.split('T')[0];
+    else if (clean.includes(' ')) clean = clean.split(' ')[0];
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const targetTime = targetDate.setHours(0, 0, 0, 0);
+    // Normalize MM/DD/YYYY to YYYY-MM-DD
+    if (clean.includes('/')) {
+      const parts = clean.split('/');
+      if (parts.length === 3 && parts[2].length === 4) {
+        clean = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+      }
+    }
 
-    if (filterType === 'today') return targetTime === today.getTime();
+    if (clean.length < 10) return false;
+    const targetIso = clean.slice(0, 10);
+
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+
+    if (filterType === 'today') {
+      return targetIso === todayStr;
+    }
     if (filterType === 'yesterday') {
-      const yest = new Date(today);
-      yest.setDate(today.getDate() - 1);
-      return targetTime === yest.getTime();
+      const yest = new Date(now.getTime() - 86400000);
+      return targetIso === yest.toISOString().slice(0, 10);
     }
     if (filterType === 'last7') {
-      const limit = new Date(today);
-      limit.setDate(today.getDate() - 6);
-      return targetTime >= limit.getTime() && targetTime <= today.getTime();
+      const past = new Date(now.getTime() - 6 * 86400000);
+      const pastStr = past.toISOString().slice(0, 10);
+      return targetIso >= pastStr && targetIso <= todayStr;
     }
     if (filterType === 'last30') {
-      const limit = new Date(today);
-      limit.setDate(today.getDate() - 29);
-      return targetTime >= limit.getTime() && targetTime <= today.getTime();
+      const past = new Date(now.getTime() - 29 * 86400000);
+      const pastStr = past.toISOString().slice(0, 10);
+      return targetIso >= pastStr && targetIso <= todayStr;
     }
     if (filterType === 'thisMonth') {
-      return (
-        targetDate.getMonth() === today.getMonth() &&
-        targetDate.getFullYear() === today.getFullYear()
-      );
+      const monthPrefix = todayStr.slice(0, 7);
+      return targetIso.startsWith(monthPrefix);
     }
     if (filterType === 'lastMonth') {
-      const lm = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      return (
-        targetDate.getMonth() === lm.getMonth() &&
-        targetDate.getFullYear() === lm.getFullYear()
-      );
+      const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lmPrefix = `${lm.getFullYear()}-${String(lm.getMonth() + 1).padStart(2, '0')}`;
+      return targetIso.startsWith(lmPrefix);
     }
     if (filterType === 'lastYear') {
-      return targetDate.getFullYear() === today.getFullYear() - 1;
+      const lyPrefix = String(now.getFullYear() - 1);
+      return targetIso.startsWith(lyPrefix);
     }
     if (filterType === 'custom') {
-      if (!startDateVal || !endDateVal) return true;
-      const s = new Date(startDateVal).getTime();
-      const e = new Date(endDateVal).getTime();
-      return targetTime >= s && targetTime <= e;
+      if (!startDateVal && !endDateVal) return true;
+      if (startDateVal && targetIso < startDateVal.slice(0, 10)) return false;
+      if (endDateVal && targetIso > endDateVal.slice(0, 10)) return false;
+      return true;
     }
     return true;
   };
@@ -2032,8 +2043,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       if (!matchDate(r.schedule_date, orderScheduleFilter, orderScheduleStart, orderScheduleEnd)) {
         return false;
       }
-      if (searchValue.trim()) {
-        const val = searchValue.trim().toLowerCase();
+      if (deferredSearchValue.trim()) {
+        const val = deferredSearchValue.trim().toLowerCase();
         if (searchType === 'order_id') {
           const idStr = String(r.order_id || r.id || '').toLowerCase();
           if (idStr !== val) return false;
@@ -2075,7 +2086,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           if (areaStr !== val) return false;
         } else if (searchType === 'address_details') {
           const addrStr = String(r.address_details || r.addressDetails || '').toLowerCase();
-          if (addrStr !== val) return false;
+          if (!addrStr.includes(val)) return false;
         } else if (searchType === 'schedule_date') {
           const scDtStr = String(r.schedule_date || r.scheduleDate || '').toLowerCase();
           if (scDtStr !== val) return false;
@@ -2117,7 +2128,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     orderScheduleStart,
     orderScheduleEnd,
     searchType,
-    searchValue,
+    deferredSearchValue,
     filterFollowupStatus
   ]);
 
@@ -2132,7 +2143,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     orderScheduleStart,
     orderScheduleEnd,
     searchType,
-    searchValue,
+    deferredSearchValue,
     filterFollowupStatus
   ]);
 
@@ -2142,7 +2153,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   }, [filteredOrders.length, orderPageSize]);
 
   const paginatedOrders = useMemo(() => {
-    if (orderPageSize === 'all') return filteredOrders;
+    if (orderPageSize === 'all') return filteredOrders.slice(0, 500);
     const size = orderPageSize as number;
     const start = (orderPage - 1) * size;
     return filteredOrders.slice(start, start + size);
@@ -2155,90 +2166,18 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     startStr: string,
     endStr: string
   ): boolean => {
-    if (!rawDate || filterType === 'all' || !filterType) return true;
-
-    let dStr = String(rawDate).trim();
-    if (dStr.includes('T')) dStr = dStr.split('T')[0];
-    else if (dStr.includes(' ')) dStr = dStr.split(' ')[0];
-
-    const parts = dStr.split(/[-/]/);
-    if (parts.length < 3) return false;
-
-    let year = parseInt(parts[0], 10);
-    let month = parseInt(parts[1], 10) - 1;
-    let day = parseInt(parts[2], 10);
-
-    if (parts[0].length === 2 && parts[2].length === 4) {
-      year = parseInt(parts[2], 10);
-      const p0 = parseInt(parts[0], 10);
-      const p1 = parseInt(parts[1], 10);
-      if (p0 > 12) {
-        day = p0;
-        month = p1 - 1;
-      } else {
-        month = p0 - 1;
-        day = p1;
-      }
-    }
-
-    const itemDate = new Date(year, month, day, 0, 0, 0, 0);
-    if (isNaN(itemDate.getTime())) return false;
-    const itemTime = itemDate.getTime();
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (filterType === 'today') return itemTime === today.getTime();
-    if (filterType === 'yesterday') {
-      const yest = new Date(today);
-      yest.setDate(today.getDate() - 1);
-      return itemTime === yest.getTime();
-    }
-    if (filterType === 'last7') {
-      const limit = new Date(today);
-      limit.setDate(today.getDate() - 6);
-      return itemTime >= limit.getTime() && itemTime <= today.getTime();
-    }
-    if (filterType === 'last30') {
-      const limit = new Date(today);
-      limit.setDate(today.getDate() - 29);
-      return itemTime >= limit.getTime() && itemTime <= today.getTime();
-    }
-    if (filterType === 'thisMonth') {
-      return itemDate.getMonth() === today.getMonth() && itemDate.getFullYear() === today.getFullYear();
-    }
-    if (filterType === 'lastMonth') {
-      const lm = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      return itemDate.getMonth() === lm.getMonth() && itemDate.getFullYear() === lm.getFullYear();
-    }
-    if (filterType === 'lastYear') {
-      return itemDate.getFullYear() === today.getFullYear() - 1;
-    }
-    if (filterType === 'custom') {
-      if (!startStr && !endStr) return true;
-      let sTime = -Infinity;
-      let eTime = Infinity;
-      if (startStr) {
-        const [sy, sm, sd] = startStr.split('-').map(Number);
-        sTime = new Date(sy, sm - 1, sd, 0, 0, 0, 0).getTime();
-      }
-      if (endStr) {
-        const [ey, em, ed] = endStr.split('-').map(Number);
-        eTime = new Date(ey, em - 1, ed, 23, 59, 59, 999).getTime();
-      }
-      return itemTime >= sTime && itemTime <= eTime;
-    }
-    return true;
+    return matchDate(rawDate || '', filterType, startStr, endStr);
   };
 
   const orderLookupMap = useMemo(() => {
+    if (activeTab !== 'followup' && activeTab !== 'orders') return new Map<string, OrderItem>();
     const map = new Map<string, OrderItem>();
     orders.forEach((o) => {
       const id = String(o.order_id || o.id || '').trim();
       if (id) map.set(id, o);
     });
     return map;
-  }, [orders]);
+  }, [orders, activeTab]);
 
   const availableUpdatedByNames = useMemo(() => {
     const names = new Set<string>();
@@ -2280,8 +2219,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       }
 
       // 4. Search with dropdown selector (matching orders table behavior)
-      if (followupSearchValue.trim()) {
-        const q = followupSearchValue.trim().toLowerCase();
+      if (deferredFollowupSearchValue.trim()) {
+        const q = deferredFollowupSearchValue.trim().toLowerCase();
         const relOrder = orderLookupMap.get(String(h.orderId || (h as any).order_id || '').trim());
 
         if (followupSearchType === 'order_id') {
@@ -2362,7 +2301,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     followupFilterName,
     followupStatusFilter,
     followupSearchType,
-    followupSearchValue
+    deferredFollowupSearchValue
   ]);
 
   const totalFollowupPages = useMemo(() => {
@@ -2371,7 +2310,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   }, [filteredFollowupHistory.length, followupPageSize]);
 
   const paginatedFollowupHistory = useMemo(() => {
-    if (followupPageSize === 'all') return filteredFollowupHistory;
+    if (followupPageSize === 'all') return filteredFollowupHistory.slice(0, 500);
     const size = followupPageSize as number;
     const start = (followupPage - 1) * size;
     return filteredFollowupHistory.slice(start, start + size);
@@ -2391,6 +2330,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   // Summary Metrics & Aggregations with single date filter
   const orderDeliveredDateMap = useMemo(() => {
+    if (activeTab !== 'summary' && activeTab !== 'agent-performance') return new Map<string, string>();
     const map = new Map<string, string>();
     orders.forEach(o => {
       if (o.delivered_date) map.set(String(o.order_id), o.delivered_date);
@@ -2401,9 +2341,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       }
     });
     return map;
-  }, [orders, followupHistory]);
+  }, [activeTab, orders, followupHistory]);
 
   const orderCancelledDateMap = useMemo(() => {
+    if (activeTab !== 'summary' && activeTab !== 'agent-performance') return new Map<string, string>();
     const map = new Map<string, string>();
     orders.forEach(o => {
       if (o.cancelled_date) map.set(String(o.order_id), o.cancelled_date);
@@ -2414,9 +2355,49 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       }
     });
     return map;
-  }, [orders, followupHistory]);
+  }, [activeTab, orders, followupHistory]);
 
   const summaryStats = useMemo(() => {
+    if (activeTab !== 'summary' && activeTab !== 'agent-performance') {
+      const emptyTotal = {
+        createOrders: 0,
+        servedOrders: 0,
+        cancelledOrders: 0,
+        orderValue: 0,
+        deliveredOrderValue: 0,
+        profit: 0,
+        bucketSize: 0,
+        deliveredRatio: 0,
+        cancelledRatio: 0,
+        nrRatio: 0,
+        pendingOrders: 0
+      };
+      return {
+        createOrdersCount: 0,
+        deliveredOrdersCount: 0,
+        cancelledOrdersCount: 0,
+        openOrdersCount: 0,
+        openOrdersValue: 0,
+        totalOrderValue: 0,
+        deliveredOrderValue: 0,
+        totalProfit: 0,
+        deliveredRatio: 0,
+        cancelledRatio: 0,
+        bucketSize: 0,
+        nrRatio: 0,
+        channelSummary: [],
+        categorySummary: [],
+        citySummary: [],
+        dateSummary: [],
+        agentSummary: [],
+        channelGrandTotal: emptyTotal,
+        categoryGrandTotal: emptyTotal,
+        cityGrandTotal: emptyTotal,
+        dateGrandTotal: emptyTotal,
+        agentGrandTotal: emptyTotal
+      };
+    }
+
     let createOrdersCount = 0;
     let deliveredOrdersCount = 0;
     let cancelledOrdersCount = 0;
@@ -2750,7 +2731,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       dateGrandTotal,
       agentGrandTotal
     };
-  }, [orders, agents, followupHistory, summaryDateFilter, summaryStartDate, summaryEndDate, orderDeliveredDateMap, orderCancelledDateMap]);
+  }, [activeTab, orders, agents, followupHistory, summaryDateFilter, summaryStartDate, summaryEndDate, orderDeliveredDateMap, orderCancelledDateMap]);
 
   // Sorted summaries
   const sortedChannelSummary = useMemo(() => {
