@@ -3073,10 +3073,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             {/* 3. Add Order */}
             <button
               onClick={() => setIsManagerCreateOrderOpen(true)}
-              className="px-3.5 py-2 bg-[#1E2C58] hover:bg-[#2A3E78] text-[#E2E8F0] rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-[#2D3E72]"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-blue-500"
             >
-              <Plus className="w-4 h-4 text-[#E2E8F0]" />
-              <span>Add Order</span>
+              <Plus className="w-4 h-4 text-white" />
+              <span className="text-white">Add Order</span>
             </button>
 
             {/* 4. User Profile & Account Dropdown (right after refresh sheet) */}
@@ -3112,6 +3112,53 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
         {/* Scrollable Workspace */}
         <main className="flex-1 overflow-y-auto p-6 space-y-6 relative z-50">
+          {/* TAB: PROFILE & ACCOUNT */}
+          {activeTab === 'profiles' && (
+            <div className="space-y-6 max-w-5xl mx-auto">
+              <div className="bg-[#111C3D] border border-[#1E2C58] rounded-3xl p-6 sm:p-8 text-[#E2E8F0] shadow-xl">
+                <AgentProfileView
+                  currentAgent={{
+                    user: managerProfile.user,
+                    pass: managerProfile.pass,
+                    name: managerProfile.name,
+                    role: managerProfile.role || 'Manager',
+                    team: managerProfile.team || 'Manager',
+                    contact: managerProfile.contact,
+                    email: managerProfile.email,
+                    address: managerProfile.address,
+                    bloodGroup: managerProfile.bloodGroup,
+                    gender: managerProfile.gender,
+                    birthday: managerProfile.birthday,
+                    status: 'active'
+                  }}
+                  onUpdateAgentProfile={(updated) => {
+                    const updatedMgr: ManagerUser = {
+                      user: updated.user,
+                      pass: updated.pass,
+                      name: updated.name,
+                      role: updated.role || 'Manager',
+                      team: updated.team || 'Manager',
+                      contact: updated.contact,
+                      email: updated.email,
+                      address: updated.address,
+                      bloodGroup: updated.bloodGroup,
+                      gender: updated.gender,
+                      birthday: updated.birthday,
+                      permissions: managerProfile.permissions
+                    };
+                    setManagerProfile(updatedMgr);
+                    const updatedAgents = agents.map(a => a.user === updatedMgr.user ? { ...a, ...updatedMgr } : a);
+                    onUpdateAgents(updatedAgents, true);
+                    showToast('Profile updated successfully!');
+                  }}
+                  orders={orders}
+                  followupHistory={followupHistory}
+                  onViewOrderJourney={(ord) => setViewJourneyOrder(ord)}
+                />
+              </div>
+            </div>
+          )}
+
           {/* TAB: GOOGLE SHEET & DYNAMIC TABS */}
           {activeTab === 'sheet-connection' && (
             <div className="space-y-6 max-w-5xl mx-auto">
@@ -4979,33 +5026,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               onClick={() => setViewJourneyOrder(ord)}
                               className="group hover:bg-[#16234D] transition-colors duration-150 cursor-pointer"
                             >
-                              <td className="py-3 px-3.5 whitespace-nowrap font-mono font-bold text-blue-400 sticky left-0 z-10 bg-[#111C3D] group-hover:bg-[#16234D] border-r border-[#1E2C58] transition-colors duration-150">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setViewJourneyOrder(ord);
-                                  }}
-                                  className="hover:underline text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer font-bold"
-                                  title="Click to open order details"
-                                >
-                                  <span>{ord.order_id || ord.id}</span>
-                                </button>
+                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[#E2E8F0] sticky left-0 z-10 bg-[#111C3D] group-hover:bg-[#16234D] border-r border-[#1E2C58] transition-colors duration-150">
+                                {ord.order_id || ord.id}
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-medium text-[#E2E8F0]">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const cId = String(ord.customer_id || ord.customerId || '');
-                                    if (cId) setSelectedCustomerId(cId);
-                                  }}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-xs font-bold text-[#E2E8F0] bg-[#080E21] hover:bg-[#0E1736] border border-[#1E2C58] transition-all cursor-pointer shadow-2xs"
-                                  title="Click to view Customer 360 profile, metrics & all orders"
-                                >
-                                  <User className="w-3.5 h-3.5 text-blue-400" />
-                                  <span>{ord.customer_id || ord.customerId || '-'}</span>
-                                </button>
+                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[#E2E8F0]">
+                                {ord.customer_id || ord.customerId || '-'}
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[#94A3B8]">
                                 {ord.customer_mobile || ord.customerContact}

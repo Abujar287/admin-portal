@@ -45,9 +45,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
         if (isManagerEmail) {
           onManagerLogin({
-            user: '1',
+            user: 'Manager',
             pass: normalizedPassword || '01410089771',
-            name: 'Abujar Algifari (Manager)',
+            name: 'Manager',
             role: 'Manager',
             email: normalizedEmail,
             permissions: {
@@ -57,7 +57,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               canChangeValue: true,
               canAddProfit: true,
               allowedOrderStatuses: ["Pending","In Progress","Confirmed","Follow-up","Delivered","Cancelled","Returned"],
-              allowedTabs: ["orders","followup","agent-performance","profiles","summary"],
+              allowedTabs: ["orders","followup","agent-performance","profiles","summary","users","category-mapping","sheet-connection"],
               orderScope: "all_orders"
             }
           });
@@ -66,7 +66,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
         if (isSuperAdminLogin) {
           onManagerLogin({
-            user: '100',
+            user: 'Superadmin',
             pass: normalizedPassword || 'superadmin123',
             name: 'Superadmin',
             role: 'Superadmin',
@@ -78,7 +78,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               canChangeValue: true,
               canAddProfit: true,
               allowedOrderStatuses: ["Pending","In Progress","Confirmed","Follow-up","Delivered","Cancelled","Returned"],
-              allowedTabs: ["orders","followup","agent-performance","profiles","summary"],
+              allowedTabs: ["orders","followup","agent-performance","profiles","summary","users","category-mapping","sheet-connection"],
               orderScope: "all_orders"
             }
           });
@@ -200,10 +200,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
           <button 
             type="submit" 
-            className="w-full mt-2 py-3 px-4 rounded-xl bg-[#1E2C58] hover:bg-[#2A3E78] text-[#E2E8F0] font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] border border-[#2D3E72] group"
+            className="w-full mt-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] border border-blue-500 group"
           >
-            <span className="text-[#E2E8F0]">Login</span>
-            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 text-[#E2E8F0]" />
+            <span className="text-white">Login</span>
+            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 text-white" />
           </button>
         </form>
       </div>

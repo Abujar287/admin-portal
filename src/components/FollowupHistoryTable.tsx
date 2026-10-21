@@ -340,19 +340,8 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                       key={`fol-row-${hist.id || hist.followupId || histIdx}-${histIdx}`} 
                       className="transition-colors hover:bg-slate-50/80"
                     >
-                      <td className="py-3 px-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const ord = orders.find((o) => String(o.order_id || o.id) === String(hist.orderId));
-                            if (ord) onViewOrder(ord);
-                          }}
-                          className="font-mono font-bold text-indigo-700 hover:text-indigo-900 hover:underline flex items-center gap-1 cursor-pointer"
-                          title="Click to view full order details & journey"
-                        >
-                          <span>#{hist.orderId}</span>
-                          <ExternalLink className="w-3 h-3 text-indigo-400" />
-                        </button>
+                      <td className="py-3 px-3.5 font-mono text-slate-800 whitespace-nowrap">
+                        {hist.orderId}
                       </td>
                       <td className="py-3 px-3.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">
                         {hist.timestamp}

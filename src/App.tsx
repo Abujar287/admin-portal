@@ -9,7 +9,12 @@ export function App() {
     try {
       const saved = localStorage.getItem('agent_portal_current_manager');
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed && (parsed.role === 'Manager' || parsed.user === '1' || parsed.user === 'Manager')) {
+          parsed.name = 'Manager';
+          parsed.user = 'Manager';
+        }
+        return parsed;
       }
     } catch {}
     return null;
@@ -171,6 +176,10 @@ export function App() {
           });
         }}
         onManagerLogin={(mgr) => {
+          if (mgr.role === 'Manager' || mgr.user === '1' || mgr.user === 'Manager') {
+            mgr.name = 'Manager';
+            mgr.user = 'Manager';
+          }
           setCurrentManager(mgr);
         }}
         onUpdateAgents={handleUpdateAgents}
