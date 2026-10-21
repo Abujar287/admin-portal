@@ -20,42 +20,73 @@ export function extractSheetId(input: string): string | null {
   return null;
 }
 
-/**
- * Formats user identifiers into the standard `username_id` format (e.g. manager_1, agent_102)
- */
-export function formatActorUsernameId(username?: string, userId?: string): string {
-  const rawUser = String(username || '').trim();
-  const rawId = String(userId || '').trim();
+export interface ActorInfo {
+  userId: string;
+  userName: string;
+  username_id: string;
+}
 
-  // If already in username_id format like manager_1, admin_1
-  if (/^[a-zA-Z0-9]+_[a-zA-Z0-9]+$/.test(rawUser)) {
-    return rawUser.toLowerCase();
+/**
+ * Resolves user credentials into:
+ * - userId: Pure user_id for Google Sheets 'updated_by' column (e.g. '1', '100', '2')
+ * - userName: Pure username for Google Sheets 'updated_by_name' column (e.g. 'manager', 'superadmin', 'rahim')
+ * - username_id: Formatted username_id for Admin Portal order history (e.g. 'manager_1', 'superadmin_100', 'rahim_2')
+ */
+export function parseActorInfo(actorInput?: string, actorNameInput?: string): ActorInfo {
+  let rawActor = String(actorInput || '').trim();
+  let rawName = String(actorNameInput || '').trim();
+
+  // If rawActor has format username_id e.g. "manager_1", "superadmin_100", "rahim_2"
+  const underscoreMatch = rawActor.match(/^([a-zA-Z0-9]+)_([a-zA-Z0-9]+)$/);
+  if (underscoreMatch) {
+    const uName = underscoreMatch[1].toLowerCase();
+    const uId = underscoreMatch[2].toLowerCase();
+    const isMgr = uName === 'manager' || uName === 'admin' || uId === '1';
+    const finalId = isMgr ? '1' : uId;
+    const finalName = isMgr ? 'manager' : uName;
+    return {
+      userId: finalId,
+      userName: finalName,
+      username_id: `${finalName}_${finalId}`
+    };
   }
-  if (/^[a-zA-Z0-9]+_[a-zA-Z0-9]+$/.test(rawId)) {
-    return rawId.toLowerCase();
+
+  // If rawName has format username_id e.g. "manager_1"
+  const nameUnderscoreMatch = rawName.match(/^([a-zA-Z0-9]+)_([a-zA-Z0-9]+)$/);
+  if (nameUnderscoreMatch) {
+    const uName = nameUnderscoreMatch[1].toLowerCase();
+    const uId = nameUnderscoreMatch[2].toLowerCase();
+    const isMgr = uName === 'manager' || uName === 'admin' || uId === '1';
+    const finalId = isMgr ? '1' : uId;
+    const finalName = isMgr ? 'manager' : uName;
+    return {
+      userId: finalId,
+      userName: finalName,
+      username_id: `${finalName}_${finalId}`
+    };
   }
 
   // Strip parentheses e.g. "Manager (Manager)" or "Manager (1)" or "Rahim (102)"
-  let extractedName = rawUser;
-  let extractedId = rawId;
+  let extractedName = rawName;
+  let extractedId = rawActor;
 
-  if (rawUser.includes('(')) {
-    const m = rawUser.match(/^(.*?)\s*\((?:@)?(.*)\)$/);
+  if (rawActor.includes('(')) {
+    const m = rawActor.match(/^(.*?)\s*\((?:@)?(.*)\)$/);
     if (m) {
-      extractedName = m[1].trim();
-      if (!extractedId || extractedId === rawUser) {
-        extractedId = m[2].trim().replace(/^@/, '');
-      }
-    }
-  }
-
-  if (rawId.includes('(')) {
-    const m = rawId.match(/^(.*?)\s*\((?:@)?(.*)\)$/);
-    if (m) {
-      if (!extractedName || extractedName === rawId) {
+      if (!extractedName || extractedName === rawActor) {
         extractedName = m[1].trim();
       }
       extractedId = m[2].trim().replace(/^@/, '');
+    }
+  }
+
+  if (rawName.includes('(')) {
+    const m = rawName.match(/^(.*?)\s*\((?:@)?(.*)\)$/);
+    if (m) {
+      extractedName = m[1].trim();
+      if (!extractedId || extractedId === rawName) {
+        extractedId = m[2].trim().replace(/^@/, '');
+      }
     }
   }
 
@@ -69,18 +100,39 @@ export function formatActorUsernameId(username?: string, userId?: string): strin
     cleanName === '1' || cleanId === '1';
 
   if (isManager) {
-    return 'manager_1';
+    return {
+      userId: '1',
+      userName: 'manager',
+      username_id: 'manager_1'
+    };
   }
 
   // Clean characters for username_id
   cleanName = cleanName.replace(/[^a-zA-Z0-9]/g, '');
   cleanId = cleanId.replace(/[^a-zA-Z0-9]/g, '');
 
-  if (!cleanName && !cleanId) return 'manager_1';
+  if (!cleanName && !cleanId) {
+    return {
+      userId: '1',
+      userName: 'manager',
+      username_id: 'manager_1'
+    };
+  }
   if (!cleanName) cleanName = 'agent';
   if (!cleanId || cleanId === cleanName) cleanId = '1';
 
-  return `${cleanName}_${cleanId}`;
+  return {
+    userId: cleanId,
+    userName: cleanName,
+    username_id: `${cleanName}_${cleanId}`
+  };
+}
+
+/**
+ * Formats user identifiers into the standard `username_id` format (e.g. manager_1, agent_102)
+ */
+export function formatActorUsernameId(username?: string, userId?: string): string {
+  return parseActorInfo(userId || username, username || userId).username_id;
 }
 
 const STORAGE_KEYS = {
@@ -961,9 +1013,9 @@ export class OrderService {
         const rawTs = String(r[idxTs !== -1 ? idxTs : 0] || '');
         const rawUBy = String(r[idxUpBy !== -1 ? idxUpBy : 11] || '').trim();
         const rawUByName = String(r[idxUpByNm !== -1 ? idxUpByNm : 12] || '').trim();
-        const formattedActor = formatActorUsernameId(rawUByName || rawUBy, rawUBy || rawUByName);
-        const uBy = formattedActor;
-        const uByName = formattedActor;
+        const actor = parseActorInfo(rawUBy, rawUByName);
+        const uBy = actor.username_id;
+        const uByName = actor.userName;
 
         parsedItems.push({
           id: String(fidRaw || i),
@@ -1671,10 +1723,13 @@ export class OrderService {
       return { updatedOrders: orders, historyItem: undefined, remoteSynced: false };
     }
 
-    // Resolve operator in standard username_id format (e.g. manager_1)
-    const formattedActor = formatActorUsernameId(updatedBy, updatedBy);
-    const uById = formattedActor;
-    const uByName = formattedActor;
+    // Resolve operator:
+    // Google Sheet: updated_by = user_id (e.g. '1'), updated_by_name = username (e.g. 'manager')
+    // Admin Portal: updated_by = username_id (e.g. 'manager_1')
+    const actor = parseActorInfo(updatedBy, updatedBy);
+    const uById = actor.userId;
+    const uByName = actor.userName;
+    const portalActor = actor.username_id;
 
     const finalOrderStatus = 'Pending';
     const finalFollowupStatus = updates.followup_status || updates.followupStatus || existingOrder?.followup_status || existingOrder?.followupStatus || 'Pending';
