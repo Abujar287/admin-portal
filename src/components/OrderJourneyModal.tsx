@@ -486,6 +486,7 @@ export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
                 </div>
                 <input
                   type="date"
+                  min={new Date().toISOString().split('T')[0]}
                   value={scheduleDate}
                   onChange={(e) => setScheduleDate(e.target.value)}
                   disabled={isOrderLocked || isSubmitting}
