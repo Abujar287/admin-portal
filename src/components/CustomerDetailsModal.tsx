@@ -59,43 +59,44 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
   const customerOrders = useMemo(() => {
     if (!customerId) return [];
     const cleanId = String(customerId).trim().toLowerCase();
-    
-    // First find by customer_id or customerId
-    const directMatches = orders.filter((o) => {
-      const cId = String(o.customer_id || o.customerId || '').trim().toLowerCase();
-      return cId === cleanId;
-    });
-
-    if (directMatches.length > 0) {
-      // Also grab phone number to catch any other order that might share this phone
-      const phone = (directMatches[0].customer_mobile || directMatches[0].customerContact || '').replace(/\D/g, '');
-      if (phone && phone.length >= 8) {
-        return orders.filter((o) => {
-          const cId = String(o.customer_id || o.customerId || '').trim().toLowerCase();
-          if (cId === cleanId) return true;
-          const oPhone = String(o.customer_mobile || o.customerContact || '').replace(/\D/g, '');
-          return oPhone === phone;
-        });
-      }
-      return directMatches;
-    }
-
-    // Fallback: match by phone number
     const cleanPhone = cleanId.replace(/\D/g, '');
-    if (cleanPhone && cleanPhone.length >= 8) {
-      const phoneMatches = orders.filter((o) => {
-        const oPhone = String(o.customer_mobile || o.customerContact || '').replace(/\D/g, '');
-        return oPhone === cleanPhone;
-      });
-      if (phoneMatches.length > 0) return phoneMatches;
+    const isPhoneQuery = cleanPhone.length >= 8;
+
+    const matches: OrderItem[] = [];
+    let primaryPhone = '';
+
+    for (let i = 0; i < orders.length; i++) {
+      const o = orders[i];
+      const cId = String(o.customer_id || o.customerId || '').trim().toLowerCase();
+      const oPhone = String(o.customer_mobile || o.customerContact || '').replace(/\D/g, '');
+      const oName = String(o.customer_name || o.customerName || '').trim().toLowerCase();
+
+      if (cId === cleanId) {
+        matches.push(o);
+        if (!primaryPhone && oPhone.length >= 8) primaryPhone = oPhone;
+      } else if (isPhoneQuery && oPhone === cleanPhone) {
+        matches.push(o);
+        if (!primaryPhone) primaryPhone = oPhone;
+      } else if (oName && oName === cleanId) {
+        matches.push(o);
+        if (!primaryPhone && oPhone.length >= 8) primaryPhone = oPhone;
+      }
     }
 
-    // Fallback: match by customer name
-    const nameMatches = orders.filter((o) => {
-      const oName = String(o.customer_name || o.customerName || '').trim().toLowerCase();
-      return oName && oName === cleanId;
-    });
-    return nameMatches;
+    if (matches.length > 0 && primaryPhone && primaryPhone !== cleanPhone) {
+      const existingSet = new Set(matches);
+      for (let i = 0; i < orders.length; i++) {
+        const o = orders[i];
+        if (!existingSet.has(o)) {
+          const oPhone = String(o.customer_mobile || o.customerContact || '').replace(/\D/g, '');
+          if (oPhone === primaryPhone) {
+            matches.push(o);
+          }
+        }
+      }
+    }
+
+    return matches;
   }, [customerId, orders]);
 
   // Derive primary customer profile info

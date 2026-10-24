@@ -1718,19 +1718,61 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     });
   };
 
-  // Helper date matcher
-  const matchDate = (
-    dateVal: string,
+  // Helper date matcher using pre-computed filter bounds
+  const getFilterBounds = (
     filterType: DateFilterType,
-    startDateVal: string,
-    endDateVal: string
+    startDateVal?: string,
+    endDateVal?: string
+  ) => {
+    if (!filterType || filterType === 'all') return { filterType: 'all' as const };
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+
+    if (filterType === 'today') {
+      return { filterType, todayStr };
+    }
+    if (filterType === 'yesterday') {
+      const yest = new Date(now.getTime() - 86400000);
+      return { filterType, yestStr: yest.toISOString().slice(0, 10) };
+    }
+    if (filterType === 'last7') {
+      const past = new Date(now.getTime() - 6 * 86400000);
+      return { filterType, todayStr, past7Str: past.toISOString().slice(0, 10) };
+    }
+    if (filterType === 'last30') {
+      const past = new Date(now.getTime() - 29 * 86400000);
+      return { filterType, todayStr, past30Str: past.toISOString().slice(0, 10) };
+    }
+    if (filterType === 'thisMonth') {
+      return { filterType, thisMonthPrefix: todayStr.slice(0, 7) };
+    }
+    if (filterType === 'lastMonth') {
+      const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      return { filterType, lastMonthPrefix: `${lm.getFullYear()}-${String(lm.getMonth() + 1).padStart(2, '0')}` };
+    }
+    if (filterType === 'lastYear') {
+      return { filterType, lastYearPrefix: String(now.getFullYear() - 1) };
+    }
+    if (filterType === 'custom') {
+      return {
+        filterType,
+        startIso: startDateVal ? startDateVal.slice(0, 10) : undefined,
+        endIso: endDateVal ? endDateVal.slice(0, 10) : undefined
+      };
+    }
+    return { filterType: 'all' as const };
+  };
+
+  const matchDateWithBounds = (
+    dateVal: string | undefined | null,
+    bounds: ReturnType<typeof getFilterBounds>
   ): boolean => {
-    if (!dateVal || filterType === 'all' || !filterType) return true;
+    if (!dateVal || bounds.filterType === 'all') return true;
     let clean = dateVal.trim();
+    if (!clean) return true;
     if (clean.includes('T')) clean = clean.split('T')[0];
     else if (clean.includes(' ')) clean = clean.split(' ')[0];
 
-    // Normalize MM/DD/YYYY to YYYY-MM-DD
     if (clean.includes('/')) {
       const parts = clean.split('/');
       if (parts.length === 3 && parts[2].length === 4) {
@@ -1741,46 +1783,43 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     if (clean.length < 10) return false;
     const targetIso = clean.slice(0, 10);
 
-    const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10);
-
-    if (filterType === 'today') {
-      return targetIso === todayStr;
+    if (bounds.filterType === 'today') {
+      return targetIso === bounds.todayStr;
     }
-    if (filterType === 'yesterday') {
-      const yest = new Date(now.getTime() - 86400000);
-      return targetIso === yest.toISOString().slice(0, 10);
+    if (bounds.filterType === 'yesterday') {
+      return targetIso === bounds.yestStr;
     }
-    if (filterType === 'last7') {
-      const past = new Date(now.getTime() - 6 * 86400000);
-      const pastStr = past.toISOString().slice(0, 10);
-      return targetIso >= pastStr && targetIso <= todayStr;
+    if (bounds.filterType === 'last7') {
+      return targetIso >= bounds.past7Str! && targetIso <= bounds.todayStr!;
     }
-    if (filterType === 'last30') {
-      const past = new Date(now.getTime() - 29 * 86400000);
-      const pastStr = past.toISOString().slice(0, 10);
-      return targetIso >= pastStr && targetIso <= todayStr;
+    if (bounds.filterType === 'last30') {
+      return targetIso >= bounds.past30Str! && targetIso <= bounds.todayStr!;
     }
-    if (filterType === 'thisMonth') {
-      const monthPrefix = todayStr.slice(0, 7);
-      return targetIso.startsWith(monthPrefix);
+    if (bounds.filterType === 'thisMonth') {
+      return targetIso.startsWith(bounds.thisMonthPrefix!);
     }
-    if (filterType === 'lastMonth') {
-      const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lmPrefix = `${lm.getFullYear()}-${String(lm.getMonth() + 1).padStart(2, '0')}`;
-      return targetIso.startsWith(lmPrefix);
+    if (bounds.filterType === 'lastMonth') {
+      return targetIso.startsWith(bounds.lastMonthPrefix!);
     }
-    if (filterType === 'lastYear') {
-      const lyPrefix = String(now.getFullYear() - 1);
-      return targetIso.startsWith(lyPrefix);
+    if (bounds.filterType === 'lastYear') {
+      return targetIso.startsWith(bounds.lastYearPrefix!);
     }
-    if (filterType === 'custom') {
-      if (!startDateVal && !endDateVal) return true;
-      if (startDateVal && targetIso < startDateVal.slice(0, 10)) return false;
-      if (endDateVal && targetIso > endDateVal.slice(0, 10)) return false;
+    if (bounds.filterType === 'custom') {
+      if (bounds.startIso && targetIso < bounds.startIso) return false;
+      if (bounds.endIso && targetIso > bounds.endIso) return false;
       return true;
     }
     return true;
+  };
+
+  const matchDate = (
+    dateVal: string,
+    filterType: DateFilterType,
+    startDateVal: string,
+    endDateVal: string
+  ): boolean => {
+    const bounds = getFilterBounds(filterType, startDateVal, endDateVal);
+    return matchDateWithBounds(dateVal, bounds);
   };
 
   // Add or update agent
@@ -2047,12 +2086,15 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   // Filtered Orders for Orders Tab
   const filteredOrders = useMemo(() => {
+    const createBounds = getFilterBounds(orderCreateFilter, orderCreateStart, orderCreateEnd);
+    const scheduleBounds = getFilterBounds(orderScheduleFilter, orderScheduleStart, orderScheduleEnd);
+
     return scopedOrders.filter((r) => {
       // DEBUG: console.log('Checking order:', r.id, 'CustID:', r.customerId, 'Search:', searchValue);
-      if (!matchDate(r.create_date, orderCreateFilter, orderCreateStart, orderCreateEnd)) {
+      if (!matchDateWithBounds(r.create_date, createBounds)) {
         return false;
       }
-      if (!matchDate(r.schedule_date, orderScheduleFilter, orderScheduleStart, orderScheduleEnd)) {
+      if (!matchDateWithBounds(r.schedule_date, scheduleBounds)) {
         return false;
       }
       if (deferredSearchValue.trim()) {
@@ -2210,9 +2252,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   }, [scopedFollowupHistory]);
 
   const filteredFollowupHistory = useMemo(() => {
+    const folBounds = getFilterBounds(followupDateFilter, followupStartDate, followupEndDate);
+
     return scopedFollowupHistory.filter((h) => {
       // 1. Timestamp Date Filter
-      if (!matchFollowupDate(h.timestamp, followupDateFilter, followupStartDate, followupEndDate)) {
+      if (!matchDateWithBounds(h.timestamp, folBounds)) {
         return false;
       }
 
@@ -2495,6 +2539,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       return dateMap[cleanKey];
     };
 
+    const summaryBounds = getFilterBounds(summaryDateFilter, summaryStartDate, summaryEndDate);
+
     orders.forEach((r) => {
       const val = Number(r.order_value) || 0;
       const profit = Number(r.profit) || 0;
@@ -2512,7 +2558,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         : 'Unknown Date';
 
       // 1. Create Orders (Create Date)
-      if (matchDate(r.create_date, summaryDateFilter, summaryStartDate, summaryEndDate)) {
+      if (matchDateWithBounds(r.create_date, summaryBounds)) {
         createOrdersCount++;
         totalOrderValue += val;
 
@@ -2544,7 +2590,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
       // 2. Delivered Orders (Followup status = Delivered & Delivered date exists)
       if (fStatus === 'delivered' && Boolean(delivDt)) {
-        if (matchDate(delivDt, summaryDateFilter, summaryStartDate, summaryEndDate)) {
+        if (matchDateWithBounds(delivDt, summaryBounds)) {
           deliveredOrdersCount++;
           deliveredOrderValue += val;
           totalProfit += profit;
@@ -2569,7 +2615,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
       // 3. Cancelled Orders (Followup status = Cancelled & Cancelled date exists)
       if (fStatus === 'cancelled' && Boolean(cancDt)) {
-        if (matchDate(cancDt, summaryDateFilter, summaryStartDate, summaryEndDate)) {
+        if (matchDateWithBounds(cancDt, summaryBounds)) {
           cancelledOrdersCount++;
 
           chItem.cancelledOrders += 1;
@@ -2589,7 +2635,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
     // Also count follow-ups logged by users
     followupHistory.forEach((h) => {
-      if (!h.isUndo && h.updatedBy && matchDate(h.timestamp, summaryDateFilter, summaryStartDate, summaryEndDate)) {
+      if (!h.isUndo && h.updatedBy && matchDateWithBounds(h.timestamp, summaryBounds)) {
         const ag = getOrInitAgent(h.updatedBy);
         ag.followupCount += 1;
       }
