@@ -133,6 +133,7 @@ export function App() {
       if (history) {
         setFollowupHistory(history);
       }
+      return res;
     } catch (e) {
       console.error('Error updating order status / sheet sync:', e);
       const updatedOrders = orders.map(o => {
@@ -143,6 +144,7 @@ export function App() {
         return o;
       });
       handleUpdateOrders(updatedOrders);
+      return { updatedOrders: updatedOrders, remoteSynced: false, error: (e as Error).message };
     }
   };
 

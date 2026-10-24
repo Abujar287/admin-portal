@@ -527,8 +527,19 @@ export class OrderService {
    * 3. Direct fetch with URLSearchParams (no-cors)
    * 4. Hidden HTML Form + iframe submission (100% reliable cross-origin fallback for Vercel static deployments)
    */
+  static lastSyncError: string | null = null;
+
+  /**
+   * Robust multi-tier poster for Google Apps Script Web App endpoints:
+   * 1. Server proxy route (/api/proxy-script) if available (preferred)
+   * 2. Direct fetch with FormData (no-cors) - Fallback for static builds
+   * 3. Direct fetch with URLSearchParams (no-cors) - Fallback for static builds
+   * 4. Hidden HTML Form + iframe submission - Last resort
+   */
   static async postToGoogleScript(scriptUrl: string, bodyData: Record<string, any>): Promise<boolean> {
+    this.lastSyncError = null;
     if (!scriptUrl) {
+        this.lastSyncError = 'Missing script URL';
         console.error('postToGoogleScript: Missing script URL');
         return false;
     }
@@ -541,21 +552,34 @@ export class OrderService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: scriptUrl, ...bodyData })
       });
+      
       if (proxyRes.ok) {
         const json = await proxyRes.json();
         if (json.success) {
             console.log('Proxy POST success');
             return true;
+        } else {
+          this.lastSyncError = json.error || 'Google Script returned error';
+          console.warn('Proxy POST reported failure:', json.error);
+          return false; // Trust the proxy's report of failure
         }
       }
-      console.warn('Proxy POST failed, status:', proxyRes.status);
-    } catch (proxyErr) {
+      
+      // If proxy specifically returns 404, it might mean we are on a static host (Vercel) without the backend.
+      // In that case, we fall through to direct fetch methods.
+      if (proxyRes.status !== 404) {
+        this.lastSyncError = `Server proxy error: ${proxyRes.status}`;
+        console.warn('Proxy POST failed with status:', proxyRes.status);
+        return false; 
+      }
+    } catch (proxyErr: any) {
       console.warn('Proxy script POST unavailable or failed:', proxyErr);
+      // If it's a network error connecting to our own proxy, it's likely a static build. Fall through.
     }
 
     // 2. Direct fetch with FormData (no-cors)
     try {
-      console.log('Attempting FormData POST...');
+      console.log('Attempting FormData POST (no-cors fallback)...');
       const formData = new FormData();
       for (const [key, val] of Object.entries(bodyData)) {
         if (val !== undefined && val !== null) {
@@ -567,34 +591,14 @@ export class OrderService {
         mode: 'no-cors',
         body: formData
       });
-      console.log('FormData POST finished (no-cors, assuming success)');
+      console.log('FormData POST finished (no-cors)');
       return true;
-    } catch (fetchErr) {
-      console.warn('Direct fetch FormData POST failed, attempting URLSearchParams:', fetchErr);
+    } catch (fetchErr: any) {
+      console.warn('Direct fetch FormData POST failed:', fetchErr);
+      this.lastSyncError = fetchErr.message || 'Direct POST failed';
     }
 
-    // 3. Direct fetch with URLSearchParams
-    try {
-      console.log('Attempting URLSearchParams POST...');
-      const params = new URLSearchParams();
-      for (const [key, val] of Object.entries(bodyData)) {
-        if (val !== undefined && val !== null) {
-          params.append(key, String(val));
-        }
-      }
-      await fetch(scriptUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params.toString()
-      });
-      console.log('URLSearchParams POST finished (no-cors, assuming success)');
-      return true;
-    } catch (paramsErr) {
-      console.warn('Direct fetch URLSearchParams POST failed, attempting hidden form submit:', paramsErr);
-    }
-
-    // 4. Guaranteed fallback for all static hosts (e.g. Vercel static build): Hidden Form Submission
+    // 3. Guaranteed fallback for all static hosts: Hidden Form Submission
     try {
       console.log('Attempting hidden form submission...');
       const iframeName = `hidden_iframe_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -631,8 +635,9 @@ export class OrderService {
       }, 5000);
 
       return true;
-    } catch (formErr) {
+    } catch (formErr: any) {
       console.error('Hidden form POST failed:', formErr);
+      this.lastSyncError = formErr.message || 'Form submission failed';
       return false;
     }
   }
@@ -2094,12 +2099,16 @@ export class OrderService {
 
         console.log('DEBUG: Final Payload sent to Google Sheet:', bodyData);
         remoteSynced = await this.postToGoogleScript(scriptUrl, bodyData);
-      } catch (err) {
+        if (!remoteSynced) {
+          console.error('Remote sync failed:', this.lastSyncError);
+        }
+      } catch (err: any) {
         console.warn('Google Apps Script status update overall error:', err);
+        this.lastSyncError = err.message || 'Unknown sync error';
       }
     }
 
-    return { updatedOrders: updated, historyItem, remoteSynced };
+    return { updatedOrders: updated, historyItem, remoteSynced, error: this.lastSyncError || undefined };
   }
 
   static async updateOrderInSheet(

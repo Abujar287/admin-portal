@@ -317,61 +317,28 @@ export const AgentProfileView: React.FC<AgentProfileViewProps> = ({
           </div>
         </div>
 
-        {/* 5 Requested Profile Top Metrics (NO Currency Symbol): Total Orders | Delivered | Delivered Revinew | NR | Profit */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-y sm:divide-y-0 divide-slate-100 bg-slate-50 border-t border-slate-200">
-          {/* 1. Total Orders */}
-          <div className="p-4 sm:p-5">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">Total Orders</span>
-            <p className="text-xl sm:text-2xl font-black text-slate-900 mt-1 tabular-nums font-mono">
-              {agentStats.totalOrders}
-            </p>
-            <span className="text-[11px] text-slate-500 font-medium mt-0.5 block">
-              Portal Orders
-            </span>
+        {/* 5 Requested Profile Top Metrics (NO Currency Symbol): Total Orders | Delivered | Delivered Revenue | NR | Profit */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-0 border-t border-slate-100 bg-slate-50/50">
+          <div className="p-4 border-r border-slate-100 flex flex-col items-center justify-center text-center">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Orders</span>
+            <span className="text-xl font-black text-slate-900 mt-1">{agentStats.totalOrders}</span>
           </div>
-
-          {/* 2. Delivered */}
-          <div className="p-4 sm:p-5">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 block">Delivered</span>
-            <p className="text-xl sm:text-2xl font-black text-emerald-700 mt-1 tabular-nums font-mono">
-              {agentStats.deliveredOrders}
-            </p>
-            <span className="text-[11px] text-emerald-600 font-bold tabular-nums mt-0.5 block">
-              {agentStats.deliveryRatio}% Success Rate
-            </span>
+          <div className="p-4 border-r border-slate-100 flex flex-col items-center justify-center text-center">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Delivered</span>
+            <span className="text-xl font-black text-emerald-700 mt-1">{agentStats.deliveredOrders}</span>
+            <span className="text-[9px] font-bold text-emerald-600">({agentStats.deliveryRatio}%)</span>
           </div>
-
-          {/* 3. Delivered Revenue */}
-          <div className="p-4 sm:p-5">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 block">Delivered Revenue</span>
-            <p className="text-xl sm:text-2xl font-black text-indigo-700 mt-1 tabular-nums font-mono">
-              {agentStats.deliveredValue.toLocaleString()}
-            </p>
-            <span className="text-[11px] text-slate-500 font-medium mt-0.5 block">
-              Fulfilled Volume
-            </span>
+          <div className="p-4 border-r border-slate-100 flex flex-col items-center justify-center text-center">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">Revenue</span>
+            <span className="text-xl font-black text-indigo-700 mt-1">{agentStats.deliveredValue.toLocaleString()}</span>
           </div>
-
-          {/* 4. NR */}
-          <div className="p-4 sm:p-5">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-purple-700 block">NR</span>
-            <p className="text-xl sm:text-2xl font-black text-purple-700 mt-1 tabular-nums font-mono">
-              {agentStats.nrRatio}%
-            </p>
-            <span className="text-[11px] text-purple-600 font-medium mt-0.5 block">
-              NR Ratio
-            </span>
+          <div className="p-4 border-r border-slate-100 flex flex-col items-center justify-center text-center">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700">NR Ratio</span>
+            <span className="text-xl font-black text-purple-700 mt-1">{agentStats.nrRatio}%</span>
           </div>
-
-          {/* 5. Profit */}
-          <div className="p-4 sm:p-5 col-span-2 sm:col-span-1 lg:col-span-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 block">Profit</span>
-            <p className="text-xl sm:text-2xl font-black text-emerald-600 mt-1 tabular-nums font-mono">
-              {agentStats.profit.toLocaleString()}
-            </p>
-            <span className="text-[11px] text-emerald-600 font-medium mt-0.5 block">
-              Net Profit Generated
-            </span>
+          <div className="p-4 flex flex-col items-center justify-center text-center">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Profit</span>
+            <span className="text-xl font-black text-emerald-600 mt-1">{agentStats.profit.toLocaleString()}</span>
           </div>
         </div>
       </div>

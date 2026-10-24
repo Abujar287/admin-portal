@@ -164,7 +164,6 @@ export const ALL_SIDEBAR_TABS: { id: AgentNavTab; label: string; description: st
   { id: 'orders', label: 'Orders', description: 'Orders database, search, and order items', section: 'operations' },
   { id: 'followup', label: 'Followup History', description: 'Customer followup tracking & audit log', section: 'operations' },
   { id: 'agent-performance', label: 'Agent Performance', description: 'Individual and team stats', section: 'operations' },
-  { id: 'profiles', label: 'Profile', description: 'User profile details', section: 'admin' },
   { id: 'users', label: 'User Details', description: 'Agent directory & access management', section: 'admin' },
   { id: 'category-mapping', label: 'Category Mapping', description: 'Category, team & status rules', section: 'admin' },
   { id: 'sheet-connection', label: 'Google Sheet & Tabs', description: 'Google sheet connection & tabs', section: 'admin' }
@@ -188,7 +187,7 @@ interface ManagerPortalProps {
   isRefreshing: boolean;
   lastSyncTime?: string;
   onLogout: () => void;
-  onUpdateOrderStatus?: (orderId: string, updates: Partial<OrderItem>, updatedBy?: string, notes?: string) => Promise<void>;
+  onUpdateOrderStatus?: (orderId: string, updates: Partial<OrderItem>, updatedBy?: string, notes?: string) => Promise<{ remoteSynced: boolean; error?: string } | any>;
 }
 
 export const ManagerPortal: React.FC<ManagerPortalProps> = ({
@@ -305,7 +304,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       ? currentUserPermissions.allowedTabs
       : ['summary', 'orders', 'followup', 'agent-performance', 'profiles'];
     
-    // Strictly strip out manager/admin tabs ('users' for user details, 'category-mapping', 'sheet-connection' for Google Sheet & tabs) for non-manager users
+    // Strictly strip out manager/admin tabs ('users' for user details, 'category-mapping', 'sheet-connection') for non-manager users
     const filtered = baseTabs.filter(t => t !== 'users' && t !== 'category-mapping' && t !== 'sheet-connection') as AgentNavTab[];
     if (!filtered.includes('profiles')) {
       filtered.push('profiles');
@@ -2888,7 +2887,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         </div>
       )}
       {/* Manager Sidebar */}
-      <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} h-screen max-h-screen bg-[#0B132B] text-[#E2E8F0] flex flex-col p-4 border-r border-[#1E2C58] shrink-0 transition-all duration-300 z-10 overflow-hidden`}>
+      <aside className={`${isSidebarOpen ? 'w-48' : 'w-16'} h-screen max-h-screen bg-[#0B132B] text-[#E2E8F0] flex flex-col p-3 border-r border-[#1E2C58] shrink-0 transition-all duration-300 z-10 overflow-hidden`}>
         <div className="flex items-center justify-between pb-4 mb-3 border-b border-[#1E2C58] shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#111C3D] flex items-center justify-center font-bold text-[#E2E8F0] shadow-sm shrink-0 border border-[#1E2C58]">
@@ -2925,15 +2924,15 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             <button
               onClick={() => setActiveTab('summary')}
               title="Summary"
-              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
+              className={`w-fit flex items-center gap-2.5 px-3.5 py-2 rounded-full text-xs transition-all duration-200 cursor-pointer whitespace-nowrap ${
                 activeTab === 'summary'
-                  ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-xs font-bold border border-[#2D3E72]'
-                  : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D] font-semibold'
+                  ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-sm font-bold border border-[#2D3E72]'
+                  : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D]/50 font-semibold'
               }`}
             >
               <BarChart2 className={`w-4 h-4 shrink-0 transition-transform duration-150 text-[#E2E8F0] ${activeTab === 'summary' ? 'scale-110' : ''}`} />
               {isSidebarOpen && (
-                <span className="truncate text-left font-semibold text-[#E2E8F0]">
+                <span className="truncate text-left font-semibold">
                   Summary
                 </span>
               )}
@@ -2945,20 +2944,20 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             <button
               onClick={() => setActiveTab('orders')}
               title={`Orders (${scopedOrders.length} records)`}
-              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
+              className={`w-fit flex items-center gap-2.5 px-3.5 py-2 rounded-full text-xs transition-all duration-200 cursor-pointer whitespace-nowrap ${
                 activeTab === 'orders'
-                  ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-xs font-bold border border-[#2D3E72]'
-                  : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D] font-semibold'
+                  ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-sm font-bold border border-[#2D3E72]'
+                  : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D]/50 font-semibold'
               }`}
             >
               <FileText className={`w-4 h-4 shrink-0 transition-transform duration-150 text-[#E2E8F0] ${activeTab === 'orders' ? 'scale-110' : ''}`} />
               {isSidebarOpen && (
-                <span className="truncate text-left font-semibold text-[#E2E8F0]">
+                <span className="truncate text-left font-semibold">
                   Orders
                 </span>
               )}
               {isSidebarOpen && (
-                <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-[#080E21] text-[#E2E8F0] border border-[#1E2C58]">
+                <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-[#080E21] text-[#E2E8F0] border border-[#1E2C58]">
                   {scopedOrders.length}
                 </span>
               )}
@@ -2970,20 +2969,20 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             <button
               onClick={() => setActiveTab('followup')}
               title={`Followup History (${scopedFollowupHistory.length} logs)`}
-              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
+              className={`w-fit flex items-center gap-2.5 px-3.5 py-2 rounded-full text-xs transition-all duration-200 cursor-pointer whitespace-nowrap ${
                 activeTab === 'followup'
-                  ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-xs font-bold border border-[#2D3E72]'
-                  : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D] font-semibold'
+                  ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-sm font-bold border border-[#2D3E72]'
+                  : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D]/50 font-semibold'
               }`}
             >
               <History className={`w-4 h-4 shrink-0 transition-transform duration-150 text-[#E2E8F0] ${activeTab === 'followup' ? 'scale-110' : ''}`} />
               {isSidebarOpen && (
-                <span className="truncate text-left font-semibold text-[#E2E8F0]">
+                <span className="truncate text-left font-semibold">
                   Followup History
                 </span>
               )}
               {isSidebarOpen && (
-                <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-[#080E21] text-[#E2E8F0] border border-[#1E2C58]">
+                <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-[#080E21] text-[#E2E8F0] border border-[#1E2C58]">
                   {scopedFollowupHistory.length}
                 </span>
               )}
@@ -2995,15 +2994,15 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             <button
               onClick={() => setActiveTab('agent-performance')}
               title="Agent Performance"
-              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
+              className={`w-fit flex items-center gap-2.5 px-3.5 py-2 rounded-full text-xs transition-all duration-200 cursor-pointer whitespace-nowrap ${
                 activeTab === 'agent-performance'
-                  ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-xs font-bold border border-[#2D3E72]'
-                  : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D] font-semibold'
+                  ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-sm font-bold border border-[#2D3E72]'
+                  : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D]/50 font-semibold'
               }`}
             >
               <TrendingUp className={`w-4 h-4 shrink-0 transition-transform duration-150 text-[#E2E8F0] ${activeTab === 'agent-performance' ? 'scale-110' : ''}`} />
               {isSidebarOpen && (
-                <span className="truncate text-left font-semibold text-[#E2E8F0]">
+                <span className="truncate text-left font-semibold">
                   Agent Performance
                 </span>
               )}
@@ -3011,7 +3010,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           )}
 
           {/* Administration Section */}
-          {(isTabAllowed('users') || isTabAllowed('category-mapping')) && (
+          {(isTabAllowed('profiles') || isTabAllowed('users') || isTabAllowed('category-mapping')) && (
             <>
               {isSidebarOpen && (
                 <div className="px-3 pt-3 pb-1 text-[10px] font-bold tracking-wider text-[#94A3B8] uppercase border-t border-[#1E2C58] mt-2">
@@ -3019,25 +3018,27 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 </div>
               )}
 
-              {/* 6. User Details */}
+
+
+              {/* 5. User Details */}
               {isTabAllowed('users') && (
                 <button
                   onClick={() => setActiveTab('users')}
                   title={`User Details (${agents.length} users)`}
-                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
+                  className={`w-fit flex items-center gap-2.5 px-3.5 py-2 rounded-full text-xs transition-all duration-200 cursor-pointer whitespace-nowrap ${
                     activeTab === 'users'
-                      ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-xs font-bold border border-[#2D3E72]'
-                      : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D] font-semibold'
+                      ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-sm font-bold border border-[#2D3E72]'
+                      : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D]/50 font-semibold'
                   }`}
                 >
                   <Users className={`w-4 h-4 shrink-0 transition-transform duration-150 text-[#E2E8F0] ${activeTab === 'users' ? 'scale-110' : ''}`} />
                   {isSidebarOpen && (
-                    <span className="truncate text-left font-semibold text-[#E2E8F0]">
+                    <span className="truncate text-left font-semibold">
                       User Details
                     </span>
                   )}
                   {isSidebarOpen && (
-                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-[#080E21] text-[#E2E8F0] border border-[#1E2C58]">
+                    <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-[#080E21] text-[#E2E8F0] border border-[#1E2C58]">
                       {agents.length}
                     </span>
                   )}
@@ -3046,45 +3047,27 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
 
 
-              {/* 7. Category Mapping */}
+              {/* 6. Category Mapping */}
               {isTabAllowed('category-mapping') && (
                 <button
                   onClick={() => setActiveTab('category-mapping')}
                   title="Category Mapping"
-                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
+                  className={`w-fit flex items-center gap-2.5 px-3.5 py-2 rounded-full text-xs transition-all duration-200 cursor-pointer whitespace-nowrap ${
                     activeTab === 'category-mapping'
-                      ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-xs font-bold border border-[#2D3E72]'
-                      : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D] font-semibold'
+                      ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-sm font-bold border border-[#2D3E72]'
+                      : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D]/50 font-semibold'
                   }`}
                 >
                   <Layers className={`w-4 h-4 shrink-0 transition-transform duration-150 text-[#E2E8F0] ${activeTab === 'category-mapping' ? 'scale-110' : ''}`} />
                   {isSidebarOpen && (
-                    <span className="truncate text-left font-semibold text-[#E2E8F0]">
+                    <span className="truncate text-left font-semibold">
                       Category Mapping
                     </span>
                   )}
                 </button>
               )}
 
-              {/* 8. Google Sheet & Tabs */}
-              {isTabAllowed('sheet-connection') && (
-                <button
-                  onClick={() => setActiveTab('sheet-connection')}
-                  title="Google Sheet & Dynamic Tabs"
-                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
-                    activeTab === 'sheet-connection'
-                      ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-xs font-bold border border-[#2D3E72]'
-                      : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D] font-semibold'
-                  }`}
-                >
-                  <FileSpreadsheet className={`w-4 h-4 shrink-0 transition-transform duration-150 text-[#E2E8F0] ${activeTab === 'sheet-connection' ? 'scale-110' : ''}`} />
-                  {isSidebarOpen && (
-                    <span className="truncate text-left font-semibold text-[#E2E8F0]">
-                      Google Sheet &amp; Tabs
-                    </span>
-                  )}
-                </button>
-              )}
+
             </>
           )}
 
@@ -3128,22 +3111,41 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               </span>
             </div>
 
-            {/* 2. Refresh Sheet */}
+            {/* 2. Google Sheet Hub (Quick Access) */}
+            {isTabAllowed('sheet-connection') && (
+              <button
+                onClick={() => setActiveTab('sheet-connection')}
+                className={`p-2.5 rounded-xl border transition-all cursor-pointer shadow-xs flex items-center gap-2 group ${
+                  activeTab === 'sheet-connection'
+                    ? 'bg-teal-600 border-teal-500 text-white'
+                    : 'bg-[#111C3D] border-[#1E2C58] text-teal-400 hover:bg-[#16234D]'
+                }`}
+                title="Google Sheet & Connection Hub"
+              >
+                <FileSpreadsheet className={`w-4 h-4 transition-transform group-hover:scale-110 ${activeTab === 'sheet-connection' ? 'text-white' : 'text-teal-400'}`} />
+                <span className={`text-xs font-bold hidden md:inline ${activeTab === 'sheet-connection' ? 'text-white' : 'text-[#E2E8F0]'}`}>
+                  Sheet Hub
+                </span>
+              </button>
+            )}
+
+            {/* 3. Global Refresh Action */}
             <button
               onClick={() => onRefreshOrders()}
               disabled={isRefreshing}
-              className="min-w-[120px] px-3 py-1.5 bg-[#111C3D] hover:bg-[#16234D] text-[#E2E8F0] rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border border-[#1E2C58] transition-colors cursor-pointer"
+              className="p-2.5 bg-[#111C3D] hover:bg-[#16234D] border border-[#1E2C58] text-[#E2E8F0] rounded-xl transition-all cursor-pointer shadow-xs disabled:opacity-50 group flex items-center gap-2"
+              title="Refresh All Sheet Data"
             >
-              <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#E2E8F0]' : ''}`} />
-              <span>{isRefreshing ? 'Refreshing...' : 'Refresh Sheet'}</span>
+              <RotateCw className={`w-4 h-4 text-indigo-400 group-hover:text-indigo-300 transition-all ${isRefreshing ? 'animate-spin' : 'group-hover:rotate-180 duration-500'}`} />
+              <span className="text-xs font-bold hidden md:inline">Sync</span>
             </button>
 
-            {/* 3. Add Order */}
+            {/* 4. Add Order CTA */}
             <button
               onClick={() => setIsManagerCreateOrderOpen(true)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-blue-500"
+              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black shadow-lg shadow-indigo-900/20 transition-all flex items-center gap-2 cursor-pointer active:scale-95 group"
             >
-              <Plus className="w-4 h-4 text-white" />
+              <Plus className="w-4 h-4 transition-transform group-hover:rotate-90 duration-300" />
               <span className="text-white">Add Order</span>
             </button>
 
@@ -3167,51 +3169,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         {/* Scrollable Workspace */}
         <main className="flex-1 overflow-y-auto p-6 space-y-6 relative z-10">
           {/* TAB: PROFILE & ACCOUNT */}
-          {activeTab === 'profiles' && (
-            <div className="space-y-6 max-w-5xl mx-auto">
-              <div className="bg-[#111C3D] border border-[#1E2C58] rounded-3xl p-6 sm:p-8 text-[#E2E8F0] shadow-xl">
-                <AgentProfileView
-                  currentAgent={{
-                    user: managerProfile.user,
-                    pass: managerProfile.pass,
-                    name: managerProfile.name,
-                    role: managerProfile.role || 'Manager',
-                    team: managerProfile.team || 'Manager',
-                    contact: managerProfile.contact,
-                    email: managerProfile.email,
-                    address: managerProfile.address,
-                    bloodGroup: managerProfile.bloodGroup,
-                    gender: managerProfile.gender,
-                    birthday: managerProfile.birthday,
-                    status: 'active'
-                  }}
-                  onUpdateAgentProfile={(updated) => {
-                    const updatedMgr: ManagerUser = {
-                      user: updated.user,
-                      pass: updated.pass,
-                      name: updated.name,
-                      role: updated.role || 'Manager',
-                      team: updated.team || 'Manager',
-                      contact: updated.contact,
-                      email: updated.email,
-                      address: updated.address,
-                      bloodGroup: updated.bloodGroup,
-                      gender: updated.gender,
-                      birthday: updated.birthday,
-                      permissions: managerProfile.permissions
-                    };
-                    setManagerProfile(updatedMgr);
-                    const updatedAgents = agents.map(a => a.user === updatedMgr.user ? { ...a, ...updatedMgr } : a);
-                    onUpdateAgents(updatedAgents, true);
-                    showToast('Profile updated successfully!');
-                  }}
-                  orders={orders}
-                  followupHistory={followupHistory}
-                  onViewOrderJourney={(ord) => setViewJourneyOrder(ord)}
-                />
-              </div>
-            </div>
-          )}
+
+
+
 
           {/* TAB: GOOGLE SHEET & DYNAMIC TABS */}
           {activeTab === 'sheet-connection' && (
@@ -5348,7 +5308,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       const isDeliv = quickUpdateStatus.toLowerCase() === 'delivered';
                       const isCanc = quickUpdateStatus.toLowerCase() === 'cancelled';
                       const nowTs = OrderService.getBdtTimestamp();
-                      await onUpdateOrderStatus?.(
+                      const res = await onUpdateOrderStatus?.(
                         quickUpdateOrderId,
                         {
                           followupStatus: quickUpdateStatus,
@@ -5383,7 +5343,12 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       setQuickUpdateScheduledTime('');
                       setQuickUpdateNotes('');
                       await onRefreshOrders?.();
-                      showToast(`Order #${updatedOId} followup updated & form reset!`);
+                      
+                      if (res && res.remoteSynced) {
+                        showToast(`✓ Order #${updatedOId} updated & synced to Google Sheets!`);
+                      } else {
+                        showToast(`⚠️ Local update saved, but Sheet sync failed: ${res?.error || 'Check Script URL'}`);
+                      }
                     } finally {
                       setIsSavingStatus(false);
                     }
@@ -7746,7 +7711,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       {/* Modal: Full Agent Details Card */}
       {selectedAgentDetails && (
         <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm transition-all duration-300 ${
-          isSidebarOpen ? 'pl-4 sm:pl-72' : 'pl-4 sm:pl-24'
+          isSidebarOpen ? 'pl-4 sm:pl-60' : 'pl-4 sm:pl-20'
         }`}>
           <div className="bg-[#111C3D] rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#1E2C58] space-y-4 max-h-[92vh] overflow-y-auto text-[#E2E8F0] select-none">
             <div className="flex items-center justify-between pb-3 border-b border-[#1E2C58]">
@@ -7963,7 +7928,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       {/* Modal: Edit Agent Profile & Permissions Popup */}
       {editingUserModal && (
         <div className={`fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm overflow-y-auto transition-all duration-300 ${
-          isSidebarOpen ? 'pl-4 sm:pl-72' : 'pl-4 sm:pl-24'
+          isSidebarOpen ? 'pl-4 sm:pl-60' : 'pl-4 sm:pl-20'
         }`}>
           <div className="bg-[#111C3D] rounded-3xl max-w-xl w-full shadow-2xl border border-[#1E2C58] overflow-hidden animate-fadeIn my-6 max-h-[92vh] flex flex-col text-[#E2E8F0]">
             <div className="p-5 bg-[#0E1736] border-b border-[#1E2C58] text-[#E2E8F0] flex items-center justify-between">
