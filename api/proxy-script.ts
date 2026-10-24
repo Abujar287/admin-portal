@@ -39,8 +39,10 @@ export default async function handler(req: any, res: any) {
     });
 
     const text = await response.text();
+    console.log('Apps Script response text:', text);
 
     if (text.trim().toLowerCase().startsWith('<!doctype html') || text.toLowerCase().includes('<html')) {
+      console.error('Apps Script returned HTML, likely an error page.');
       return res.status(502).json({ success: false, error: 'Invalid Google Script URL or configuration. Please check your Web App URL.' });
     }
 
