@@ -30,13 +30,13 @@
     "teamLeaderId": "TL Karim",
     "permissions": {
       "canCreate": true,
-      "canUpdateStatus": false,
-      "canChangeSchedule": false,
-      "canChangeValue": false,
-      "canAddProfit": false,
-      "allowedOrderStatuses": [],
-      "allowedTabs": ["summary","orders","profiles"],
-      "orderScope": "my_orders"
+      "canUpdateStatus": true,
+      "canChangeSchedule": true,
+      "canChangeValue": true,
+      "canAddProfit": true,
+      "allowedOrderStatuses": ["Pending","In Progress","Confirmed","Follow-up","Delivered","Cancelled","Returned"],
+      "allowedTabs": ["summary","orders","followup","profiles"],
+      "orderScope": "all_orders"
     }
   },
   {
@@ -91,12 +91,12 @@
     "permissions": {
       "canCreate": true,
       "canUpdateStatus": true,
-      "canChangeSchedule": false,
-      "canChangeValue": false,
-      "canAddProfit": false,
-      "allowedOrderStatuses": [],
-      "allowedTabs": ["orders","summary"],
-      "orderScope": "my_orders"
+      "canChangeSchedule": true,
+      "canChangeValue": true,
+      "canAddProfit": true,
+      "allowedOrderStatuses": ["Pending","In Progress","Confirmed","Follow-up","Delivered","Cancelled","Returned"],
+      "allowedTabs": ["orders","followup","summary"],
+      "orderScope": "all_orders"
     }
   }
 ]

@@ -341,8 +341,19 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                       key={`fol-row-${hist.id || hist.followupId || histIdx}-${histIdx}`} 
                       className="transition-colors hover:bg-slate-50/80"
                     >
-                      <td className="py-3 px-3.5 font-mono text-slate-800 whitespace-nowrap">
-                        {hist.orderId}
+                      <td className="py-3 px-3.5 font-mono whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const ord = orders.find((o) => String(o.order_id || o.id) === String(hist.orderId));
+                            if (ord) onViewOrder(ord);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-mono text-xs font-black text-amber-300 hover:text-white bg-amber-950/70 hover:bg-amber-900 border border-amber-500/60 hover:border-amber-400 shadow-sm transition-all cursor-pointer ring-1 ring-amber-500/20"
+                          title="Click to view & update Order details"
+                        >
+                          <span className="text-amber-400 font-bold">#</span>
+                          <span>{hist.orderId}</span>
+                        </button>
                       </td>
                       <td className="py-3 px-3.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">
                         {hist.timestamp}
@@ -360,13 +371,17 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                                 onViewCustomer(hist.customerContact);
                               }
                             }}
-                            className="hover:underline text-slate-900 hover:text-indigo-600 font-bold cursor-pointer text-left"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-xs font-black text-blue-300 hover:text-white bg-blue-950/70 hover:bg-blue-900 border border-blue-500/60 hover:border-blue-400 shadow-sm transition-all cursor-pointer ring-1 ring-blue-500/20"
                             title="Click to view Customer 360 profile"
                           >
-                            {hist.customerName || '-'}
+                            <span className="text-blue-400 font-bold">CID:</span>
+                            <span>{(() => {
+                              const ord = orders.find((o) => String(o.order_id || o.id) === String(hist.orderId));
+                              return ord?.customer_id || ord?.customerId || hist.customerName || '-';
+                            })()}</span>
                           </button>
                         ) : (
-                          hist.customerName || '-'
+                          <span className="font-semibold text-slate-800">{hist.customerName || '-'}</span>
                         )}
                       </td>
                       <td className="py-3 px-3.5 font-mono text-slate-600 whitespace-nowrap">

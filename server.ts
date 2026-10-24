@@ -112,9 +112,9 @@ async function startServer() {
       const cacheKey = `${targetSheetId}__${targetSheetName.toLowerCase()}`;
 
       let sheetNames: string[] = ['orders', 'Sheet5', 'Followup', 'users', 'users details'];
-
-      // 1. Instant Cache Return (sub-millisecond response)
       const cached = sheetCache.get(cacheKey);
+
+      // Instant cache hit if not forcing refresh
       if (!isForce && cached && (Date.now() - cached.timestamp < 60000)) {
         return res.json({
           success: true,
@@ -127,67 +127,104 @@ async function startServer() {
         });
       }
 
+      console.log(`[/api/fetch-orders] Requested tab: "${requestedTab}", target: "${targetSheetName}", isForce: ${isForce}`);
+
       let rows: any[][] = [];
 
-      // 2. High-speed GViz CSV Export (streams 100,000 rows in 1-2s vs 40s+ for XLSX)
-      try {
-        const csvUrl = `https://docs.google.com/spreadsheets/d/${targetSheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(targetSheetName)}`;
-        const csvController = new AbortController();
-        const timeoutId = setTimeout(() => csvController.abort(), 45000);
-
-        const csvRes = await fetch(csvUrl, {
-          headers: { 'Accept': 'text/csv, text/plain, */*' },
-          signal: csvController.signal,
-          redirect: 'follow'
-        });
-        clearTimeout(timeoutId);
-
-        if (csvRes.ok) {
-          const csvText = await csvRes.text();
-          if (!csvText.includes('<!doctype html') && !csvText.includes('sign in to google')) {
-            rows = parseFastCsv(csvText);
-          }
-        }
-      } catch (gvizErr) {
-        console.warn('High-speed GViz CSV fetch failed, attempting alternate stream:', gvizErr);
-      }
-
-      // 3. Fallback: Direct sheet export CSV URL
-      if (!rows || rows.length <= 1) {
+      // 1. For default or 'orders' tab: Direct CSV export yields all 10,000+ unfiltered rows in ~200ms
+      if (!requestedTab || targetSheetName.toLowerCase() === 'orders') {
         try {
-          const altCsvUrl = `https://docs.google.com/spreadsheets/d/${targetSheetId}/export?format=csv&sheet=${encodeURIComponent(targetSheetName)}`;
-          const altRes = await fetch(altCsvUrl, { redirect: 'follow' });
-          if (altRes.ok) {
-            const altText = await altRes.text();
-            if (!altText.includes('<!doctype html') && !altText.includes('sign in to google')) {
-              rows = parseFastCsv(altText);
+          const directCsvUrl = `https://docs.google.com/spreadsheets/d/${targetSheetId}/export?format=csv`;
+          const csvController = new AbortController();
+          const timeoutId = setTimeout(() => csvController.abort(), 20000);
+
+          const csvRes = await fetch(directCsvUrl, {
+            headers: { 'Accept': 'text/csv, text/plain, */*' },
+            signal: csvController.signal,
+            redirect: 'follow'
+          });
+          clearTimeout(timeoutId);
+
+          if (csvRes.ok) {
+            const csvText = await csvRes.text();
+            if (!csvText.includes('<!doctype html') && !csvText.includes('sign in to google')) {
+              const parsedRows = parseFastCsv(csvText);
+              if (parsedRows.length > 5) {
+                rows = parsedRows;
+              }
             }
           }
-        } catch (altErr) {
-          console.warn('Alternate CSV stream failed:', altErr);
+        } catch (directCsvErr) {
+          console.warn('Direct CSV orders export warning:', directCsvErr);
         }
       }
 
-      // 4. Fallback only if CSV completely fails: XLSX metadata export
-      if (!rows || rows.length <= 1) {
+      // 2. Multi-tab XLSX export (parses all tabs: orders, Followup, users details in ~1s)
+      if (!rows || rows.length <= 5) {
         try {
           const xlsxUrl = `https://docs.google.com/spreadsheets/d/${targetSheetId}/export?format=xlsx`;
-          const xlsxRes = await fetch(xlsxUrl, { redirect: 'follow' });
+          const xlsxController = new AbortController();
+          const timeoutId = setTimeout(() => xlsxController.abort(), 30000);
+
+          const xlsxRes = await fetch(xlsxUrl, { redirect: 'follow', signal: xlsxController.signal });
+          clearTimeout(timeoutId);
+
           if (xlsxRes.ok) {
             const arrayBuf = await xlsxRes.arrayBuffer();
             const buffer = Buffer.from(arrayBuf);
-            const workbook = XLSX.read(buffer, { type: 'buffer' });
+            const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
             if (workbook.SheetNames && workbook.SheetNames.length > 0) {
               sheetNames = workbook.SheetNames;
-              const worksheet = workbook.Sheets[targetSheetName] || workbook.Sheets[sheetNames[0]];
-              if (worksheet) {
-                const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false }) as any[][];
-                rows = rawRows.filter(r => Array.isArray(r) && r.some(c => c !== undefined && c !== null && String(c).trim() !== ''));
+              console.log(`[XLSX] Found sheet names:`, sheetNames);
+
+              // Pre-cache all available sheets from the workbook
+              for (const sName of sheetNames) {
+                const ws = workbook.Sheets[sName];
+                if (ws) {
+                  const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false }) as any[][];
+                  const filtered = rawRows.filter(r => Array.isArray(r) && r.some(c => c !== undefined && c !== null && String(c).trim() !== ''));
+                  console.log(`[XLSX] Sheet "${sName}" filtered rows: ${filtered.length}, target: "${targetSheetName}"`);
+                  const k = `${targetSheetId}__${sName.toLowerCase()}`;
+                  sheetCache.set(k, {
+                    data: filtered,
+                    tabs: sheetNames,
+                    total: Math.max(0, filtered.length - 1),
+                    timestamp: Date.now()
+                  });
+                  if (sName.toLowerCase() === targetSheetName.toLowerCase()) {
+                    rows = filtered;
+                  }
+                }
+              }
+
+              // Fallback match if requested sheet wasn't exact match
+              if (!rows || rows.length === 0) {
+                const targetWs = workbook.Sheets[targetSheetName] || workbook.Sheets[sheetNames[0]];
+                if (targetWs) {
+                  const rawRows = XLSX.utils.sheet_to_json(targetWs, { header: 1, raw: false }) as any[][];
+                  rows = rawRows.filter(r => Array.isArray(r) && r.some(c => c !== undefined && c !== null && String(c).trim() !== ''));
+                }
               }
             }
           }
         } catch (xlsxErr) {
-          console.warn('XLSX fallback also failed:', xlsxErr);
+          console.warn('XLSX multi-tab stream warning:', xlsxErr);
+        }
+      }
+
+      // 3. Last fallback: GViz query export
+      if (!rows || rows.length <= 1) {
+        try {
+          const gvizUrl = `https://docs.google.com/spreadsheets/d/${targetSheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(targetSheetName)}`;
+          const gvizRes = await fetch(gvizUrl, { redirect: 'follow' });
+          if (gvizRes.ok) {
+            const gvizText = await gvizRes.text();
+            if (!gvizText.includes('<!doctype html') && !gvizText.includes('sign in to google')) {
+              rows = parseFastCsv(gvizText);
+            }
+          }
+        } catch (gvizErr) {
+          console.warn('GViz fallback warning:', gvizErr);
         }
       }
 

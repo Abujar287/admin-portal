@@ -225,6 +225,15 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const userMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    const matchedUser = users.find(u => u && u.user && String(u.user).toLowerCase() === String(currentManager.user || '').toLowerCase());
+    setManagerProfile(prev => ({
+      ...prev,
+      ...currentManager,
+      ...(matchedUser || {})
+    }));
+  }, [currentManager, users]);
+
+  useEffect(() => {
     if (isLocked) {
       sessionStorage.setItem('portal_screen_locked', 'true');
     } else {
@@ -325,25 +334,29 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
     setActiveTabState(tab);
   };
 
+  // Order View Scope toggle: 'all' (All Orders) vs 'my' (My Orders)
+  const [orderScopeFilter, setOrderScopeFilter] = useState<'all' | 'my'>('all');
+
   const userOrderScope: 'my_orders' | 'all_orders' = useMemo(() => {
     if (currentUserPermissions?.orderScope) {
       return currentUserPermissions.orderScope;
     }
-    if (isSuperAdminOrFullManager) return 'all_orders';
-    return 'my_orders';
-  }, [currentUserPermissions, isSuperAdminOrFullManager]);
+    return 'all_orders';
+  }, [currentUserPermissions]);
 
-  // Scoped orders based on userOrderScope
+  // Scoped orders based on orderScopeFilter
   const scopedOrders = useMemo(() => {
-    if (userOrderScope !== 'my_orders') return orders;
-    const curUserId = String(currentManager.user || '').trim().toLowerCase();
-    const curUserName = String(currentManager.name || '').trim().toLowerCase();
-    return orders.filter((r) => {
-      const aId = String(r.agent_id || r.agentId || '').trim().toLowerCase();
-      const aNm = String(r.agent_name || r.agentName || '').trim().toLowerCase();
-      return aId === curUserId || aNm === curUserName || aNm === curUserId;
-    });
-  }, [orders, userOrderScope, currentManager]);
+    if (orderScopeFilter === 'my') {
+      const curUserId = String(currentManager.user || '').trim().toLowerCase();
+      const curUserName = String(currentManager.name || '').trim().toLowerCase();
+      return orders.filter((r) => {
+        const aId = String(r.agent_id || r.agentId || '').trim().toLowerCase();
+        const aNm = String(r.agent_name || r.agentName || '').trim().toLowerCase();
+        return aId === curUserId || aNm === curUserName || aNm === curUserId || aId.replace(/^@/, '') === curUserId;
+      });
+    }
+    return orders;
+  }, [orders, orderScopeFilter, currentManager]);
 
   // Scoped followup history based on role & permissions
   const scopedFollowupHistory = useMemo(() => {
@@ -465,7 +478,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
   const handleOpenOrderModal = (ord: OrderItem) => {
     setViewJourneyOrder(ord);
-    setStatusModalOrder(ord);
     setModalFollowupStatus(ord.followup_status || ord.followupStatus || 'Pending');
     const oVal = String(ord.order_value ?? ord.orderValue ?? '');
     setModalOrderValue(oVal);
@@ -2047,13 +2059,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
         const val = deferredSearchValue.trim().toLowerCase();
         if (searchType === 'order_id') {
           const idStr = String(r.order_id || r.id || '').toLowerCase();
-          if (idStr !== val) return false;
+          if (!idStr.includes(val)) return false;
         } else if (searchType === 'customer_id') {
           const cIdStr = String(r.customer_id || r.customerId || '').trim().toLowerCase();
-          if (cIdStr !== val) return false;
+          if (!cIdStr.includes(val)) return false;
         } else if (searchType === 'customer_mobile') {
           const cStr = String(r.customer_mobile || r.customerContact || '').toLowerCase();
-          if (cStr !== val) return false;
+          if (!cStr.includes(val)) return false;
         } else if (searchType === 'customer_name') {
           const nStr = String(r.customer_name || r.customerName || '').toLowerCase();
           if (!nStr.includes(val)) return false;
@@ -2979,6 +2991,26 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 </button>
               )}
 
+              {/* 5. My Profile */}
+              {isTabAllowed('profiles') && (
+                <button
+                  onClick={() => setActiveTab('profiles')}
+                  title="My Profile"
+                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
+                    activeTab === 'profiles'
+                      ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-xs font-bold border border-[#2D3E72]'
+                      : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D] font-semibold'
+                  }`}
+                >
+                  <User className={`w-4 h-4 shrink-0 transition-transform duration-150 text-[#E2E8F0] ${activeTab === 'profiles' ? 'scale-110' : ''}`} />
+                  {isSidebarOpen && (
+                    <span className="truncate text-left font-semibold text-[#E2E8F0]">
+                      My Profile
+                    </span>
+                  )}
+                </button>
+              )}
+
               {/* 7. Category Mapping */}
               {isTabAllowed('category-mapping') && (
                 <button
@@ -2994,6 +3026,26 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                   {isSidebarOpen && (
                     <span className="truncate text-left font-semibold text-[#E2E8F0]">
                       Category Mapping
+                    </span>
+                  )}
+                </button>
+              )}
+
+              {/* 8. Google Sheet & Tabs */}
+              {isTabAllowed('sheet-connection') && (
+                <button
+                  onClick={() => setActiveTab('sheet-connection')}
+                  title="Google Sheet & Dynamic Tabs"
+                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
+                    activeTab === 'sheet-connection'
+                      ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-xs font-bold border border-[#2D3E72]'
+                      : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D] font-semibold'
+                  }`}
+                >
+                  <FileSpreadsheet className={`w-4 h-4 shrink-0 transition-transform duration-150 text-[#E2E8F0] ${activeTab === 'sheet-connection' ? 'scale-110' : ''}`} />
+                  {isSidebarOpen && (
+                    <span className="truncate text-left font-semibold text-[#E2E8F0]">
+                      Google Sheet &amp; Tabs
                     </span>
                   )}
                 </button>
@@ -3015,13 +3067,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             <span className="text-[#1E2C58]">•</span>
             <h1 className="text-lg font-extrabold text-[#E2E8F0] capitalize">
               {activeTab === 'summary' && 'Analytics & Summary'}
-              {activeTab === 'orders' && (userOrderScope === 'my_orders' ? 'My Orders Database' : 'All Orders Database')}
+              {activeTab === 'orders' && (orderScopeFilter === 'my' ? `My Orders (${currentManager.user})` : 'All Orders Database')}
               {activeTab === 'followup' && 'All Followup History & Audit Logs'}
               {activeTab === 'agent-performance' && 'Agent Performance Report'}
               {activeTab === 'users' && 'User Details (Agent Directory)'}
               {activeTab === 'category-mapping' && 'Category, Team & Status Mapping'}
               {activeTab === 'sheet-connection' && 'Google Sheet & Dynamic Tabs Hub'}
-              {activeTab === 'profiles' && 'Profile & Account'}
+              {activeTab === 'profiles' && 'My Profile & Account'}
             </h1>
           </div>
 
@@ -3087,6 +3139,98 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 <ChevronDown className={`w-3.5 h-3.5 text-[#94A3B8] transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180 text-[#E2E8F0]' : ''}`} />
               </button>
 
+              {/* User Dropdown Menu */}
+              {isUserMenuOpen && (
+                <div 
+                  className="absolute right-0 top-full mt-2 w-64 bg-[#0E1736] border border-[#1E2C58] rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95 duration-150 overflow-hidden"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* User Profile Header */}
+                  <div className="px-4 py-3 border-b border-[#1E2C58] bg-[#111C3D]/60">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs">
+                        {(managerProfile.name || managerProfile.user || 'M')
+                          .split(' ')
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .map(w => w[0].toUpperCase())
+                          .join('') || 'M'}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-bold text-[#E2E8F0] truncate">
+                          {managerProfile.name || managerProfile.user}
+                        </span>
+                        <span className="text-[11px] text-[#94A3B8] font-mono truncate">
+                          User ID: #{managerProfile.user}
+                        </span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-900/60 text-blue-300 border border-blue-700/50">
+                            {managerProfile.role || 'Agent'}
+                          </span>
+                          {managerProfile.team && (
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-900/60 text-indigo-300 border border-indigo-700/50 truncate max-w-[80px]">
+                              {managerProfile.team}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Menu Options */}
+                  <div className="p-1.5 space-y-0.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('profiles');
+                        setIsUserMenuOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-[#E2E8F0] hover:bg-[#1E2C58] transition-colors cursor-pointer text-left"
+                    >
+                      <User className="w-4 h-4 text-blue-400" />
+                      <span>My Profile</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('orders');
+                        setIsUserMenuOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-[#E2E8F0] hover:bg-[#1E2C58] transition-colors cursor-pointer text-left"
+                    >
+                      <FileText className="w-4 h-4 text-indigo-400" />
+                      <span>All Orders Database</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsLocked(true);
+                        setIsUserMenuOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 hover:bg-[#1E2C58] transition-colors cursor-pointer text-left"
+                    >
+                      <Lock className="w-4 h-4 text-amber-400" />
+                      <span>Lock Screen</span>
+                    </button>
+
+                    <div className="my-1 border-t border-[#1E2C58]" />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        onLogout();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition-colors cursor-pointer text-left"
+                    >
+                      <LogOut className="w-4 h-4 text-rose-400" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>
@@ -4761,6 +4905,47 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             <div className="space-y-4">
               {/* Filters Card */}
               <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-md space-y-4 sticky top-0 z-30">
+                {/* Scope selector tabs & order count header */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setOrderScopeFilter('all'); setOrderPage(1); }}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        orderScopeFilter === 'all'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      All Orders ({orders.length.toLocaleString()})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setOrderScopeFilter('my'); setOrderPage(1); }}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        orderScopeFilter === 'my'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      My Orders ({orders.filter(o => {
+                        const curId = String(currentManager.user || '').trim().toLowerCase();
+                        const curNm = String(currentManager.name || '').trim().toLowerCase();
+                        const aId = String(o.agent_id || o.agentId || '').trim().toLowerCase();
+                        const aNm = String(o.agent_name || o.agentName || '').trim().toLowerCase();
+                        return aId === curId || aNm === curNm || aNm === curId || aId.replace(/^@/, '') === curId;
+                      }).length.toLocaleString()})
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-500 font-medium">Database:</span>
+                    <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                      {orderScopeFilter === 'all' ? `All Orders: ${orders.length.toLocaleString()} records` : `My Orders: ${scopedOrders.length.toLocaleString()} records`}
+                    </span>
+                  </div>
+                </div>
+
                 <div className="flex items-center gap-4">
                   {/* Create Date Filter */}
                   <div className="flex-1">
@@ -4889,9 +5074,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     </span>
                     <span className="text-[#1E2C58]">•</span>
                     <span className="text-[#E2E8F0] font-mono text-[11px] bg-[#0E1736] font-bold px-2.5 py-0.5 rounded-full border border-[#1E2C58]">
-                      {userOrderScope === 'my_orders'
-                        ? `My Orders (${currentManager.user}): ${scopedOrders.length}`
-                        : `Sheet Total: ${orders.length}`}
+                      {orderScopeFilter === 'my'
+                        ? `My Orders (${currentManager.user}): ${scopedOrders.length.toLocaleString()}`
+                        : `All Orders Total: ${orders.length.toLocaleString()}`}
                     </span>
                   </div>
 
@@ -5008,10 +5193,33 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               className="group hover:bg-[#16234D] transition-colors duration-150 cursor-pointer"
                             >
                               <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[#E2E8F0] sticky left-0 z-10 bg-[#111C3D] group-hover:bg-[#16234D] border-r border-[#1E2C58] transition-colors duration-150">
-                                {ord.order_id || ord.id}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setViewJourneyOrder(ord);
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-mono text-xs font-black text-amber-300 hover:text-white bg-amber-950/70 hover:bg-amber-900 border border-amber-500/60 hover:border-amber-400 shadow-sm transition-all cursor-pointer ring-1 ring-amber-500/20"
+                                  title="Click to view & update Order details"
+                                >
+                                  <span className="text-amber-400 font-bold">#</span>
+                                  <span>{ord.order_id || ord.id}</span>
+                                </button>
                               </td>
-                              <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[#E2E8F0]">
-                                {ord.customer_id || ord.customerId || '-'}
+                              <td className="py-3 px-3.5 whitespace-nowrap font-mono">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const cId = String(ord.customer_id || ord.customerId || ord.customer_mobile || ord.customerContact || '').trim();
+                                    if (cId) setSelectedCustomerId(cId);
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-mono text-xs font-black text-blue-300 hover:text-white bg-blue-950/70 hover:bg-blue-900 border border-blue-500/60 hover:border-blue-400 shadow-sm transition-all cursor-pointer ring-1 ring-blue-500/20"
+                                  title="Click to view Customer 360 profile, all orders & Master Category"
+                                >
+                                  <span className="text-blue-400 font-bold">CID:</span>
+                                  <span>{ord.customer_id || ord.customerId || '-'}</span>
+                                </button>
                               </td>
                               <td className="py-3 px-3.5 whitespace-nowrap font-mono text-[#94A3B8]">
                                 {ord.customer_mobile || ord.customerContact}
@@ -5021,11 +5229,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    const cId = String(ord.customer_id || ord.customerId || '');
+                                    const cId = String(ord.customer_id || ord.customerId || ord.customer_mobile || ord.customerContact || '').trim();
                                     if (cId) setSelectedCustomerId(cId);
                                   }}
                                   className="hover:underline text-[#E2E8F0] hover:text-blue-400 cursor-pointer font-bold text-left transition-colors"
-                                  title="Click to view customer details"
+                                  title="Click to view customer details, all orders & Master Category"
                                 >
                                   {ord.customer_name || ord.customerName}
                                 </button>
@@ -5421,23 +5629,41 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       >
                         Reset
                       </button>
-                      <button
-                        type="submit"
-                        disabled={!quickUpdateOrderId || isSavingStatus}
-                        className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-emerald-900/30 active:scale-[0.99]"
-                      >
-                        {isSavingStatus ? (
-                          <>
-                            <RotateCw className="w-3.5 h-3.5 animate-spin" />
-                            <span>Syncing...</span>
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Update &amp; Sync Sheet</span>
-                          </>
-                        )}
-                      </button>
+                      {(() => {
+                        const selOrd = orders.find((o) => String(o.order_id || o.id) === String(quickUpdateOrderId));
+                        const fStatus = (selOrd?.followup_status || selOrd?.followupStatus || '').toLowerCase();
+                        const oStatus = (selOrd?.order_status || selOrd?.orderStatus || '').toLowerCase();
+                        const isLocked = Boolean(selOrd) && (
+                          fStatus === 'delivered' ||
+                          fStatus === 'cancelled' ||
+                          oStatus === 'delivered' ||
+                          oStatus === 'cancelled'
+                        );
+                        return (
+                          <button
+                            type="submit"
+                            disabled={!quickUpdateOrderId || isSavingStatus || Boolean(isLocked)}
+                            className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-emerald-900/30 active:scale-[0.99]"
+                          >
+                            {isSavingStatus ? (
+                              <>
+                                <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                                <span>Syncing...</span>
+                              </>
+                            ) : isLocked ? (
+                              <>
+                                <Lock className="w-3.5 h-3.5" />
+                                <span>Locked (Delivered/Cancelled)</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Update &amp; Sync Sheet</span>
+                              </>
+                            )}
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
                 </form>
@@ -7557,6 +7783,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       )}
 
       {/* Modal: Full Order Details & Complete Activity Journey */}
+      {/* Modal: Full Order Details, Follow-up & Activity Journey */}
       {viewJourneyOrder && (
         <OrderJourneyModal
           order={viewJourneyOrder}
@@ -7565,21 +7792,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           currentUser={currentManager}
           onUpdateOrderStatus={onUpdateOrderStatus}
           onRefreshOrders={onRefreshOrders}
-          canEdit={currentManager.permissions?.canUpdateStatus || currentManager.role === 'Manager' || currentManager.role === 'Superadmin'}
-          onViewCustomer={(cId) => setSelectedCustomerId(cId)}
-        />
-      )}
-
-      {/* Modal: Status & Remarks Update Modal */}
-      {statusModalOrder && (
-        <OrderJourneyModal
-          order={statusModalOrder}
-          onClose={() => setStatusModalOrder(null)}
-          followupHistory={followupHistory}
-          currentUser={currentManager}
-          onUpdateOrderStatus={onUpdateOrderStatus}
-          onRefreshOrders={onRefreshOrders}
-          canEdit={currentManager.permissions?.canUpdateStatus || currentManager.role === 'Manager' || currentManager.role === 'Superadmin'}
+          canEdit={true}
           onViewCustomer={(cId) => setSelectedCustomerId(cId)}
         />
       )}

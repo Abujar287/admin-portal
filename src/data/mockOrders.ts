@@ -11,31 +11,54 @@ export const INITIAL_AGENTS: AgentUser[] = [
     status: 'active'
   },
   {
-    user: 'agent1',
-    pass: '123456',
-    name: 'Sarah Agent',
-    role: 'Agent',
-    team: 'Acquisition',
-    email: 'sarah@portal.local',
-    status: 'active'
-  },
-  {
-    user: 'agent2',
-    pass: '123456',
-    name: 'Alex Sales',
-    role: 'Agent',
-    team: 'Sales',
-    email: 'alex@portal.local',
-    status: 'active'
-  },
-  {
     user: '100',
     pass: 'superadmin123',
     name: 'superadmin',
-    role: 'Superadmin',
+    role: 'Team Leader',
     team: 'All',
     email: 'superadmin@gmail.com',
-    status: 'active'
+    status: 'active',
+    teamLeaderId: 'Manager (Admin)'
+  },
+  {
+    user: '2',
+    pass: '123456',
+    name: 'Rahim Ahmed',
+    role: 'Agent',
+    team: 'Acquisition',
+    email: 'rahim@gmail.com',
+    status: 'active',
+    teamLeaderId: 'TL Karim'
+  },
+  {
+    user: '3',
+    pass: '123456',
+    name: 'Karim Ahmed',
+    role: 'Sr Agent',
+    team: 'All',
+    email: 'karim@gmail.com',
+    status: 'active',
+    teamLeaderId: 'TL Karim'
+  },
+  {
+    user: '4',
+    pass: '123456',
+    name: 'Abdul',
+    role: 'Sr Agent',
+    team: 'All',
+    email: 'abdul@gmail.com',
+    status: 'active',
+    teamLeaderId: 'superadmin'
+  },
+  {
+    user: '5',
+    pass: '123456',
+    name: 'Jolil',
+    role: 'Agent',
+    team: 'Call-Center',
+    email: 'jolil@gmail.com',
+    status: 'active',
+    teamLeaderId: 'superadmin'
   }
 ];
 

@@ -436,8 +436,9 @@ export class OrderService {
     const url = scriptUrl || this.getScriptUrl();
     const targetSheetId = extractSheetId(url || '') || DEFAULT_SHEET_ID;
 
-    // Check candidate tabs ('users' requested by user, or 'users details')
-    const candidateTabs = ['users', 'users details', 'Users', 'Users Details'];
+    // IMPORTANT: Tab "users details" is the legitimate staff users tab in the Google Sheet.
+    // Tab "users" is a duplicate of 10,000 customer orders and must NOT be fetched for users!
+    const candidateTabs = ['users details', 'Users Details'];
 
     // 1. Try server proxy route
     for (const tabName of candidateTabs) {
@@ -640,20 +641,34 @@ export class OrderService {
 
     // Case 2: 2D array of rows
     const firstRow = nonNullRows[0].map((h: any) => String(h || '').trim().toLowerCase());
+
+    // Safety: Verify this is an actual users table and not an orders table!
+    const headerStr = firstRow.join(' ').toLowerCase();
+    if (
+      headerStr.includes('order_id') ||
+      headerStr.includes('customer_name') ||
+      headerStr.includes('customer_mobile') ||
+      headerStr.includes('delivery_area') ||
+      headerStr.includes('product_name')
+    ) {
+      console.warn('parseAgentSheetRows: Tab contains customer order data, strictly rejecting to protect admin user list.');
+      return [];
+    }
+
     const findCol = (...candidates: string[]) => {
       for (const cand of candidates) {
         const norm = cand.toLowerCase().replace(/[\s_-]+/g, '');
         const idx = firstRow.findIndex((h: string) => {
           const normH = h.replace(/[\s_-]+/g, '');
-          return normH === norm || h === cand.toLowerCase() || h.includes(cand.toLowerCase());
+          return normH === norm || h === cand.toLowerCase();
         });
         if (idx !== -1) return idx;
       }
       return -1;
     };
 
-    const idxId = findCol('user_id', 'userid', 'user', 'id');
-    const idxName = findCol('user_name', 'username', 'name', 'agent_name');
+    const idxId = findCol('user_id', 'userid', 'user', 'username');
+    const idxName = findCol('user_name', 'username', 'name');
     const idxEmail = findCol('email', 'mail');
     const idxPass = findCol('password', 'pass');
     const idxTeam = findCol('team', 'channel', 'department');
@@ -664,11 +679,16 @@ export class OrderService {
     const idxBlood = findCol('blood group', 'bloodgroup', 'blood');
     const idxStatus = findCol('status');
 
+    if (idxId === -1 && idxName === -1) {
+      console.warn('parseAgentSheetRows: No user_id column found, ignoring tab.');
+      return [];
+    }
+
     const dataRows = nonNullRows.slice(1);
     return dataRows.map((row: any[]): AgentUser | null => {
       const u = String(row[idxId !== -1 ? idxId : 0] || '').trim();
       // Ignore if user cell is header or empty
-      if (!u || u.toLowerCase() === 'user_id' || u.toLowerCase() === 'user') return null;
+      if (!u || u.toLowerCase() === 'user_id' || u.toLowerCase() === 'user' || u.toLowerCase() === 'order_id') return null;
 
       const p = String(row[idxPass !== -1 ? idxPass : 3] || '123456');
       const nm = String(row[idxName !== -1 ? idxName : 1] || u);
@@ -731,11 +751,12 @@ export class OrderService {
             fileAgents = await res.json();
         }
     } catch (e) {
-        console.warn('Failed to fetch user_details.json', e);
+      console.warn('Failed to fetch user_details.json', e);
     }
 
     const map = new Map<string, AgentUser>();
-    // Pre-populate with INITIAL_AGENTS
+
+    // 1. Pre-populate with INITIAL_AGENTS
     if (Array.isArray(INITIAL_AGENTS)) {
       INITIAL_AGENTS.forEach(a => {
         const k = String(a.user || '').trim().toLowerCase();
@@ -743,17 +764,32 @@ export class OrderService {
       });
     }
 
-    // Merge persistent agents
+    // 2. Merge persistent agents from user_details.json
     fileAgents.forEach(a => {
       const k = String(a.user || '').trim().toLowerCase();
       if (k) map.set(k, { ...(map.get(k) || {}), ...a });
     });
 
-    // Merge stored agents (local storage takes precedence)
+    // 3. Merge legitimately created stored agents (strictly filter out any accidental customer order artifacts)
+    const validRoles = ['Manager', 'Admin', 'Superadmin', 'Team Leader', 'Sr Agent', 'Agent'];
     storedAgents.forEach(a => {
-      const k = String(a.user || '').trim().toLowerCase();
-      if (k) {
-        map.set(k, { ...(map.get(k) || {}), ...a });
+      if (!a || !a.user) return;
+      const k = String(a.user).trim().toLowerCase();
+      // Keep if already known from user_details.json or INITIAL_AGENTS
+      if (map.has(k)) {
+        map.set(k, { ...map.get(k)!, ...a });
+        return;
+      }
+      // If it's a real user created by admin in the portal
+      if (
+        a.role &&
+        validRoles.includes(a.role) &&
+        a.pass &&
+        a.name &&
+        !a.name.startsWith('Agent ') &&
+        a.user !== a.name
+      ) {
+        map.set(k, a);
       }
     });
 
@@ -1165,35 +1201,11 @@ export class OrderService {
   }
 
   /**
-   * Automatically extracts and updates agents based on orders present in the Google Sheet.
+   * User accounts are strictly managed via 'users details' Google Sheet tab and Admin user creation.
+   * Auto-extracting agents from orders is disabled to ensure no customers ever become admin users.
    */
-  static async syncAgentsFromOrders(orders: OrderItem[]): Promise<void> {
-    const currentAgents = await this.getAgents();
-    const agentMap = new Map<string, AgentUser>();
-
-    // Seed existing
-    currentAgents.forEach(a => {
-      if (a && a.user) agentMap.set(String(a.user).toLowerCase(), a);
-    });
-
-    // Extract from sheet orders
-    orders.forEach(o => {
-      const cleanId = String(o.agent_id || (o as any).agentId || '').trim();
-      if (!cleanId) return;
-
-      if (!agentMap.has(cleanId.toLowerCase())) {
-        agentMap.set(cleanId.toLowerCase(), {
-          user: cleanId,
-          pass: cleanId, // default pass same as user id
-          name: o.agent_name || (o as any).agentName || `Agent ${cleanId}`,
-          team: o.order_channel || (o as any).orderChannel || 'Acquisition',
-          email: `${cleanId.toLowerCase()}@portal.local`
-        });
-      }
-    });
-
-    const updated = Array.from(agentMap.values());
-    this.saveAgents(updated);
+  static async syncAgentsFromOrders(_orders: OrderItem[]): Promise<void> {
+    return;
   }
 
   /**
@@ -1712,15 +1724,13 @@ export class OrderService {
     const orders = (await this.getLocalOrders()) || [];
     const existingOrder = orders.find((ord) => String(ord.order_id || ord.id) === String(orderId));
 
-    // If order is already Delivered or Cancelled, it CANNOT be edited from ANY access!
+    // If order is already Delivered or Cancelled, disallow modifications
     const currentOrderFollowup = (existingOrder?.followup_status || existingOrder?.followupStatus || '').toLowerCase();
     const currentOrderStatus = (existingOrder?.order_status || existingOrder?.orderStatus || '').toLowerCase();
-    const isCurrentlyLocked = 
-      currentOrderFollowup === 'delivered' || currentOrderFollowup === 'cancelled' ||
-      currentOrderStatus === 'delivered' || currentOrderStatus === 'cancelled';
-    if (isCurrentlyLocked) {
-      console.warn(`Order #${orderId} is locked (Delivered/Cancelled) from all access editing.`);
-      return { updatedOrders: orders, historyItem: undefined, remoteSynced: false };
+    const isAlreadyDeliveredOrCancelled = currentOrderFollowup === 'delivered' || currentOrderFollowup === 'cancelled' || currentOrderStatus === 'delivered' || currentOrderStatus === 'cancelled';
+    if (isAlreadyDeliveredOrCancelled && !(updates as any)._allowLockedEdit) {
+      console.warn(`Order #${orderId} is finalized (${currentOrderFollowup || currentOrderStatus}). Further edits are disabled.`);
+      return { updatedOrders: orders, remoteSynced: false };
     }
 
     // Resolve operator:

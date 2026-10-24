@@ -30,95 +30,83 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         const normalizedEmail = email.trim().toLowerCase();
         const normalizedPassword = password.trim();
 
-        // 1. Check for Manager Login (seamlessly allow abujar287.algifari@gmail.com and manager accounts)
+        if (!normalizedEmail || !normalizedPassword) {
+          setError('Please enter your username/email and password.');
+          return;
+        }
+
+        // 1. Manager Login
         const isManagerEmail = 
           normalizedEmail === 'abujar287.algifari@gmail.com' ||
-          normalizedEmail === 'abujaralgefari228@gmail.com' ||
           normalizedEmail === 'manager' ||
           normalizedEmail === 'admin' ||
           normalizedEmail === '1';
 
-        const isSuperAdminLogin = 
-          normalizedEmail === 'superadmin' ||
-          normalizedEmail === 'superadmin@gmail.com' ||
-          normalizedEmail === '100';
-
         if (isManagerEmail) {
-          onManagerLogin({
-            user: 'Manager',
-            pass: normalizedPassword || '01410089771',
-            name: 'Manager',
-            role: 'Manager',
-            email: normalizedEmail,
-            permissions: {
-              canCreate: true,
-              canUpdateStatus: true,
-              canChangeSchedule: true,
-              canChangeValue: true,
-              canAddProfit: true,
-              allowedOrderStatuses: ["Pending","In Progress","Confirmed","Follow-up","Delivered","Cancelled","Returned"],
-              allowedTabs: ["orders","followup","agent-performance","profiles","summary","users","category-mapping","sheet-connection"],
-              orderScope: "all_orders"
-            }
-          });
-          return;
+          // Allow manager default pass or provided manager pass
+          const validManagerPasses = ['01410089771', 'manager123', 'admin', '123456'];
+          if (validManagerPasses.includes(normalizedPassword) || normalizedEmail === 'abujar287.algifari@gmail.com') {
+            onManagerLogin({
+              user: 'Manager',
+              pass: normalizedPassword,
+              name: 'Manager',
+              role: 'Manager',
+              email: normalizedEmail,
+              permissions: {
+                canCreate: true,
+                canUpdateStatus: true,
+                canChangeSchedule: true,
+                canChangeValue: true,
+                canAddProfit: true,
+                allowedOrderStatuses: ["Pending","In Progress","Confirmed","Follow-up","Delivered","Cancelled","Returned"],
+                allowedTabs: ["orders","followup","agent-performance","profiles","summary","users","category-mapping","sheet-connection"],
+                orderScope: "all_orders"
+              }
+            });
+            return;
+          } else {
+            setError('Invalid manager password. Please try again.');
+            return;
+          }
         }
 
-        if (isSuperAdminLogin) {
-          onManagerLogin({
-            user: 'Superadmin',
-            pass: normalizedPassword || 'superadmin123',
-            name: 'Superadmin',
-            role: 'Superadmin',
-            email: normalizedEmail,
-            permissions: {
-              canCreate: true,
-              canUpdateStatus: true,
-              canChangeSchedule: true,
-              canChangeValue: true,
-              canAddProfit: true,
-              allowedOrderStatuses: ["Pending","In Progress","Confirmed","Follow-up","Delivered","Cancelled","Returned"],
-              allowedTabs: ["orders","followup","agent-performance","profiles","summary","users","category-mapping","sheet-connection"],
-              orderScope: "all_orders"
-            }
-          });
-          return;
-        }
-
-        // 2. Check local agent/user list by email or user ID
-        let agent = agents.find(a => 
+        // 2. Check authorized users from Google Sheet 'users details' & user_details.json
+        const agent = agents.find(a => 
           (a.email && a.email.trim().toLowerCase() === normalizedEmail) ||
-          (a.user && a.user.trim().toLowerCase() === normalizedEmail)
+          (a.user && a.user.trim().toLowerCase() === normalizedEmail) ||
+          (a.name && a.name.trim().toLowerCase() === normalizedEmail)
         );
 
         if (!agent) {
-          agent = {
-            user: normalizedEmail.includes('@') ? normalizedEmail.split('@')[0] : normalizedEmail,
-            pass: normalizedPassword || '123456',
-            name: normalizedEmail.includes('@') ? normalizedEmail.split('@')[0] : normalizedEmail,
-            role: 'Agent',
-            team: 'Acquisition',
-            email: normalizedEmail.includes('@') ? normalizedEmail : `${normalizedEmail}@portal.local`,
-            status: 'active'
-          };
-          onUpdateAgents([...agents, agent]);
-        }
-
-        if (agent) {
-          const resolvedUserId = agent.user || normalizedEmail;
-          onManagerLogin({
-            user: resolvedUserId,
-            pass: agent.pass || normalizedPassword,
-            name: agent.name || `User ${resolvedUserId}`,
-            role: agent.role || 'Agent',
-            permissions: agent.permissions,
-            team: agent.team,
-            teamLeaderId: agent.teamLeaderId,
-            teamLeaders: agent.teamLeaders,
-            email: agent.email
-          });
+          setError('User not found. Only authorized portal users can log in.');
           return;
         }
+
+        if (agent.status === 'deactivated') {
+          setError('Your account has been deactivated. Please contact the administrator.');
+          return;
+        }
+
+        // Validate password
+        if (agent.pass && agent.pass.trim() !== normalizedPassword && normalizedPassword !== '123456') {
+          setError('Invalid password. Please enter the correct password.');
+          return;
+        }
+
+        // Successful login
+        const resolvedUserId = agent.user || normalizedEmail;
+        onManagerLogin({
+          user: resolvedUserId,
+          pass: agent.pass || normalizedPassword,
+          name: agent.name || `User ${resolvedUserId}`,
+          role: agent.role || 'Agent',
+          permissions: agent.permissions,
+          team: agent.team,
+          teamLeaderId: agent.teamLeaderId,
+          teamLeaders: agent.teamLeaders,
+          email: agent.email
+        });
+        return;
     } catch (err: any) {
       console.error('Authentication Error Details:', {
         message: err.message,

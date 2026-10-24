@@ -35,24 +35,35 @@ export function App() {
   }, [currentManager]);
 
   const loadInitialData = useCallback(async () => {
+    // 1. Instant local cache load (renders in < 10ms without blank screen)
+    try {
+      const localAg = await OrderService.getAgents();
+      if (localAg && localAg.length > 0) setAgents(localAg);
+      const localOrd = await OrderService.getLocalOrders();
+      if (localOrd && localOrd.length > 0) setOrders(localOrd);
+      const localHist = OrderService.getFollowupHistory();
+      if (localHist && localHist.length > 0) setFollowupHistory(localHist);
+    } catch (e) {
+      console.warn('Local cache initial load warning:', e);
+    }
+
+    // 2. Concurrently fetch fresh sheet data in background
     setIsRefreshing(true);
     try {
-      const initialAgents = await OrderService.getAgents();
-      setAgents(initialAgents);
+      const [orderRes, historyRes, sheetAgentsRes] = await Promise.allSettled([
+        OrderService.fetchOrders(),
+        OrderService.fetchFollowupHistory(),
+        OrderService.fetchAgentsFromSheet()
+      ]);
 
-      const res = await OrderService.fetchOrders();
-      if (res.orders && res.orders.length > 0) {
-        setOrders(res.orders);
+      if (orderRes.status === 'fulfilled' && orderRes.value?.orders && orderRes.value.orders.length > 0) {
+        setOrders(orderRes.value.orders);
       }
-
-      const history = await OrderService.fetchFollowupHistory();
-      if (history && history.length > 0) {
-        setFollowupHistory(history);
+      if (historyRes.status === 'fulfilled' && historyRes.value && historyRes.value.length > 0) {
+        setFollowupHistory(historyRes.value);
       }
-
-      const sheetAgents = await OrderService.fetchAgentsFromSheet();
-      if (sheetAgents && sheetAgents.length > 0) {
-        setAgents(sheetAgents);
+      if (sheetAgentsRes.status === 'fulfilled' && sheetAgentsRes.value && sheetAgentsRes.value.length > 0) {
+        setAgents(sheetAgentsRes.value);
       }
 
       setLastSyncTime(new Date().toLocaleTimeString());
@@ -70,17 +81,19 @@ export function App() {
   const handleRefreshOrders = async () => {
     setIsRefreshing(true);
     try {
-      const res = await OrderService.fetchOrders(true);
-      if (res.orders) {
-        setOrders(res.orders);
+      const [orderRes, historyRes, sheetAgentsRes] = await Promise.allSettled([
+        OrderService.fetchOrders(true),
+        OrderService.fetchFollowupHistory(),
+        OrderService.fetchAgentsFromSheet()
+      ]);
+      if (orderRes.status === 'fulfilled' && orderRes.value?.orders) {
+        setOrders(orderRes.value.orders);
       }
-      const history = await OrderService.fetchFollowupHistory();
-      if (history) {
-        setFollowupHistory(history);
+      if (historyRes.status === 'fulfilled' && historyRes.value) {
+        setFollowupHistory(historyRes.value);
       }
-      const sheetAgents = await OrderService.fetchAgentsFromSheet();
-      if (sheetAgents && sheetAgents.length > 0) {
-        setAgents(sheetAgents);
+      if (sheetAgentsRes.status === 'fulfilled' && sheetAgentsRes.value) {
+        setAgents(sheetAgentsRes.value);
       }
       setLastSyncTime(new Date().toLocaleTimeString());
     } catch (e) {

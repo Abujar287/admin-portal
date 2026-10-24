@@ -341,9 +341,9 @@ export const AgentProfileView: React.FC<AgentProfileViewProps> = ({
             </span>
           </div>
 
-          {/* 3. Delivered Revinew */}
+          {/* 3. Delivered Revenue */}
           <div className="p-4 sm:p-5">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 block">Delivered Revinew</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 block">Delivered Revenue</span>
             <p className="text-xl sm:text-2xl font-black text-indigo-700 mt-1 tabular-nums font-mono">
               {agentStats.deliveredValue.toLocaleString()}
             </p>

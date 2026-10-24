@@ -1,24 +1,27 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 import { OrderItem, FollowupHistoryItem } from '../types';
 import { OrderService, formatActorUsernameId } from '../services/orderService';
-import { TIME_SLOTS, getTimeSlots } from '../data/mockOrders';
+import { getTimeSlots } from '../data/mockOrders';
 import {
   X,
-  Edit3,
   Copy,
   Check,
-  Package,
-  AlertTriangle,
-  MapPin
+  Calendar,
+  Clock,
+  User,
+  MapPin,
+  Phone,
+  FileText,
+  Save,
+  CheckCircle2,
+  Tag,
+  DollarSign,
+  TrendingUp,
+  History
 } from 'lucide-react';
 
-interface OrderJourneyModalProps {
+export interface OrderJourneyModalProps {
   order: OrderItem | null;
   onClose: () => void;
   followupHistory: FollowupHistoryItem[];
@@ -41,631 +44,576 @@ interface OrderJourneyModalProps {
 export const OrderJourneyModal: React.FC<OrderJourneyModalProps> = ({
   order,
   onClose,
-  followupHistory,
+  followupHistory: initialFollowupHistory,
   currentUser,
   onUpdateOrderStatus,
-  onRefreshOrders,
-  canEdit = true,
   onViewCustomer
 }) => {
   if (!order) return null;
 
   const orderId = String(order.order_id || order.id || '');
-  const [copiedId, setCopiedId] = useState(false);
+  const customerId = String(order.customer_id || order.customerId || '').trim();
 
-  // Independent Single Action States
-  const [singleStatus, setSingleStatus] = useState<string>(
-    order.followup_status || order.followupStatus || 'Pending'
+  // Local followup history for instant optimistic rendering
+  const [localHistory, setLocalHistory] = useState<FollowupHistoryItem[]>(() =>
+    initialFollowupHistory.filter(h => String(h.orderId) === orderId)
   );
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
-  const [singleValue, setSingleValue] = useState<string>(
+  // Field states
+  const [followupStatus, setFollowupStatus] = useState<string>(
+    order.followup_status || order.followupStatus || 'Follow-up'
+  );
+  const [scheduleDate, setScheduleDate] = useState<string>(
+    order.schedule_date || order.scheduleDate || ''
+  );
+  const [scheduleTime, setScheduleTime] = useState<string>(
+    order.schedule_time || order.scheduledTime || ''
+  );
+  const [editOrderValue, setEditOrderValue] = useState<string>(
     String(order.order_value ?? order.orderValue ?? '')
   );
-  const [isUpdatingValue, setIsUpdatingValue] = useState(false);
-  const [valueMsg, setValueMsg] = useState<string | null>(null);
-
-  const [singleProfit, setSingleProfit] = useState<string>(
+  const [editProfit, setEditProfit] = useState<string>(
     String(order.profit ?? '')
   );
-  const [singleProfitPercent, setSingleProfitPercent] = useState<string>(() => {
+  const [editProfitPercent, setEditProfitPercent] = useState<string>(() => {
     const oVal = Number(order.order_value ?? order.orderValue ?? 0);
     const prVal = Number(order.profit ?? 0);
     return oVal > 0 && prVal > 0 ? ((prVal / oVal) * 100).toFixed(1).replace(/\.0$/, '') : '';
   });
-  const [isUpdatingProfit, setIsUpdatingProfit] = useState(false);
-  const [profitMsg, setProfitMsg] = useState<string | null>(null);
-
-  const [singleScheduleDate, setSingleScheduleDate] = useState<string>(
-    order.schedule_date || order.scheduleDate || ''
-  );
-  const [isUpdatingScheduleDate, setIsUpdatingScheduleDate] = useState(false);
-  const [scheduleDateMsg, setScheduleDateMsg] = useState<string | null>(null);
-
-  const [singleScheduleTime, setSingleScheduleTime] = useState<string>(
-    order.schedule_time || order.scheduledTime || ''
-  );
-  const [isUpdatingScheduleTime, setIsUpdatingScheduleTime] = useState(false);
-  const [scheduleTimeMsg, setScheduleTimeMsg] = useState<string | null>(null);
-
-  const [singleAddress, setSingleAddress] = useState<string>(
+  const [editAddress, setEditAddress] = useState<string>(
     order.address_details || order.addressDetails || ''
   );
-  const [isUpdatingAddress, setIsUpdatingAddress] = useState(false);
-  const [addressMsg, setAddressMsg] = useState<string | null>(null);
+  const [optionalNote, setOptionalNote] = useState<string>('');
 
-  // Format operator name: clean IDs without '@' prefix
-  const sessionRole = typeof window !== 'undefined' ? sessionStorage.getItem('portal_session_role') : null;
-  const isManagerRole = 
-    sessionRole === 'manager' ||
-    currentUser.role === 'Manager' || 
-    currentUser.user === '1' ||
-    currentUser.user?.toLowerCase() === 'manager';
+  // UI interaction states
+  const [copiedOrderId, setCopiedOrderId] = useState(false);
+  const [copiedPhone, setCopiedPhone] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittingSection, setSubmittingSection] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Use formatActorUsernameId for standard username_id format (e.g. manager_1)
   const actorUserId = currentUser.user || '1';
   const actorUserName = currentUser.name || currentUser.user || 'User';
   const userDisplayName = formatActorUsernameId(actorUserName, actorUserId);
 
-  const currentFStatus = (order.followup_status || order.followupStatus || '').toLowerCase();
-  const currentOStatus = (order.order_status || order.orderStatus || '').toLowerCase();
-  const isDelivered = currentFStatus === 'delivered' || currentOStatus === 'delivered';
-  const isCancelled = currentFStatus === 'cancelled' || currentOStatus === 'cancelled';
-  const isLocked = isDelivered || isCancelled;
-  const canEditEffective = Boolean(canEdit && !isLocked);
+  const isDeliveredSelected = followupStatus.toLowerCase() === 'delivered';
 
-  const handleProfitChange = (valStr: string) => {
-    setSingleProfit(valStr);
-    const pVal = parseFloat(valStr);
-    const oVal = singleValue !== '' ? parseFloat(singleValue) : Number(order.order_value ?? order.orderValue ?? 0);
-    if (oVal > 0 && !isNaN(pVal)) {
-      setSingleProfitPercent(((pVal / oVal) * 100).toFixed(1).replace(/\.0$/, ''));
-    } else {
-      setSingleProfitPercent('');
-    }
-  };
+  const STATUS_LIST = [
+    'Follow-up',
+    'Confirmed',
+    'In Progress',
+    'Delivered',
+    'Cancelled',
+    'Rescheduled',
+    'Returned',
+    'Pending'
+  ];
 
-  const handleProfitPercentChange = (pctStr: string) => {
-    setSingleProfitPercent(pctStr);
-    const pct = parseFloat(pctStr);
-    const oVal = singleValue !== '' ? parseFloat(singleValue) : Number(order.order_value ?? order.orderValue ?? 0);
-    if (oVal > 0 && !isNaN(pct)) {
-      setSingleProfit(String(Math.round((oVal * pct) / 100)));
-    } else {
-      setSingleProfit('');
-    }
-  };
-
-  const handleApplyProfitPreset = (pct: number) => {
-    setSingleProfitPercent(String(pct));
-    const oVal = singleValue !== '' ? parseFloat(singleValue) : Number(order.order_value ?? order.orderValue ?? 0);
-    if (oVal > 0) {
-      setSingleProfit(String(Math.round((oVal * pct) / 100)));
-    }
-  };
-
-  const handleUpdateProfitOnly = async () => {
-    if (!canEditEffective || !onUpdateOrderStatus || singleProfit === '') return;
-    setIsUpdatingProfit(true);
-    setProfitMsg(null);
-    try {
-      const parsedProfit = parseFloat(singleProfit) || 0;
-
-      await onUpdateOrderStatus(
-        orderId,
-        {
-          profit: parsedProfit
-        },
-        userDisplayName,
-        `Profit updated to ${parsedProfit.toLocaleString()}`
-      );
-      setProfitMsg('Updated!');
-      if (onRefreshOrders) await onRefreshOrders();
-      setTimeout(() => setProfitMsg(null), 2000);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsUpdatingProfit(false);
-    }
-  };
+  const timeSlots = getTimeSlots();
 
   const handleCopyOrderId = () => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(orderId);
-      setCopiedId(true);
-      setTimeout(() => setCopiedId(false), 2000);
+      setCopiedOrderId(true);
+      setTimeout(() => setCopiedOrderId(false), 2000);
     }
   };
 
-  const handleUpdateStatusOnly = async () => {
-    if (!canEditEffective || !onUpdateOrderStatus) return;
-    setIsUpdatingStatus(true);
-    setStatusMsg(null);
+  const handleCopyPhone = () => {
+    const phone = order.customer_mobile || order.customerContact || '';
+    if (phone && navigator.clipboard) {
+      navigator.clipboard.writeText(phone);
+      setCopiedPhone(true);
+      setTimeout(() => setCopiedPhone(false), 2000);
+    }
+  };
+
+  const handleSetQuickDate = (offsetDays: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    setScheduleDate(`${yyyy}-${mm}-${dd}`);
+  };
+
+  const handleProfitChange = (valStr: string) => {
+    setEditProfit(valStr);
+    const pVal = parseFloat(valStr);
+    const oVal = editOrderValue !== '' ? parseFloat(editOrderValue) : Number(order.order_value ?? order.orderValue ?? 0);
+    if (oVal > 0 && !isNaN(pVal)) {
+      setEditProfitPercent(((pVal / oVal) * 100).toFixed(1).replace(/\.0$/, ''));
+    } else {
+      setEditProfitPercent('');
+    }
+  };
+
+  const handleProfitPercentChange = (pctStr: string) => {
+    setEditProfitPercent(pctStr);
+    const pct = parseFloat(pctStr);
+    const oVal = editOrderValue !== '' ? parseFloat(editOrderValue) : Number(order.order_value ?? order.orderValue ?? 0);
+    if (oVal > 0 && !isNaN(pct)) {
+      setEditProfit(String(Math.round((oVal * pct) / 100)));
+    } else {
+      setEditProfit('');
+    }
+  };
+
+  // Execute Individual Update
+  const executeIndividualUpdate = async (
+    sectionKey: string,
+    updates: Partial<OrderItem>,
+    noteToLog: string,
+    successText: string
+  ) => {
+    if (!onUpdateOrderStatus || isSubmitting) return;
+
+    setIsSubmitting(true);
+    setSubmittingSection(sectionKey);
+    setSuccessMsg(null);
+
     try {
-      const isDeliv = singleStatus.toLowerCase() === 'delivered';
-      const isCanc = singleStatus.toLowerCase() === 'cancelled';
-
-      if (isDeliv) {
-        if (!singleProfit || parseFloat(singleProfit) <= 0) {
-          if (!order.profit || order.profit <= 0) {
-            setStatusMsg('Profit required!');
-            setIsUpdatingStatus(false);
-            return;
-          }
-        }
-      }
-
       const nowTs = OrderService.getBdtTimestamp();
-      const currentVal = singleValue !== '' ? parseFloat(singleValue) : Number(order.order_value ?? order.orderValue ?? 0);
+      updates.followup_date = nowTs;
+      updates.followupDate = nowTs;
 
-      let finalProfit = 0;
-      if (isDeliv) {
-        if (singleProfit !== '') {
-          finalProfit = parseFloat(singleProfit) || 0;
-        } else if (order.profit) {
-          finalProfit = order.profit;
-        } else {
-          finalProfit = Math.round(currentVal * 0.20);
-        }
-      } else {
-        finalProfit = singleProfit !== '' ? parseFloat(singleProfit) || 0 : (order.profit || 0);
+      const effectiveNote = optionalNote.trim() 
+        ? `${noteToLog} | Note: ${optionalNote.trim()}`
+        : noteToLog;
+
+      const newHistoryItem: FollowupHistoryItem = {
+        id: `local_${Date.now()}`,
+        followupId: localHistory.length + 1,
+        orderId: orderId,
+        customerName: order.customer_name || order.customerName || '',
+        customerContact: order.customer_mobile || order.customerContact || '',
+        previousStatus: order.followup_status || order.followupStatus || 'Pending',
+        newStatus: updates.followup_status || followupStatus,
+        orderStatus: updates.order_status || 'Pending',
+        orderValue: updates.order_value !== undefined ? Number(updates.order_value) : Number(order.order_value || 0),
+        scheduleDate: updates.schedule_date !== undefined ? updates.schedule_date : scheduleDate,
+        scheduledTime: updates.schedule_time !== undefined ? updates.schedule_time : scheduleTime,
+        updatedBy: actorUserId,
+        updatedByName: actorUserName,
+        timestamp: nowTs,
+        action: sectionKey,
+        notes: effectiveNote
+      };
+      setLocalHistory(prev => [newHistoryItem, ...prev]);
+
+      await onUpdateOrderStatus(orderId, updates, userDisplayName, effectiveNote);
+
+      if (optionalNote.trim()) {
+        setOptionalNote('');
       }
 
-      await onUpdateOrderStatus(
-        orderId,
-        {
-          followup_status: singleStatus,
-          followupStatus: singleStatus,
-          order_status: 'Pending',
-          orderStatus: 'Pending',
-          profit: finalProfit,
-          delivered_date: isDeliv ? nowTs : '',
-          deliveredDate: isDeliv ? nowTs : '',
-          cancelled_date: isCanc ? nowTs : '',
-          cancelledDate: isCanc ? nowTs : '',
-          followup_date: nowTs,
-          followupDate: nowTs
-        },
-        userDisplayName,
-        `Status updated to ${singleStatus}`
-      );
-      setStatusMsg('Updated!');
-      if (onRefreshOrders) await onRefreshOrders();
-      setTimeout(() => {
-        setStatusMsg(null);
-        onClose();
-      }, 600);
-    } catch (err) {
-      console.error(err);
+      setSuccessMsg(successText);
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (err: any) {
+      console.error('Update failed:', err);
+      setSuccessMsg('Error: ' + (err?.message || 'Update failed'));
+      setTimeout(() => setSuccessMsg(null), 4000);
     } finally {
-      setIsUpdatingStatus(false);
+      setIsSubmitting(false);
+      setSubmittingSection(null);
     }
   };
 
-  const handleUpdateValueOnly = async () => {
-    if (!canEditEffective || !onUpdateOrderStatus || singleValue === '') return;
-    setIsUpdatingValue(true);
-    setValueMsg(null);
-    try {
-      const parsedVal = parseFloat(singleValue);
-      const isDeliv = (order.followup_status || order.followupStatus || '').toLowerCase() === 'delivered';
+  // Individual Updaters
+  const handleUpdateStatus = () => {
+    const isNowDeliv = followupStatus.toLowerCase() === 'delivered';
+    const isNowCanc = followupStatus.toLowerCase() === 'cancelled';
+    const nowTs = OrderService.getBdtTimestamp();
 
-      let calculatedProfit = order.profit || 0;
-      if (singleProfitPercent !== '') {
-        calculatedProfit = Math.round((parsedVal * parseFloat(singleProfitPercent)) / 100);
-        setSingleProfit(String(calculatedProfit));
-      } else if (singleProfit !== '') {
-        calculatedProfit = parseFloat(singleProfit) || 0;
-      } else if (isDeliv) {
-        calculatedProfit = Math.round(parsedVal * 0.20);
-      }
+    const updates: Partial<OrderItem> = {
+      followup_status: followupStatus,
+      followupStatus: followupStatus,
+      order_status: isNowDeliv ? 'Delivered' : (isNowCanc ? 'Cancelled' : 'Pending'),
+      orderStatus: isNowDeliv ? 'Delivered' : (isNowCanc ? 'Cancelled' : 'Pending')
+    };
 
-      await onUpdateOrderStatus(
-        orderId,
-        {
-          order_value: parsedVal,
-          orderValue: parsedVal,
-          profit: calculatedProfit
-        },
-        userDisplayName,
-        `Price updated to ${parsedVal.toLocaleString()}`
-      );
-      setValueMsg('Updated!');
-      if (onRefreshOrders) await onRefreshOrders();
-      setTimeout(() => setValueMsg(null), 2000);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsUpdatingValue(false);
+    if (isNowDeliv) {
+      updates.delivered_date = nowTs;
+      updates.deliveredDate = nowTs;
+      const prVal = editProfit !== '' ? parseFloat(editProfit) : Number(order.profit || 0);
+      updates.profit = prVal > 0 ? prVal : Math.round(Number(editOrderValue || order.order_value || 0) * 0.2);
     }
+    if (isNowCanc) {
+      updates.cancelled_date = nowTs;
+      updates.cancelledDate = nowTs;
+    }
+
+    executeIndividualUpdate('status', updates, `Status updated to ${followupStatus}`, `Status updated to ${followupStatus}!`);
   };
 
-  const handleUpdateScheduleDateOnly = async () => {
-    if (!canEditEffective || !onUpdateOrderStatus) return;
-    setIsUpdatingScheduleDate(true);
-    setScheduleDateMsg(null);
-    try {
-      await onUpdateOrderStatus(
-        orderId,
-        {
-          schedule_date: singleScheduleDate,
-          scheduleDate: singleScheduleDate
-        },
-        userDisplayName,
-        `Schedule Date updated to ${singleScheduleDate}`
-      );
-      setScheduleDateMsg('Updated!');
-      if (onRefreshOrders) await onRefreshOrders();
-      setTimeout(() => setScheduleDateMsg(null), 2000);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsUpdatingScheduleDate(false);
-    }
+  const handleUpdateDate = () => {
+    executeIndividualUpdate('date', { schedule_date: scheduleDate, scheduleDate: scheduleDate }, `Schedule date set to ${scheduleDate || 'Unscheduled'}`, 'Schedule date updated!');
   };
 
-  const handleUpdateScheduleTimeOnly = async () => {
-    if (!canEditEffective || !onUpdateOrderStatus) return;
-    setIsUpdatingScheduleTime(true);
-    setScheduleTimeMsg(null);
-    try {
-      await onUpdateOrderStatus(
-        orderId,
-        {
-          schedule_time: singleScheduleTime,
-          scheduledTime: singleScheduleTime
-        },
-        userDisplayName,
-        `Time Slot updated to ${singleScheduleTime}`
-      );
-      setScheduleTimeMsg('Updated!');
-      if (onRefreshOrders) await onRefreshOrders();
-      setTimeout(() => setScheduleTimeMsg(null), 2000);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsUpdatingScheduleTime(false);
-    }
+  const handleUpdateSlot = () => {
+    executeIndividualUpdate('slot', { schedule_time: scheduleTime, scheduledTime: scheduleTime }, `Delivery slot set to ${scheduleTime || 'None'}`, 'Delivery slot updated!');
   };
 
-  const handleUpdateAddressOnly = async () => {
-    if (!canEditEffective || !onUpdateOrderStatus || isUpdatingAddress) return;
-    setIsUpdatingAddress(true);
-    setAddressMsg(null);
-    try {
-      const trimmed = singleAddress.trim();
-      await onUpdateOrderStatus(
-        orderId,
-        {
-          address_details: trimmed,
-          addressDetails: trimmed
-        },
-        userDisplayName,
-        `Address updated to "${trimmed}"`
-      );
-      setAddressMsg('Updated!');
-      if (onRefreshOrders) await onRefreshOrders();
-      setTimeout(() => setAddressMsg(null), 2500);
-    } catch (err) {
-      console.error(err);
-      setAddressMsg('Failed');
-    } finally {
-      setIsUpdatingAddress(false);
-    }
+  const handleUpdateValueAndProfit = () => {
+    const parsedVal = editOrderValue !== '' ? parseFloat(editOrderValue) : Number(order.order_value ?? order.orderValue ?? 0);
+    const parsedProfit = editProfit !== '' ? parseFloat(editProfit) : Number(order.profit || 0);
+
+    const updates: Partial<OrderItem> = {
+      order_value: parsedVal,
+      orderValue: parsedVal,
+      profit: parsedProfit
+    };
+
+    executeIndividualUpdate('value', updates, `Order value updated to ৳${parsedVal} (Profit: ৳${parsedProfit})`, 'Order value & profit updated!');
   };
+
+  const handleUpdateAddress = () => {
+    const trimmedAddress = editAddress.trim();
+    executeIndividualUpdate('address', { address_details: trimmedAddress, addressDetails: trimmedAddress }, `Address updated: ${trimmedAddress}`, 'Address updated!');
+  };
+
+  const phone = order.customer_mobile || order.customerContact || '';
 
   return ReactDOM.createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-3 sm:p-5 backdrop-blur-sm overflow-y-auto animate-fadeIn select-none" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-[#111C3D] rounded-3xl max-w-4xl w-full max-h-[94vh] flex flex-col shadow-2xl border border-[#1E2C58] overflow-hidden my-auto text-[#E2E8F0]">
+    /* Outer Backdrop: Clicking outside DOES NOT close the modal per user specification */
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/85 p-2 sm:p-4 backdrop-blur-md overflow-y-auto animate-fadeIn select-none">
+      
+      {/* Modal Dialog Card */}
+      <div 
+        className="bg-[#111C3D] rounded-2xl max-w-3xl w-full max-h-[94vh] flex flex-col shadow-2xl border border-[#1E2C58] overflow-hidden my-auto text-[#E2E8F0]"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* MODAL HEADER */}
-        <div className="px-6 py-3.5 bg-[#0E1736] text-[#E2E8F0] flex items-center justify-between shrink-0 border-b border-[#1E2C58]">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#111C3D] border border-[#1E2C58] text-[#E2E8F0] font-extrabold flex items-center justify-center text-xs shadow-md">
-              #{orderId}
+        <div className="px-4 py-3 bg-[#0E1736] text-[#E2E8F0] flex items-center justify-between shrink-0 border-b border-[#1E2C58]">
+          <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
+            {/* Highlighted Order ID Badge */}
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-950/90 text-amber-300 border border-amber-500/60 shadow-xs font-mono font-black text-xs">
+              <span>Order #{orderId}</span>
+              <button
+                type="button"
+                onClick={handleCopyOrderId}
+                title="Copy Order ID"
+                className="p-0.5 rounded hover:bg-amber-900/60 text-amber-300 hover:text-white transition-colors cursor-pointer"
+              >
+                {copiedOrderId ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+              </button>
             </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-sm font-black text-[#E2E8F0] tracking-tight flex items-center gap-2">
-                  <span>Order Details &amp; Quick Updates</span>
-                  <button
-                    onClick={handleCopyOrderId}
-                    title="Copy Order ID"
-                    className="p-1 rounded-lg hover:bg-[#111C3D] text-[#E2E8F0] transition-colors cursor-pointer text-[11px] flex items-center gap-1 font-mono border border-[#1E2C58]"
-                  >
-                    {copiedId ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-[#E2E8F0]" />}
-                    <span>{copiedId ? 'Copied' : 'Copy'}</span>
-                  </button>
-                </h2>
-                
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-                    isDelivered
-                      ? 'bg-emerald-950/70 text-emerald-300 border-emerald-800/60'
-                      : isCancelled
-                      ? 'bg-rose-950/70 text-rose-300 border-rose-800/60'
-                      : 'bg-amber-950/70 text-amber-300 border-amber-800/60'
-                  }`}
+
+            {/* Highlighted Customer ID Badge */}
+            {customerId && (
+              <button
+                type="button"
+                onClick={() => onViewCustomer && onViewCustomer(customerId)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-950/90 hover:bg-blue-900 text-blue-300 hover:text-white border border-blue-500/60 transition-all font-mono font-bold text-xs shadow-xs cursor-pointer"
+                title="Click to view Customer Profile & All Orders"
+              >
+                <User className="w-3 h-3 text-blue-400" />
+                <span>CID: {customerId}</span>
+              </button>
+            )}
+
+            <span className="text-xs font-semibold text-[#E2E8F0]">
+              {order.customer_name || order.customerName || 'Customer'}
+            </span>
+            {phone && (
+              <span className="inline-flex items-center gap-1 font-mono text-emerald-400 text-xs bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40">
+                <Phone className="w-3 h-3" />
+                <a href={`tel:${phone}`} className="hover:underline font-bold">{phone}</a>
+              </span>
+            )}
+          </div>
+
+          {/* Prominent Close (X) Button */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-xl bg-[#16234D] hover:bg-rose-950/60 hover:text-rose-300 hover:border-rose-700/60 text-[#94A3B8] border border-[#1E2C58] flex items-center justify-center transition-colors cursor-pointer shrink-0 ml-2 shadow-xs"
+            title="Close Popup (Esc)"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Success Message Banner */}
+        {successMsg && (
+          <div className={`px-4 py-1.5 text-xs font-bold flex items-center gap-2 border-b transition-all ${
+            successMsg.startsWith('Error') 
+              ? 'bg-rose-950/80 text-rose-300 border-rose-800/60' 
+              : 'bg-emerald-950/80 text-emerald-300 border-emerald-800/60'
+          }`}>
+            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+            <span>{successMsg}</span>
+          </div>
+        )}
+
+        {/* MODAL BODY: EXACT 2-ROW DESIGN AS REQUESTED */}
+        <div className="p-4 overflow-y-auto space-y-4 flex-1 bg-[#090E21]">
+          
+          {/* 1. 2-ROW EDITABLE CONTROLS SECTION */}
+          <div className="space-y-3">
+            
+            {/* ROW 1: Status & Update */}
+            <div className="bg-[#0E1736] p-3.5 rounded-xl border border-[#1E2C58] flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="w-full sm:w-1/3">
+                <label className="block text-xs font-black uppercase text-[#CBD5E1] mb-1 flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Status</span>
+                </label>
+                <select
+                  value={followupStatus}
+                  onChange={(e) => setFollowupStatus(e.target.value)}
+                  className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0] focus:border-blue-500 focus:outline-hidden"
                 >
-                  ● {order.followup_status || order.followupStatus || 'Pending'}
-                </span>
+                  {STATUS_LIST.map((st) => (
+                    <option key={st} value={st}>{st}</option>
+                  ))}
+                </select>
               </div>
-              <p className="text-[11px] text-[#94A3B8] mt-0.5">
-                Customer:{' '}
-                {onViewCustomer ? (
+
+              {/* Profit if Delivered */}
+              {isDeliveredSelected && (
+                <div className="w-full sm:w-1/3 bg-emerald-950/40 p-2 rounded-lg border border-emerald-700/60 flex items-center gap-2">
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-emerald-300 font-bold mb-0.5">Profit (৳)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={editProfit}
+                      onChange={(e) => handleProfitChange(e.target.value)}
+                      placeholder="Profit"
+                      className="w-full px-2 py-1 text-xs font-mono font-bold rounded border border-emerald-700 bg-[#080E21] text-emerald-300"
+                    />
+                  </div>
+                  <div className="w-20">
+                    <label className="block text-[10px] text-emerald-300 font-bold mb-0.5">Profit %</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={editProfitPercent}
+                      onChange={(e) => handleProfitPercentChange(e.target.value)}
+                      placeholder="%"
+                      className="w-full px-2 py-1 text-xs font-mono font-bold rounded border border-emerald-700 bg-[#080E21] text-emerald-300"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="w-full sm:w-auto self-end">
+                <button
+                  type="button"
+                  onClick={handleUpdateStatus}
+                  disabled={isSubmitting}
+                  className="w-full sm:w-auto px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{submittingSection === 'status' ? 'Updating...' : 'Update Status'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* ROW 2: Schedule Date, Slot, Value, Address, Note with individual update buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              
+              {/* Schedule Date */}
+              <div className="bg-[#0E1736] p-3 rounded-xl border border-[#1E2C58] space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black uppercase text-[#CBD5E1] flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Schedule Date</span>
+                  </label>
                   <button
                     type="button"
-                    onClick={() => onViewCustomer(String(order.customer_id || order.customerId))}
-                    className="text-[#E2E8F0] font-bold hover:underline cursor-pointer inline-flex items-center gap-1"
-                    title="Click to view Customer 360 profile & history"
+                    onClick={() => handleSetQuickDate(0)}
+                    className="text-[10px] font-bold text-indigo-300 hover:underline cursor-pointer"
                   >
-                    <span>{order.customer_name || order.customerName}</span>
-                    <span className="text-[10px] text-[#94A3B8]">({order.customer_id || order.customerId})</span>
+                    Today
                   </button>
-                ) : (
-                  <strong className="text-[#E2E8F0]">{order.customer_name || order.customerName}</strong>
-                )}{' '}
-                ({order.customer_mobile || order.customerContact}) • Agent: <strong className="text-[#E2E8F0]">{order.agent_name || order.agentName}</strong>
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-xl text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D] transition-colors cursor-pointer"
-            title="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* MODAL CONTENT BODY */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-[#0B132B] text-[#E2E8F0]">
-
-          {isLocked && (
-            <div className="bg-amber-950/60 border border-amber-700/80 text-amber-200 px-4 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-2xs">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>This order is {isDelivered ? 'Delivered' : 'Cancelled'} and can no longer be edited.</span>
-            </div>
-          )}
-
-          {!isLocked && !canEditEffective && (
-            <div className="bg-[#111C3D] border border-[#1E2C58] text-[#E2E8F0] px-4 py-2.5 rounded-2xl text-xs font-semibold flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-[#94A3B8] shrink-0" />
-              <span>View-only mode • Order editing is restricted to Manager access.</span>
-            </div>
-          )}
-
-          {/* COMPACT INDIVIDUAL UPDATE ACTIONS */}
-          {canEditEffective && (
-            <div className="bg-[#111C3D] rounded-3xl p-5 border border-[#1E2C58] shadow-sm space-y-4 text-[#E2E8F0]">
-              <div className="flex items-center justify-between border-b border-[#1E2C58] pb-3">
-                <h3 className="font-black text-xs uppercase tracking-widest text-[#E2E8F0] flex items-center gap-2">
-                  <Edit3 className="w-4 h-4 text-blue-400" />
-                  <span>Quick Field Updates</span>
-                </h3>
-                <span className="text-[10px] font-bold text-[#E2E8F0] bg-[#0E1736] border border-[#1E2C58] px-2 py-0.5 rounded-full">Pro Mode Enabled</span>
+                </div>
+                <input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  className="w-full px-2.5 py-1.5 text-xs font-mono font-medium rounded-lg border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0]"
+                />
+                <button
+                  type="button"
+                  onClick={handleUpdateDate}
+                  disabled={isSubmitting}
+                  className="w-full py-1.5 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer flex items-center justify-center gap-1"
+                >
+                  <span>Update Date</span>
+                </button>
               </div>
 
-              {singleStatus.toLowerCase() === 'delivered' ? (
-                <div className="p-5 rounded-2xl bg-[#0E1736] border border-[#1E2C58] space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-emerald-400 uppercase tracking-widest">
-                      ✓ Delivered Order Configuration
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                    {[
-                      { label: 'Status', type: 'select', value: singleStatus, setter: setSingleStatus, options: ['Pending', 'Confirmed', 'Follow-up', 'Delivered', 'Cancelled'] },
-                      { label: 'Profit ()', type: 'number', value: singleProfit, setter: handleProfitChange, placeholder: 'Enter Profit' },
-                      { label: 'Value ()', type: 'number', value: singleValue, setter: setSingleValue, placeholder: 'Order Value' },
-                      { label: '%', type: 'number', value: singleProfitPercent, setter: handleProfitPercentChange, placeholder: '%' },
-                    ].map((field) => (
-                      <div key={field.label}>
-                        <label className="block text-[10px] font-bold text-[#94A3B8] mb-1.5 uppercase">{field.label}</label>
-                        {field.type === 'select' ? (
-                          <select value={field.value} onChange={(e) => field.setter(e.target.value)} className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0] focus:border-blue-500 transition-all cursor-pointer">
-                            {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                          </select>
-                        ) : (
-                          <input
-                            type="number"
-                            value={field.value}
-                            onChange={(e) => field.setter(e.target.value)}
-                            placeholder={field.placeholder}
-                            className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0] focus:border-blue-500 transition-all shadow-2xs"
-                          />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center justify-end pt-2">
-                    <button
-                      type="button"
-                      disabled={isUpdatingStatus || !singleProfit || parseFloat(singleProfit) <= 0}
-                      onClick={handleUpdateStatusOnly}
-                      className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-black tracking-wide transition-all cursor-pointer shadow-lg"
-                    >
-                      {isUpdatingStatus ? 'Updating...' : 'Update Delivered Status'}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {[
-                    { label: 'Status', value: singleStatus, setter: setSingleStatus, action: handleUpdateStatusOnly, isUpdating: isUpdatingStatus, msg: statusMsg },
-                    { label: 'Value', value: singleValue, setter: setSingleValue, action: handleUpdateValueOnly, isUpdating: isUpdatingValue, msg: valueMsg },
-                    { label: 'Schedule Date', value: singleScheduleDate, setter: setSingleScheduleDate, action: handleUpdateScheduleDateOnly, isUpdating: isUpdatingScheduleDate, msg: scheduleDateMsg },
-                    { label: 'Time Slot', value: singleScheduleTime, setter: setSingleScheduleTime, action: handleUpdateScheduleTimeOnly, isUpdating: isUpdatingScheduleTime, msg: scheduleTimeMsg }
-                  ].map((field) => (
-                    <div key={field.label} className="p-3 rounded-xl bg-[#0E1736] border border-[#1E2C58] flex flex-col gap-2">
-                      <label className="text-[10px] font-bold uppercase text-[#94A3B8]">{field.label}</label>
-                      {field.label === 'Status' ? (
-                        <select value={field.value} onChange={(e) => field.setter(e.target.value)} className="w-full px-2 py-1.5 text-xs font-bold rounded-lg border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0] cursor-pointer">
-                          {['Pending', 'Confirmed', 'Follow-up', 'Delivered', 'Cancelled'].map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                        </select>
-                      ) : field.label === 'Time Slot' ? (
-                        <select value={field.value} onChange={(e) => field.setter(e.target.value)} className="w-full px-2 py-1.5 text-xs font-bold rounded-lg border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0] cursor-pointer">
-                            <option value="">-- Slot --</option>
-                            {getTimeSlots().map(slot => <option key={slot} value={slot}>{slot}</option>)}
-                        </select>
-                      ) : (
-                        <input type={field.label === 'Schedule Date' ? 'date' : 'text'} value={field.value} onChange={(e) => field.setter(e.target.value)} className="w-full px-2 py-1.5 text-xs font-semibold rounded-lg border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0]" />
-                      )}
-                      <button
-                        type="button"
-                        disabled={field.isUpdating}
-                        onClick={field.action}
-                        className="w-full py-1.5 bg-[#1E2C58] hover:bg-[#2A3E78] text-[#E2E8F0] border border-[#2D3E72] rounded-lg text-[11px] font-bold transition-all cursor-pointer shadow-2xs"
-                      >
-                        {field.isUpdating ? '...' : 'Save'}
-                      </button>
-                    </div>
+              {/* Delivery Slot */}
+              <div className="bg-[#0E1736] p-3 rounded-xl border border-[#1E2C58] space-y-2">
+                <label className="text-xs font-black uppercase text-[#CBD5E1] flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Delivery Slot</span>
+                </label>
+                <select
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0]"
+                >
+                  <option value="">-- Select Slot --</option>
+                  {timeSlots.map((slot) => (
+                    <option key={slot} value={slot}>{slot}</option>
                   ))}
-                </div>
-              )}
+                </select>
+                <button
+                  type="button"
+                  onClick={handleUpdateSlot}
+                  disabled={isSubmitting}
+                  className="w-full py-1.5 px-3 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold cursor-pointer flex items-center justify-center gap-1"
+                >
+                  <span>Update Slot</span>
+                </button>
+              </div>
 
-              {/* Address Update */}
-              {isManagerRole && (
-                <div className="p-4 rounded-2xl bg-[#0E1736] border border-[#1E2C58] space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-black uppercase text-[#E2E8F0] tracking-widest flex items-center gap-1.5">
-                      <MapPin className="w-4 h-4 text-blue-400" />
-                      <span>Customer Delivery Address</span>
-                    </label>
-                    <span className="text-[10px] font-bold text-[#E2E8F0] bg-[#111C3D] border border-[#1E2C58] px-2 py-0.5 rounded-full">
-                      🔒 Manager Only
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <textarea
-                      rows={2}
-                      value={singleAddress}
-                      onChange={(e) => setSingleAddress(e.target.value)}
-                      placeholder="Enter customer delivery address..."
-                      className="flex-1 px-3 py-2 text-xs font-semibold rounded-xl border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0] placeholder-[#64748B] focus:border-blue-500"
-                    />
-                    <button
-                      type="button"
-                      disabled={isUpdatingAddress || !singleAddress.trim()}
-                      onClick={handleUpdateAddressOnly}
-                      className="px-4 bg-[#1E2C58] hover:bg-[#2A3E78] border border-[#2D3E72] disabled:opacity-50 text-[#E2E8F0] rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md"
-                    >
-                      {isUpdatingAddress ? 'Saving...' : 'Update'}
-                    </button>
-                  </div>
+              {/* Order Value */}
+              <div className="bg-[#0E1736] p-3 rounded-xl border border-[#1E2C58] space-y-2">
+                <label className="text-xs font-black uppercase text-[#CBD5E1] flex items-center gap-1.5">
+                  <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Order Value</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-400">৳</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={editOrderValue}
+                    onChange={(e) => setEditOrderValue(e.target.value)}
+                    placeholder="Value"
+                    className="w-full pl-6 pr-2.5 py-1.5 text-xs font-mono font-bold rounded-lg border border-[#1E2C58] bg-[#080E21] text-amber-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
                 </div>
-              )}
-            </div>
-          )}
+                <button
+                  type="button"
+                  onClick={handleUpdateValueAndProfit}
+                  disabled={isSubmitting}
+                  className="w-full py-1.5 px-3 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold cursor-pointer flex items-center justify-center gap-1"
+                >
+                  <span>Update Value</span>
+                </button>
+              </div>
 
-          {/* COMPACT ORDER SUMMARY */}
-          <div className="bg-[#111C3D] rounded-2xl p-3.5 border border-[#1E2C58] shadow-2xs space-y-2">
-            <div className="flex items-center justify-between border-b border-[#1E2C58] pb-1.5">
-              <h3 className="font-extrabold text-xs uppercase tracking-wider text-[#E2E8F0] flex items-center gap-1.5">
-                <Package className="w-3.5 h-3.5 text-blue-400" />
-                <span>Order Summary (#{orderId})</span>
-              </h3>
-              <span className="text-[10px] text-[#94A3B8] font-mono">22 fields</span>
-            </div>
-            
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1.5 text-xs py-1">
-              {[
-                { label: 'Order ID', value: order.order_id || order.id },
-                { label: 'Order Date', value: OrderService.formatDateTime(order.create_date || order.createDate || '') },
-                { label: 'Channel', value: order.order_channel || order.orderChannel },
-                { label: 'Category', value: order.product_category || order.productCategory },
-                { label: 'Customer', value: order.customer_name || order.customerName },
-                { label: 'Mobile', value: order.customer_mobile || order.customerContact },
-                { label: 'Gender', value: order.gender },
-                { label: 'Product', value: order.product_name || order.productName },
-                { label: 'City', value: order.city },
-                { label: 'Delivery Area', value: order.delivery_area || order.deliveryArea },
-                { label: 'Schedule Date', value: order.schedule_date || order.scheduleDate },
-                { label: 'Schedule Time', value: order.schedule_time || order.scheduledTime },
-                { label: 'Agent ID', value: order.agent_id || order.agentId },
-                { label: 'Agent Name', value: order.agent_name || order.agentName },
-                { label: 'Order Value', value: ` ${((order.order_value ?? order.orderValue) || 0).toLocaleString()}` },
-                { label: 'Profit', value: ` ${((order.profit ?? 0) || 0).toLocaleString()}` },
-                { label: 'Order Status', value: order.order_status || order.orderStatus },
-                { label: 'Followup Status', value: order.followup_status || order.followupStatus },
-                { label: 'Delivered Date', value: order.delivered_date ? OrderService.formatDateTime(order.delivered_date) : '-' },
-                { label: 'Cancelled Date', value: order.cancelled_date ? OrderService.formatDateTime(order.cancelled_date) : '-' },
-                { label: 'Customer ID', value: order.customer_id || order.customerId },
-                { label: 'Address', value: order.address_details || order.addressDetails, span: 'col-span-2 sm:col-span-3' }
-              ].map((item, idx) => {
-                const isCustomerField = (item.label === 'Customer ID' || item.label === 'Customer') && onViewCustomer;
-                return (
-                  <div key={`order-detail-field-${item.label}-${idx}`} className={`flex items-baseline gap-1.5 py-0.5 border-b border-[#1E2C58]/40 ${item.span || ''}`}>
-                    <span className="text-[10px] text-[#94A3B8] font-medium whitespace-nowrap min-w-[70px]">{item.label}:</span>
-                    {isCustomerField ? (
-                      <button
-                        type="button"
-                        onClick={() => onViewCustomer(String(order.customer_id || order.customerId))}
-                        className="text-[11px] font-bold text-blue-400 hover:text-blue-300 hover:underline cursor-pointer truncate text-left"
-                        title="Click to view Customer 360 profile"
-                      >
-                        {item.value || '-'}
-                      </button>
-                    ) : (
-                      <span className="text-[11px] font-semibold text-[#E2E8F0] truncate" title={String(item.value || '-')}>{item.value || '-'}</span>
-                    )}
-                  </div>
-                );
-              })}
+              {/* Address */}
+              <div className="bg-[#0E1736] p-3 rounded-xl border border-[#1E2C58] space-y-2">
+                <label className="text-xs font-black uppercase text-[#CBD5E1] flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Address</span>
+                </label>
+                <input
+                  type="text"
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                  placeholder="Address..."
+                  className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#1E2C58] bg-[#080E21] text-[#E2E8F0] truncate"
+                />
+                <button
+                  type="button"
+                  onClick={handleUpdateAddress}
+                  disabled={isSubmitting}
+                  className="w-full py-1.5 px-3 rounded-lg bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold cursor-pointer flex items-center justify-center gap-1"
+                >
+                  <span>Update Address</span>
+                </button>
+              </div>
+
             </div>
           </div>
 
-          {/* ORDER HISTORY */}
-          <div className="bg-[#111C3D] rounded-2xl p-3.5 border border-[#1E2C58] shadow-2xs space-y-2">
-            <h3 className="font-extrabold text-xs uppercase tracking-wider text-[#E2E8F0] border-b border-[#1E2C58] pb-1.5">Order History</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-[11px] border-collapse">
-                <thead>
-                  <tr className="text-[#94A3B8] border-b border-[#1E2C58]">
-                    <th className="py-2 px-3">Timestamp</th>
-                    <th className="py-2 px-3">Updated By</th>
-                    <th className="py-2 px-3">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#1E2C58]">
-                  {followupHistory
-                    .filter(h => String(h.orderId) === orderId)
-                    .map((h, i) => (
-                      <tr key={`journey-fol-hist-${h.id || h.followupId || i}-${i}`} className="text-[#E2E8F0] hover:bg-[#16234D]">
-                        <td className="py-2 px-3 font-mono whitespace-nowrap text-[#94A3B8]">{h.timestamp}</td>
-                        <td className="py-2 px-3 whitespace-nowrap font-medium">
-                          <span className="font-bold font-mono text-blue-400">
-                            {formatActorUsernameId(h.updatedByName, h.updatedBy)}
-                          </span>
-                        </td>
-                        <td className="py-2 px-3">
-                           <div className="font-bold text-[#E2E8F0]">{h.action}</div>
-                           {h.notes && <div className="text-[#94A3B8] text-[10px]">{h.notes}</div>}
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
+          {/* 2. ORDER SUMMARY BANNER (NICEY OI ORDER ER SUMMARY) */}
+          <div className="bg-[#0E1736] p-3 rounded-xl border border-[#1E2C58] space-y-2">
+            <div className="text-[11px] font-black uppercase tracking-wider text-[#94A3B8] flex items-center gap-1.5">
+              <Tag className="w-3.5 h-3.5 text-blue-400" />
+              <span>Order Summary &amp; Details</span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div className="bg-[#080E21] p-2 rounded-lg border border-[#1E2C58]">
+                <span className="text-[10px] text-[#94A3B8] block">Product Category</span>
+                <span className="font-bold text-[#E2E8F0]">{order.product_category || order.productCategory || '-'}</span>
+              </div>
+              <div className="bg-[#080E21] p-2 rounded-lg border border-[#1E2C58]">
+                <span className="text-[10px] text-[#94A3B8] block">Order Value</span>
+                <span className="font-bold font-mono text-amber-300">৳{(Number(order.order_value || order.orderValue || 0)).toLocaleString()}</span>
+              </div>
+              <div className="bg-[#080E21] p-2 rounded-lg border border-[#1E2C58]">
+                <span className="text-[10px] text-[#94A3B8] block">Profit</span>
+                <span className="font-bold font-mono text-emerald-400">৳{(Number(order.profit || 0)).toLocaleString()}</span>
+              </div>
+              <div className="bg-[#080E21] p-2 rounded-lg border border-[#1E2C58]">
+                <span className="text-[10px] text-[#94A3B8] block">Channel</span>
+                <span className="font-bold text-indigo-300">{order.order_channel || '-'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. ORDER HISTORY (NICEY ORDER ER HISTORY) */}
+          <div className="bg-[#0E1736] p-3 rounded-xl border border-[#1E2C58] space-y-2">
+            <div className="text-[11px] font-black uppercase tracking-wider text-[#94A3B8] flex items-center gap-1.5">
+              <History className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Order Followup &amp; Activity History</span>
+            </div>
+
+            <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+              {localHistory.length === 0 ? (
+                <div className="text-center py-4 text-xs text-[#64748B]">No history logs found for this order.</div>
+              ) : (
+                localHistory.map((h, i) => (
+                  <div key={`hist-${h.id || i}`} className="bg-[#080E21] p-2 rounded-lg border border-[#1E2C58] text-xs flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[10px] text-[#94A3B8]">{h.timestamp}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-800">{h.action || 'Followup'}</span>
+                        <span className="font-mono font-bold text-blue-400">{formatActorUsernameId(h.updatedByName, h.updatedBy)}</span>
+                      </div>
+                      <p className="text-[#CBD5E1] text-[11px] mt-0.5 truncate">{h.notes || '-'}</p>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800 shrink-0">
+                      {h.newStatus || h.orderStatus || 'Updated'}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
         </div>
 
-        {/* FOOTER */}
-        <div className="px-6 py-3 bg-[#0E1736] border-t border-[#1E2C58] flex items-center justify-between shrink-0">
-          <div className="text-xs text-[#94A3B8] font-medium">
-            Order #{orderId}
+        {/* MODAL FOOTER */}
+        <div className="px-4 py-3 bg-[#0E1736] border-t border-[#1E2C58] flex items-center justify-between shrink-0 gap-3">
+          {customerId && onViewCustomer ? (
+            <button
+              type="button"
+              onClick={() => onViewCustomer(customerId)}
+              className="text-xs text-blue-400 hover:text-blue-300 font-bold hover:underline cursor-pointer flex items-center gap-1"
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>Customer Profile ➔</span>
+            </button>
+          ) : (
+            <div className="text-xs text-[#94A3B8] font-mono">
+              #{orderId}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            {/* Prominent Explicit Close Button */}
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-1.5 bg-[#1E2C58] hover:bg-[#2A3E78] text-[#E2E8F0] border border-[#2D3E72] rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-sm"
+            >
+              Close
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 bg-[#1E2C58] hover:bg-[#2A3E78] text-[#E2E8F0] border border-[#2D3E72] rounded-xl text-xs font-bold transition-colors cursor-pointer"
-          >
-            Close
-          </button>
         </div>
 
       </div>
