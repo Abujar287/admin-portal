@@ -2182,14 +2182,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   };
 
   const orderLookupMap = useMemo(() => {
-    if (activeTab !== 'followup' && activeTab !== 'orders') return new Map<string, OrderItem>();
     const map = new Map<string, OrderItem>();
     orders.forEach((o) => {
       const id = String(o.order_id || o.id || '').trim();
       if (id) map.set(id, o);
     });
     return map;
-  }, [orders, activeTab]);
+  }, [orders]);
 
   const availableUpdatedByNames = useMemo(() => {
     const names = new Set<string>();
@@ -2341,33 +2340,31 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   ]);
 
   // Summary Metrics & Aggregations with single date filter
-  const orderDeliveredDateMap = useMemo(() => {
-    if (activeTab !== 'summary' && activeTab !== 'agent-performance') return new Map<string, string>();
-    const map = new Map<string, string>();
-    orders.forEach(o => {
-      if (o.delivered_date) map.set(String(o.order_id), o.delivered_date);
-    });
-    followupHistory.forEach(h => {
-      if (!h.isUndone && h.newStatus?.toLowerCase() === 'delivered' && h.timestamp) {
-        map.set(String(h.orderId), h.timestamp);
-      }
-    });
-    return map;
-  }, [activeTab, orders, followupHistory]);
+  const { orderDeliveredDateMap, orderCancelledDateMap } = useMemo(() => {
+    const delMap = new Map<string, string>();
+    const cancMap = new Map<string, string>();
 
-  const orderCancelledDateMap = useMemo(() => {
-    if (activeTab !== 'summary' && activeTab !== 'agent-performance') return new Map<string, string>();
-    const map = new Map<string, string>();
     orders.forEach(o => {
-      if (o.cancelled_date) map.set(String(o.order_id), o.cancelled_date);
-    });
-    followupHistory.forEach(h => {
-      if (!h.isUndone && h.newStatus?.toLowerCase() === 'cancelled' && h.timestamp) {
-        map.set(String(h.orderId), h.timestamp);
+      const id = String(o.order_id || o.id || '');
+      if (id) {
+        if (o.delivered_date) delMap.set(id, o.delivered_date);
+        if (o.cancelled_date) cancMap.set(id, o.cancelled_date);
       }
     });
-    return map;
-  }, [activeTab, orders, followupHistory]);
+
+    followupHistory.forEach(h => {
+      if (!h.isUndone && h.timestamp) {
+        const id = String(h.orderId || '');
+        if (id) {
+          const ns = h.newStatus?.toLowerCase();
+          if (ns === 'delivered' && !delMap.has(id)) delMap.set(id, h.timestamp);
+          if (ns === 'cancelled' && !cancMap.has(id)) cancMap.set(id, h.timestamp);
+        }
+      }
+    });
+
+    return { orderDeliveredDateMap: delMap, orderCancelledDateMap: cancMap };
+  }, [orders, followupHistory]);
 
   const summaryStats = useMemo(() => {
     if (activeTab !== 'summary' && activeTab !== 'agent-performance') {
@@ -2991,25 +2988,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                 </button>
               )}
 
-              {/* 5. My Profile */}
-              {isTabAllowed('profiles') && (
-                <button
-                  onClick={() => setActiveTab('profiles')}
-                  title="My Profile"
-                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 cursor-pointer whitespace-nowrap ${
-                    activeTab === 'profiles'
-                      ? 'bg-[#1E2C58] text-[#E2E8F0] shadow-xs font-bold border border-[#2D3E72]'
-                      : 'text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#111C3D] font-semibold'
-                  }`}
-                >
-                  <User className={`w-4 h-4 shrink-0 transition-transform duration-150 text-[#E2E8F0] ${activeTab === 'profiles' ? 'scale-110' : ''}`} />
-                  {isSidebarOpen && (
-                    <span className="truncate text-left font-semibold text-[#E2E8F0]">
-                      My Profile
-                    </span>
-                  )}
-                </button>
-              )}
+
 
               {/* 7. Category Mapping */}
               {isTabAllowed('category-mapping') && (
@@ -3194,13 +3173,13 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        setActiveTab('orders');
+                        setActiveTab('sheet-connection');
                         setIsUserMenuOpen(false);
                       }}
                       className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-[#E2E8F0] hover:bg-[#1E2C58] transition-colors cursor-pointer text-left"
                     >
-                      <FileText className="w-4 h-4 text-indigo-400" />
-                      <span>All Orders Database</span>
+                      <Layers className="w-4 h-4 text-teal-400" />
+                      <span>Google Sheet &amp; Tabs</span>
                     </button>
 
                     <button
@@ -3226,7 +3205,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition-colors cursor-pointer text-left"
                     >
                       <LogOut className="w-4 h-4 text-rose-400" />
-                      <span>Sign Out</span>
+                      <span>Logout</span>
                     </button>
                   </div>
                 </div>
@@ -5022,8 +5001,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         </button>
                         {openExportMenuId === 'orders' && (
                           <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-1 w-24">
-                            <button onClick={() => { handleExportCsv(filteredOrders, 'orders.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-100 rounded">CSV</button>
-                            <button onClick={() => { handleExportXlsx(filteredOrders, 'orders.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-100 rounded">XLSX</button>
+                            <button onClick={() => { handleExportCsv(paginatedOrders, 'orders_page.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-100 rounded text-slate-800 font-medium cursor-pointer">CSV</button>
+                            <button onClick={() => { handleExportXlsx(paginatedOrders, 'orders_page.xlsx'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-100 rounded text-slate-800 font-medium cursor-pointer">XLSX</button>
                           </div>
                         )}
                       </div>
@@ -7806,6 +7785,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
           orders={orders}
           followupHistory={followupHistory}
           onViewOrderJourney={(ord) => {
+            setSelectedCustomerId(null);
             setViewJourneyOrder(ord);
           }}
         />

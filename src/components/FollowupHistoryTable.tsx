@@ -220,7 +220,7 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            onExportCsv(allFilteredRecords, 'followup_audit_logs.csv');
+                            onExportCsv(paginatedRecords, 'followup_audit_logs_page.csv');
                             setIsExportMenuOpen(false);
                           }}
                           className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-100 rounded text-slate-700 font-medium cursor-pointer"
@@ -232,7 +232,7 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            onExportXlsx(allFilteredRecords, 'followup_audit_logs.xlsx');
+                            onExportXlsx(paginatedRecords, 'followup_audit_logs_page.xlsx');
                             setIsExportMenuOpen(false);
                           }}
                           className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-100 rounded text-slate-700 font-medium cursor-pointer"
@@ -311,26 +311,16 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
           <table className="w-full text-left border-collapse text-xs text-white">
             <thead>
               <tr className="bg-[#1e2330] text-white font-bold border-b border-slate-700 sticky top-0 z-10 uppercase tracking-wider text-[11px]">
-                <th className="py-3 px-3.5 whitespace-nowrap text-white">Order ID</th>
                 <th className="py-3 px-3.5 whitespace-nowrap text-white">Date</th>
-                <th className="py-3 px-3.5 whitespace-nowrap text-white">Customer Name</th>
-                <th className="py-3 px-3.5 whitespace-nowrap text-white">Contact</th>
-                <th className="py-3 px-3.5 whitespace-nowrap text-white">Previous Status</th>
-                <th className="py-3 px-3.5 whitespace-nowrap text-white">New Status</th>
-                <th className="py-3 px-3.5 whitespace-nowrap text-white">Order Status</th>
-                <th className="py-3 px-3.5 whitespace-nowrap text-white">Order Value</th>
-                <th className="py-3 px-3.5 whitespace-nowrap text-white">Schedule</th>
-                <th className="py-3 px-3.5 whitespace-nowrap text-white">Updated By</th>
-                <th className="py-3 px-3.5 whitespace-nowrap text-white">Updated By Name</th>
-                <th className="py-3 px-3.5 whitespace-nowrap text-white">Action Name</th>
-                <th className="py-3 px-3.5 whitespace-nowrap text-white">Remarks / Notes</th>
-                <th className="py-3 px-3.5 whitespace-nowrap text-center text-white">Actions</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-white">updated_by</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-white">action</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-white">status change</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700 text-white bg-[#242936]">
               {paginatedRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="text-center py-12 text-slate-400 font-semibold">
+                  <td colSpan={4} className="text-center py-12 text-slate-400 font-semibold">
                     No followup history records matching filters.
                   </td>
                 </tr>
@@ -339,100 +329,19 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                   return (
                     <tr 
                       key={`fol-row-${hist.id || hist.followupId || histIdx}-${histIdx}`} 
-                      className="transition-colors hover:bg-slate-50/80"
+                      className="transition-colors hover:bg-slate-800/60"
                     >
-                      <td className="py-3 px-3.5 font-mono whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const ord = orders.find((o) => String(o.order_id || o.id) === String(hist.orderId));
-                            if (ord) onViewOrder(ord);
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-mono text-xs font-black text-amber-300 hover:text-white bg-amber-950/70 hover:bg-amber-900 border border-amber-500/60 hover:border-amber-400 shadow-sm transition-all cursor-pointer ring-1 ring-amber-500/20"
-                          title="Click to view & update Order details"
-                        >
-                          <span className="text-amber-400 font-bold">#</span>
-                          <span>{hist.orderId}</span>
-                        </button>
-                      </td>
-                      <td className="py-3 px-3.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                      <td className="py-3 px-3.5 font-mono text-xs text-slate-300 whitespace-nowrap">
                         {hist.timestamp}
                       </td>
-                      <td className="py-3 px-3.5 text-slate-700 whitespace-nowrap font-medium">
-                        {onViewCustomer ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const ord = orders.find((o) => String(o.order_id || o.id) === String(hist.orderId));
-                              const cId = ord ? String(ord.customer_id || ord.customerId || '') : '';
-                              if (cId) {
-                                onViewCustomer(cId);
-                              } else if (hist.customerContact) {
-                                onViewCustomer(hist.customerContact);
-                              }
-                            }}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-xs font-black text-blue-300 hover:text-white bg-blue-950/70 hover:bg-blue-900 border border-blue-500/60 hover:border-blue-400 shadow-sm transition-all cursor-pointer ring-1 ring-blue-500/20"
-                            title="Click to view Customer 360 profile"
-                          >
-                            <span className="text-blue-400 font-bold">CID:</span>
-                            <span>{(() => {
-                              const ord = orders.find((o) => String(o.order_id || o.id) === String(hist.orderId));
-                              return ord?.customer_id || ord?.customerId || hist.customerName || '-';
-                            })()}</span>
-                          </button>
-                        ) : (
-                          <span className="font-semibold text-slate-800">{hist.customerName || '-'}</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3.5 font-mono text-slate-600 whitespace-nowrap">
-                        {hist.customerContact || '-'}
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                          {hist.previousStatus || '-'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                          {hist.newStatus || '-'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3.5 whitespace-nowrap">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          {hist.orderStatus || '-'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">
-                         {(Number(hist.orderValue) || 0).toLocaleString()}
-                      </td>
-                      <td className="py-3 px-3.5 text-[11px] text-slate-600 whitespace-nowrap">
-                        {hist.scheduledTime ? `${hist.scheduleDate || ''} (${hist.scheduledTime})` : (hist.scheduleDate || '-')}
-                      </td>
-                      <td className="py-3 px-3.5 font-mono text-xs text-[#E2E8F0] whitespace-nowrap">
+                      <td className="py-3 px-3.5 font-mono text-xs text-blue-300 whitespace-nowrap font-bold">
                         {formatActorUsernameId(hist.updatedByName, hist.updatedBy)}
                       </td>
-                      <td className="py-3 px-3.5 font-mono font-bold text-blue-400 whitespace-nowrap">
-                        {formatActorUsernameId(hist.updatedByName, hist.updatedBy)}
-                      </td>
-                      <td className="py-3 px-3.5 font-bold text-purple-700 whitespace-nowrap">
+                      <td className="py-3 px-3.5 font-bold text-purple-300 whitespace-nowrap">
                         {hist.action || 'Followup'}
                       </td>
-                      <td className="py-3 px-3.5 text-slate-600 max-w-xs truncate" title={hist.notes}>
-                        {hist.notes || '-'}
-                      </td>
-                      <td className="py-3 px-3.5 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const ord = orders.find((o) => String(o.order_id || o.id) === String(hist.orderId));
-                              if (ord) onViewOrder(ord);
-                            }}
-                            className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold cursor-pointer transition-colors"
-                          >
-                            View Order
-                          </button>
-                        </div>
+                      <td className="py-3 px-3.5 text-xs text-[#E2E8F0] whitespace-nowrap">
+                        {hist.notes || `Order #${hist.orderId} status changed`}
                       </td>
                     </tr>
                   );

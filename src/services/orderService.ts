@@ -135,6 +135,50 @@ export function formatActorUsernameId(username?: string, userId?: string): strin
   return parseActorInfo(userId || username, username || userId).username_id;
 }
 
+/**
+ * Normalizes any date string (e.g., "25-Oct-26", "25-10-2026", "2026-10-25T...") to standard YYYY-MM-DD
+ */
+export function formatToIsoDate(dateStr?: string): string {
+  if (!dateStr || dateStr === 'Unscheduled' || dateStr === '-' || dateStr === 'None') return dateStr || 'Unscheduled';
+  const trimmed = dateStr.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+
+  const parts = trimmed.split(/[-/ .]/);
+  if (parts.length === 3) {
+    let [p1, p2, p3] = parts;
+    const months: Record<string, string> = {
+      jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+      jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+    };
+
+    if (months[p2.toLowerCase().substring(0, 3)]) {
+      let day = String(parseInt(p1, 10)).padStart(2, '0');
+      let month = months[p2.toLowerCase().substring(0, 3)];
+      let year = p3.length === 2 ? '20' + p3 : p3;
+      if (year.length === 4 && day !== 'NaN') return `${year}-${month}-${day}`;
+    }
+
+    if (p1.length === 4) {
+      return `${p1}-${String(parseInt(p2, 10)).padStart(2, '0')}-${String(parseInt(p3, 10)).padStart(2, '0')}`;
+    } else if (p3.length === 4 || p3.length === 2) {
+      let year = p3.length === 2 ? '20' + p3 : p3;
+      let month = String(parseInt(p2, 10)).padStart(2, '0');
+      let day = String(parseInt(p1, 10)).padStart(2, '0');
+      if (month !== 'NaN' && day !== 'NaN') return `${year}-${month}-${day}`;
+    }
+  }
+
+  const parsed = new Date(trimmed);
+  if (!isNaN(parsed.getTime())) {
+    const yyyy = parsed.getFullYear();
+    const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+    const dd = String(parsed.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  return trimmed;
+}
+
 const STORAGE_KEYS = {
   ORDERS: 'agent_portal_orders_v3',
   AGENTS: 'agentUsers_v3',
@@ -1891,14 +1935,15 @@ export class OrderService {
         actionStr = `(${changedParts.join(', ')}) change`;
       }
 
-      // Generate status change string capturing ALL changes
+      // Generate status change string capturing ALL changes cleanly (e.g. "3500 -> 3478" or "12PM to 2PM -> 4PM to 6PM")
       const changeDescriptions: string[] = [];
       if (statusChanged) changeDescriptions.push(`${prevFo} -> ${finalFollowupStatus || prevFo}`);
-      if (schedDateChanged) changeDescriptions.push(`Schedule Date: ${prevScDate} -> ${schedDate}`);
-      if (schedTimeChanged) changeDescriptions.push(`Schedule Time: ${prevScTime} -> ${schedTime}`);
-      if (priceChanged) changeDescriptions.push(`Price: ${prevVal} -> ${orderVal}`);
+      if (schedDateChanged) changeDescriptions.push(`${formatToIsoDate(prevScDate)} -> ${formatToIsoDate(schedDate)}`);
+      if (schedTimeChanged) changeDescriptions.push(`${prevScTime || 'None'} -> ${schedTime || 'None'}`);
+      if (priceChanged) changeDescriptions.push(`${prevVal} -> ${orderVal}`);
       
       const statusChangeText = changeDescriptions.length > 0 ? changeDescriptions.join(', ') : 'No Status Change';
+      const cleanNotes = notes ? notes : statusChangeText;
 
       historyItem = {
         id: nextId,
@@ -1916,7 +1961,7 @@ export class OrderService {
         updatedByName: uByName,
         timestamp: currentTimestamp,
         action: actionStr,
-        notes: notes || ''
+        notes: cleanNotes
       };
 
       this.saveFollowupHistory([historyItem, ...existingHistory]);
@@ -1943,18 +1988,21 @@ export class OrderService {
         const prevOrderVal = Number(existingOrder?.order_value || existingOrder?.orderValue || 0);
 
         const changeDescriptions: string[] = [];
-        if (statusChanged) changeDescriptions.push(`Status: ${prevFo} -> ${finalFollowupStatus || prevFo}`);
-        if (schedDateChanged) changeDescriptions.push(`Schedule Date: ${prevSchedDate} -> ${schedDate}`);
-        if (schedTimeChanged) changeDescriptions.push(`Schedule Time: ${prevSchedTime} -> ${schedTime}`);
-        if (priceChanged) changeDescriptions.push(`Price: ${prevOrderVal} -> ${orderValToSync}`);
+        if (statusChanged) changeDescriptions.push(`${prevFo} -> ${finalFollowupStatus || prevFo}`);
+        if (schedDateChanged) changeDescriptions.push(`${formatToIsoDate(prevSchedDate)} -> ${formatToIsoDate(schedDate)}`);
+        if (schedTimeChanged) changeDescriptions.push(`${prevSchedTime || 'None'} -> ${schedTime || 'None'}`);
+        if (priceChanged) changeDescriptions.push(`${prevOrderVal} -> ${orderValToSync}`);
         
-        const statusChangeText = changeDescriptions.length > 0 ? changeDescriptions.map(d => `(${d})`).join(' ') : 'No Status Change';
+        const statusChangeText = changeDescriptions.length > 0 ? changeDescriptions.join(', ') : 'No Status Change';
+        const finalStatusChangePayload = (notes && notes.trim()) ? notes.trim() : statusChangeText;
 
         const finalProfitParam = isCancelled ? 0 : (updates.profit !== undefined ? updates.profit : (orderValToSync !== undefined ? Math.round(Number(orderValToSync) * 0.20) : undefined));
 
         const bodyData: Record<string, string> = {
           url: scriptUrl,
           action: 'updateFollowup',
+          'updated_at': currentTimestamp,
+          updatedAt: currentTimestamp,
           'Log Timestamp': currentTimestamp,
           logTimestamp: currentTimestamp,
           timestamp: currentTimestamp,
@@ -1984,12 +2032,12 @@ export class OrderService {
           updatedByName: uByName,
           'update_by_name': uByName,
           updateByName: uByName,
-          'status_change': statusChangeText,
-          statusChange: statusChangeText,
+          'status_change': finalStatusChangePayload,
+          statusChange: finalStatusChangePayload,
           'change_description': actionStr,
           actionName: actionStr,
-          'notes': notes,
-          remarks: notes,
+          'notes': finalStatusChangePayload,
+          remarks: finalStatusChangePayload,
           // CRITICAL: order_status ALWAYS remains 'Pending'
           'order_status': 'Pending',
           orderStatus: 'Pending',
