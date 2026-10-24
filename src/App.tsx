@@ -202,10 +202,15 @@ export function App() {
       onRefreshOrders={handleRefreshOrders}
       isRefreshing={isRefreshing}
       lastSyncTime={lastSyncTime}
-      onLogout={() => setCurrentManager(null)}
+      onLogout={() => {
+        sessionStorage.removeItem('portal_screen_locked');
+        localStorage.removeItem('agent_portal_current_manager');
+        setCurrentManager(null);
+      }}
       onUpdateOrderStatus={handleUpdateOrderStatus}
     />
   );
 }
+
 
 export default App;

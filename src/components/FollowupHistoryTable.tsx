@@ -312,20 +312,24 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
             <thead>
               <tr className="bg-[#1e2330] text-white font-bold border-b border-slate-700 sticky top-0 z-10 uppercase tracking-wider text-[11px]">
                 <th className="py-3 px-3.5 whitespace-nowrap text-white">Date</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-white">Order ID</th>
                 <th className="py-3 px-3.5 whitespace-nowrap text-white">updated_by</th>
                 <th className="py-3 px-3.5 whitespace-nowrap text-white">action</th>
                 <th className="py-3 px-3.5 whitespace-nowrap text-white">status change</th>
+                <th className="py-3 px-3.5 whitespace-nowrap text-right text-white">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700 text-white bg-[#242936]">
               {paginatedRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="text-center py-12 text-slate-400 font-semibold">
+                  <td colSpan={6} className="text-center py-12 text-slate-400 font-semibold">
                     No followup history records matching filters.
                   </td>
                 </tr>
               ) : (
                 paginatedRecords.map((hist, histIdx) => {
+                  const targetOrder = orders.find(o => String(o.order_id || o.id) === String(hist.orderId));
+                  
                   return (
                     <tr 
                       key={`fol-row-${hist.id || hist.followupId || histIdx}-${histIdx}`} 
@@ -334,14 +338,49 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                       <td className="py-3 px-3.5 font-mono text-xs text-slate-300 whitespace-nowrap">
                         {hist.timestamp}
                       </td>
+                      <td className="py-3 px-3.5 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => targetOrder && onViewOrder(targetOrder)}
+                          className="px-2 py-1 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 rounded-md font-mono font-bold text-xs border border-blue-500/30 transition-all cursor-pointer"
+                        >
+                          #{hist.orderId}
+                        </button>
+                      </td>
                       <td className="py-3 px-3.5 font-mono text-xs text-blue-300 whitespace-nowrap font-bold">
                         {formatActorUsernameId(hist.updatedByName, hist.updatedBy)}
                       </td>
                       <td className="py-3 px-3.5 font-bold text-purple-300 whitespace-nowrap">
-                        {hist.action || 'Followup'}
+                        <span className="px-2 py-0.5 bg-purple-500/10 border border-purple-500/20 rounded text-[10px] uppercase">
+                          {hist.action || 'Followup'}
+                        </span>
                       </td>
-                      <td className="py-3 px-3.5 text-xs text-[#E2E8F0] whitespace-nowrap">
-                        {hist.notes || `Order #${hist.orderId} status changed`}
+                      <td className="py-3 px-3.5 text-xs text-[#E2E8F0]">
+                        <div className="max-w-[300px] truncate" title={hist.notes}>
+                          {hist.notes || `Order #${hist.orderId} status changed`}
+                        </div>
+                      </td>
+                      <td className="py-3 px-3.5 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => targetOrder && onViewOrder(targetOrder)}
+                            className="p-1.5 hover:bg-blue-500/20 text-blue-400 rounded-lg transition-colors cursor-pointer"
+                            title="View Order Details"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </button>
+                          {onUndoFollowup && !hist.isUndone && (
+                            <button
+                              type="button"
+                              onClick={() => onUndoFollowup(String(hist.id || hist.followupId), String(hist.orderId), hist.previousStatus || 'Pending', hist.updatedBy)}
+                              className="p-1.5 hover:bg-rose-500/20 text-rose-400 rounded-lg transition-colors cursor-pointer"
+                              title="Undo/Revert Status"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
