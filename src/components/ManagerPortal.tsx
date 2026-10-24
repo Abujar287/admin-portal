@@ -295,7 +295,6 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   const isManager = isSuperAdminOrFullManager || currentManager.role === 'Manager';
   const isTeamLeader = !isManager && currentManager.role === 'Team Leader';
 
-  // Allowed tabs for the active user session
   const userAllowedTabs: AgentNavTab[] = useMemo(() => {
     if (isSuperAdminOrFullManager) {
       return ['summary', 'orders', 'followup', 'agent-performance', 'users', 'category-mapping', 'sheet-connection', 'profiles'];
@@ -305,7 +304,11 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       : ['summary', 'orders', 'followup', 'agent-performance', 'profiles'];
     
     // Strictly strip out manager/admin tabs ('users' for user details, 'category-mapping', 'sheet-connection' for Google Sheet & tabs) for non-manager users
-    return baseTabs.filter(t => t !== 'users' && t !== 'category-mapping' && t !== 'sheet-connection') as AgentNavTab[];
+    const filtered = baseTabs.filter(t => t !== 'users' && t !== 'category-mapping' && t !== 'sheet-connection') as AgentNavTab[];
+    if (!filtered.includes('profiles')) {
+      filtered.push('profiles');
+    }
+    return filtered;
   }, [isSuperAdminOrFullManager, currentUserPermissions]);
 
   const isTabAllowed = (tab: AgentNavTab) => userAllowedTabs.includes(tab);

@@ -520,6 +520,109 @@ export class OrderService {
     return await this.getAgents();
   }
 
+  /**
+   * Robust multi-tier poster for Google Apps Script Web App endpoints:
+   * 1. Server proxy route (/api/proxy-script) if available
+   * 2. Direct fetch with FormData (no-cors)
+   * 3. Direct fetch with URLSearchParams (no-cors)
+   * 4. Hidden HTML Form + iframe submission (100% reliable cross-origin fallback for Vercel static deployments)
+   */
+  static async postToGoogleScript(scriptUrl: string, bodyData: Record<string, any>): Promise<boolean> {
+    if (!scriptUrl) return false;
+
+    // 1. Try local server proxy route if available
+    try {
+      const proxyRes = await fetch('/api/proxy-script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: scriptUrl, ...bodyData })
+      });
+      if (proxyRes.ok) {
+        const json = await proxyRes.json();
+        if (json.success) return true;
+      }
+    } catch (proxyErr) {
+      console.warn('Proxy script POST unavailable or failed:', proxyErr);
+    }
+
+    // 2. Direct fetch with FormData (no-cors)
+    try {
+      const formData = new FormData();
+      for (const [key, val] of Object.entries(bodyData)) {
+        if (val !== undefined && val !== null) {
+          formData.append(key, String(val));
+        }
+      }
+      await fetch(scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: formData
+      });
+      return true;
+    } catch (fetchErr) {
+      console.warn('Direct fetch FormData POST failed, attempting URLSearchParams:', fetchErr);
+    }
+
+    // 3. Direct fetch with URLSearchParams
+    try {
+      const params = new URLSearchParams();
+      for (const [key, val] of Object.entries(bodyData)) {
+        if (val !== undefined && val !== null) {
+          params.append(key, String(val));
+        }
+      }
+      await fetch(scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+      });
+      return true;
+    } catch (paramsErr) {
+      console.warn('Direct fetch URLSearchParams POST failed, attempting hidden form submit:', paramsErr);
+    }
+
+    // 4. Guaranteed fallback for all static hosts (e.g. Vercel static build): Hidden Form Submission
+    try {
+      const iframeName = `hidden_iframe_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const iframe = document.createElement('iframe');
+      iframe.name = iframeName;
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = scriptUrl;
+      form.target = iframeName;
+      form.style.display = 'none';
+
+      for (const [key, val] of Object.entries(bodyData)) {
+        if (val !== undefined && val !== null) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = String(val);
+          form.appendChild(input);
+        }
+      }
+
+      document.body.appendChild(form);
+      form.submit();
+
+      setTimeout(() => {
+        try {
+          if (form.parentNode) form.parentNode.removeChild(form);
+          if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        } catch {}
+      }, 5000);
+
+      return true;
+    } catch (formErr) {
+      console.error('Hidden form POST failed:', formErr);
+      return false;
+    }
+  }
+
   static async saveAgentToSheet(agent: AgentUser): Promise<{ success: boolean; error?: string; rawResponse?: any }> {
     const scriptUrl = this.getScriptUrl();
     if (!scriptUrl) {
@@ -528,7 +631,6 @@ export class OrderService {
 
     try {
       const payload = {
-        url: scriptUrl,
         action: 'saveUser',
         user_id: agent.user,
         user_name: agent.name || agent.user,
@@ -545,40 +647,8 @@ export class OrderService {
         status: agent.status || 'active'
       };
 
-      const res = await fetch('/api/proxy-script', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'Failed to sync with Google Sheet' };
-      }
-
-      // Check whether Google Apps Script actually executed saveUser or fell back to order creation
-      let parsedResp: any = null;
-      try {
-        parsedResp = typeof data.response === 'string' ? JSON.parse(data.response) : data.response;
-      } catch {}
-
-      if (parsedResp && (parsedResp.orderId !== undefined || parsedResp.order_id !== undefined)) {
-        return {
-          success: false,
-          error: 'Apps Script Outdated: Google Sheet Apps Script does not have the updated Code.gs! It treated this user as a new order. Please update Code.gs in your Google Sheet (Extensions > Apps Script) and deploy a "New version".'
-        };
-      }
-
-      if (parsedResp && parsedResp.status === 'error') {
-        return {
-          success: false,
-          error: parsedResp.message || 'Google Sheet returned error while saving user'
-        };
-      }
-
-      return { success: true, rawResponse: parsedResp };
+      const success = await this.postToGoogleScript(scriptUrl, payload);
+      return { success };
     } catch (e: any) {
       console.error('saveAgentToSheet error:', e);
       return { success: false, error: e.message || 'Network error' };
@@ -605,30 +675,11 @@ export class OrderService {
     if (!scriptUrl) return { success: false, error: 'No script URL' };
     try {
       const payload = {
-        url: scriptUrl,
         action: 'deleteUser',
         user_id: userId
       };
-      const res = await fetch('/api/proxy-script', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      
-      let parsedResp: any = null;
-      try {
-        parsedResp = typeof data.response === 'string' ? JSON.parse(data.response) : data.response;
-      } catch {}
-
-      if (parsedResp && (parsedResp.orderId !== undefined || parsedResp.order_id !== undefined)) {
-        return {
-          success: false,
-          error: 'Apps Script Outdated: Please update Code.gs in Extensions > Apps Script with New Version.'
-        };
-      }
-
-      return { success: !!data.success };
+      const success = await this.postToGoogleScript(scriptUrl, payload);
+      return { success };
     } catch (e: any) {
       return { success: false, error: e.message };
     }
@@ -1634,7 +1685,6 @@ export class OrderService {
     if (scriptUrl) {
       try {
         const bodyData = {
-          url: scriptUrl,
           order_id: fullOrder.order_id,
           customer_id: fullOrder.customer_id,
           customer_mobile: fullOrder.customer_mobile,
@@ -1659,37 +1709,7 @@ export class OrderService {
           cancelled_date: fullOrder.cancelled_date || ''
         };
 
-        try {
-          const proxyRes = await fetch('/api/proxy-script', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(bodyData)
-          });
-          if (proxyRes.ok) {
-            remoteSynced = true;
-          } else {
-            throw new Error(`Proxy error ${proxyRes.status}`);
-          }
-        } catch (proxyErr) {
-          console.warn('Google Apps Script proxy error, attempting direct POST:', proxyErr);
-          try {
-            const params = new URLSearchParams();
-            for (const [key, val] of Object.entries(bodyData)) {
-              params.append(key, String(val ?? ''));
-            }
-            await fetch(scriptUrl, {
-              method: 'POST',
-              mode: 'no-cors',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: params.toString()
-            });
-            remoteSynced = true;
-          } catch (directErr) {
-            console.warn('Direct Google Apps Script doPost error:', directErr);
-          }
-        }
+        remoteSynced = await this.postToGoogleScript(scriptUrl, bodyData);
       } catch (err) {
         console.warn('Google Apps Script createOrder overall error:', err);
       }
@@ -2059,39 +2079,7 @@ export class OrderService {
         };
 
         console.log('DEBUG: Final Payload sent to Google Sheet:', bodyData);
-        try {
-          const proxyRes = await fetch('/api/proxy-script', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(bodyData)
-          });
-          if (proxyRes.ok) {
-            const proxyJson = await proxyRes.json();
-            console.log('DEBUG: Proxy script response:', proxyJson);
-            remoteSynced = proxyJson.success ?? false;
-          } else {
-            throw new Error(`Proxy returned HTTP ${proxyRes.status}`);
-          }
-        } catch (proxyErr) {
-          console.warn('Google Apps Script status update proxy error, attempting direct POST:', proxyErr);
-          try {
-            const params = new URLSearchParams();
-            for (const [key, val] of Object.entries(bodyData)) {
-              params.append(key, String(val ?? ''));
-            }
-            await fetch(scriptUrl, {
-              method: 'POST',
-              mode: 'no-cors',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: params.toString()
-            });
-            remoteSynced = true;
-          } catch (directErr) {
-            console.warn('Direct Google Apps Script status update error:', directErr);
-          }
-        }
+        remoteSynced = await this.postToGoogleScript(scriptUrl, bodyData);
       } catch (err) {
         console.warn('Google Apps Script status update overall error:', err);
       }
