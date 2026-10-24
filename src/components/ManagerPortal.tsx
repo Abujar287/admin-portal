@@ -1458,11 +1458,71 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
   };
 
   const formatForExport = (data: any[]) => {
-    if (data.length === 0) return data;
+    if (!data || data.length === 0) return [];
     const first = data[0];
 
-    // Case 1: Agent Performance item
-    if ('agentId' in first || ('user' in first && 'role' in first && 'servedOrders' in first) || ('createOrders' in first && 'team' in first)) {
+    // Priority Case 1: Standard Order item (Must check FIRST because OrderItem may contain agentId/agent_id)
+    const isOrderItem = (
+      ('order_id' in first || 'orderStatus' in first || 'order_status' in first || 'customer_mobile' in first || 'customerContact' in first || 'customer_name' in first || 'customerName' in first) &&
+      !('servedOrders' in first) &&
+      !('createOrders' in first)
+    );
+
+    if (isOrderItem) {
+      return data.map(item => ({
+        order_id: item.order_id || item.id || '',
+        customer_id: item.customer_id || item.customerId || '',
+        customer_mobile: item.customer_mobile || item.customerContact || '',
+        customer_name: item.customer_name || item.customerName || '',
+        gender: item.gender || '',
+        create_date: item.create_date || item.createDate || item.createdAt || '',
+        order_channel: item.order_channel || item.orderChannel || '',
+        agent_id: String(item.agent_id || item.agentId || '').replace(/^@/, ''),
+        agent_name: item.agent_name || item.agentName || '',
+        product_category: item.product_category || item.productCategory || '',
+        product_name: item.product_name || item.productName || '',
+        city: item.city || '',
+        delivery_area: item.delivery_area || item.deliveryArea || '',
+        address_details: item.address_details || item.addressDetails || '',
+        schedule_date: item.schedule_date || item.scheduleDate || '',
+        schedule_time: item.schedule_time || item.scheduledTime || '',
+        order_value: Number(item.order_value ?? item.orderValue ?? 0),
+        order_status: item.order_status || item.orderStatus || '',
+        followup_status: item.followup_status || item.followupStatus || '',
+        profit: Number(item.profit ?? 0),
+        delivered_date: item.delivered_date || item.deliveredDate || '',
+        cancelled_date: item.cancelled_date || item.cancelledDate || '',
+        followup_date: item.followup_date || item.followupDate || ''
+      }));
+    }
+
+    // Priority Case 2: Followup History item
+    const isFollowupHistory = (
+      ('action' in first || 'prevStatus' in first || 'previousStatus' in first || 'followupId' in first) &&
+      ('timestamp' in first || 'updatedBy' in first || 'updatedByName' in first || 'orderId' in first)
+    );
+    if (isFollowupHistory) {
+      return data.map(item => ({
+        order_id: item.orderId || item.order_id || '',
+        timestamp: item.timestamp || '',
+        updated_by: item.updatedByName || item.updatedBy || '',
+        action: item.action || '',
+        previous_status: item.previousStatus || item.prevStatus || '',
+        new_status: item.newStatus || item.new_status || item.orderStatus || '',
+        order_status: item.orderStatus || '',
+        order_value: item.orderValue ?? '',
+        schedule_date: item.scheduleDate || '',
+        schedule_time: item.scheduledTime || '',
+        notes: item.notes || ''
+      }));
+    }
+
+    // Priority Case 3: Agent Performance item
+    const isAgentPerformance = (
+      ('createOrders' in first || 'servedOrders' in first || 'cancelledOrders' in first || 'bucketSize' in first) &&
+      ('team' in first || 'role' in first || 'agentName' in first || ('user' in first && 'role' in first) || ('id' in first && 'name' in first) || ('agentId' in first && 'servedOrders' in first))
+    );
+    if (isAgentPerformance) {
       const mapped = data.map(item => ({
         agent_id: String(item.agentId || item.id || item.user || '').replace(/^@/, ''),
         agent_name: item.agentName || item.name || '',
@@ -1517,8 +1577,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       return mapped;
     }
 
-    // Case 2: Date Wise Summary item
-    if ('date' in first || ('name' in first && /^\d{4}-\d{2}-\d{2}/.test(String(first.name)))) {
+    // Priority Case 4: Date Wise Summary item
+    if (('date' in first || ('name' in first && /^\d{4}-\d{2}-\d{2}/.test(String(first.name)))) && ('createOrders' in first || 'orderValue' in first || 'servedOrders' in first)) {
       const mapped = data.map(item => ({
         date: item.date || item.name,
         create_orders: item.createOrders ?? 0,
@@ -1562,7 +1622,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       return mapped;
     }
 
-    // Case 3: Channel / Category / City Summary item
+    // Priority Case 5: Channel / Category / City Summary item
     if ('createOrders' in first && 'servedOrders' in first && 'name' in first) {
       const mapped = data.map(item => ({
         name: item.name,
@@ -1604,78 +1664,52 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
       return mapped;
     }
 
-    // Case 4: Followup History item
-    if ('action' in first && 'timestamp' in first) {
-      return data.map(item => ({
-        order_id: item.orderId || '',
-        timestamp: item.timestamp || '',
-        updated_by: item.updatedByName || item.updatedBy || '',
-        action: item.action || '',
-        previous_status: item.prevStatus || '',
-        new_status: item.newStatus || '',
-        notes: item.notes || ''
-      }));
-    }
-
-    // Case 5: Standard Order item
-    if ('order_id' in first || 'customer_mobile' in first || 'product_name' in first || 'customer_name' in first || 'id' in first) {
-      return data.map(item => ({
-        order_id: item.order_id || item.id || '',
-        customer_id: item.customer_id || item.customerId || '',
-        customer_mobile: item.customer_mobile || item.customerContact || '',
-        customer_name: item.customer_name || item.customerName || '',
-        gender: item.gender || '',
-        create_date: item.create_date || item.createDate || item.createdAt || '',
-        order_channel: item.order_channel || item.orderChannel || '',
-        agent_id: item.agent_id || item.agentId || '',
-        agent_name: item.agent_name || item.agentName || '',
-        product_category: item.product_category || item.productCategory || '',
-        product_name: item.product_name || item.productName || '',
-        city: item.city || '',
-        delivery_area: item.delivery_area || item.deliveryArea || '',
-        address_details: item.address_details || item.addressDetails || '',
-        schedule_date: item.schedule_date || item.scheduleDate || '',
-        schedule_time: item.schedule_time || item.scheduledTime || '',
-        order_value: item.order_value || item.orderValue || 0,
-        order_status: item.order_status || item.orderStatus || '',
-        followup_status: item.followup_status || item.followupStatus || '',
-        profit: item.profit || 0,
-        delivered_date: item.delivered_date || item.deliveredDate || '',
-        cancelled_date: item.cancelled_date || item.cancelledDate || '',
-        followup_date: item.followup_date || item.followupDate || ''
-      }));
-    }
-
     return data;
   };
 
   const handleExportCsv = (data: any[], filename: string) => {
-    if (data.length === 0) return;
+    if (!data || data.length === 0) {
+      showToast("No data to export.");
+      return;
+    }
     const formatted = formatForExport(data);
+    if (!formatted || formatted.length === 0) {
+      showToast("No data to export.");
+      return;
+    }
     const headers = Object.keys(formatted[0]).join(",");
     const rows = formatted.map(row => 
-      Object.values(row).map(value => `"${String(value).replace(/"/g, '""')}"`).join(",")
+      Object.values(row).map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(",")
     );
     const csvContent = [headers, ...rows].join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", filename);
+    const safeFilename = filename.endsWith('.csv') ? filename : `${filename}.csv`;
+    link.setAttribute("download", safeFilename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    showToast(`Exported ${formatted.length} records to CSV!`);
   };
 
   const handleExportXlsx = (data: any[], filename: string) => {
-    if (data.length === 0) return;
-    
+    if (!data || data.length === 0) {
+      showToast("No data to export.");
+      return;
+    }
     const exportData = formatForExport(data);
-
+    if (!exportData || exportData.length === 0) {
+      showToast("No data to export.");
+      return;
+    }
     const ws = XLSX.utils.json_to_sheet(exportData, { header: Object.keys(exportData[0]) });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-    XLSX.writeFile(wb, filename.replace('.csv', '.xlsx'));
+    const safeFilename = filename.endsWith('.xlsx') ? filename : filename.replace(/\.[^/.]+$/, "") + ".xlsx";
+    XLSX.writeFile(wb, safeFilename);
+    showToast(`Exported ${exportData.length} records to Excel!`);
   };
 
   const [openExportMenuId, setOpenExportMenuId] = useState<string | null>(null);
@@ -4908,11 +4942,80 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           className="py-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer shadow-2xs"
                         >
                           <span>📥 Export</span>
+                          {filteredOrders.length > 0 && (
+                            <span className="text-[10px] bg-emerald-800 text-emerald-100 px-1.5 py-0.2 rounded-full font-bold ml-0.5">
+                              {filteredOrders.length}
+                            </span>
+                          )}
                         </button>
                         {openExportMenuId === 'orders' && (
-                          <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-1 w-24">
-                            <button onClick={() => { handleExportCsv(paginatedOrders, 'orders_page.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-100 rounded text-slate-800 font-medium cursor-pointer">CSV</button>
-                            <button onClick={() => { handleExportXlsx(paginatedOrders, 'orders_page.xlsx'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-100 rounded text-slate-800 font-medium cursor-pointer">XLSX</button>
+                          <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-1.5 w-60 text-slate-800">
+                            <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between">
+                              <span>Filtered Orders</span>
+                              <span className="font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-bold">{filteredOrders.length} records</span>
+                            </div>
+                            <div className="py-1 space-y-0.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (filteredOrders.length === 0) {
+                                    showToast('No filtered orders to export.');
+                                  } else {
+                                    handleExportCsv(filteredOrders, `filtered_orders_${new Date().toISOString().slice(0, 10)}.csv`);
+                                  }
+                                  setOpenExportMenuId(null);
+                                }}
+                                className="w-full text-left px-2.5 py-1.5 text-xs hover:bg-emerald-50 hover:text-emerald-800 rounded-lg font-medium cursor-pointer flex items-center justify-between"
+                              >
+                                <span className="flex items-center gap-1.5">📄 <span>Export All Filtered (CSV)</span></span>
+                                <span className="text-[10px] font-bold font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{filteredOrders.length}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (filteredOrders.length === 0) {
+                                    showToast('No filtered orders to export.');
+                                  } else {
+                                    handleExportXlsx(filteredOrders, `filtered_orders_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                                  }
+                                  setOpenExportMenuId(null);
+                                }}
+                                className="w-full text-left px-2.5 py-1.5 text-xs hover:bg-emerald-50 hover:text-emerald-800 rounded-lg font-medium cursor-pointer flex items-center justify-between"
+                              >
+                                <span className="flex items-center gap-1.5">📊 <span>Export All Filtered (Excel)</span></span>
+                                <span className="text-[10px] font-bold font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{filteredOrders.length}</span>
+                              </button>
+                            </div>
+
+                            {paginatedOrders.length < filteredOrders.length && (
+                              <div className="mt-1 pt-1 border-t border-slate-100 space-y-0.5">
+                                <div className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                  Current Page Only
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleExportCsv(paginatedOrders, `orders_page_${orderPage}_${new Date().toISOString().slice(0, 10)}.csv`);
+                                    setOpenExportMenuId(null);
+                                  }}
+                                  className="w-full text-left px-2.5 py-1.5 text-xs hover:bg-slate-100 text-slate-700 rounded-lg font-medium cursor-pointer flex items-center justify-between"
+                                >
+                                  <span>Page {orderPage} (CSV)</span>
+                                  <span className="text-[10px] text-slate-400 font-mono">{paginatedOrders.length}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleExportXlsx(paginatedOrders, `orders_page_${orderPage}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                                    setOpenExportMenuId(null);
+                                  }}
+                                  className="w-full text-left px-2.5 py-1.5 text-xs hover:bg-slate-100 text-slate-700 rounded-lg font-medium cursor-pointer flex items-center justify-between"
+                                >
+                                  <span>Page {orderPage} (Excel)</span>
+                                  <span className="text-[10px] text-slate-400 font-mono">{paginatedOrders.length}</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

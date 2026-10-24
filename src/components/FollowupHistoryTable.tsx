@@ -213,33 +213,48 @@ export const FollowupHistoryTable: React.FC<FollowupHistoryTableProps> = ({
                     className="py-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer shadow-2xs"
                   >
                     <span>📥 Export</span>
+                    {(allFilteredRecords?.length ?? 0) > 0 && (
+                      <span className="text-[10px] bg-emerald-800 text-emerald-100 px-1.5 py-0.2 rounded-full font-bold ml-0.5">
+                        {allFilteredRecords.length}
+                      </span>
+                    )}
                   </button>
                   {isExportMenuOpen && (
-                    <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-1 w-24">
-                      {onExportCsv && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onExportCsv(paginatedRecords, 'followup_audit_logs_page.csv');
-                            setIsExportMenuOpen(false);
-                          }}
-                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-100 rounded text-slate-700 font-medium cursor-pointer"
-                        >
-                          CSV
-                        </button>
-                      )}
-                      {onExportXlsx && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onExportXlsx(paginatedRecords, 'followup_audit_logs_page.xlsx');
-                            setIsExportMenuOpen(false);
-                          }}
-                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-100 rounded text-slate-700 font-medium cursor-pointer"
-                        >
-                          XLSX
-                        </button>
-                      )}
+                    <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-30 p-1.5 w-60 text-slate-800">
+                      <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between">
+                        <span>Filtered Logs</span>
+                        <span className="font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-bold">{(allFilteredRecords?.length ?? 0)} records</span>
+                      </div>
+                      <div className="py-1 space-y-0.5">
+                        {onExportCsv && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const exportList = (allFilteredRecords && allFilteredRecords.length > 0) ? allFilteredRecords : paginatedRecords;
+                              onExportCsv(exportList, `followup_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`);
+                              setIsExportMenuOpen(false);
+                            }}
+                            className="w-full text-left px-2.5 py-1.5 text-xs hover:bg-emerald-50 hover:text-emerald-800 rounded-lg font-medium cursor-pointer flex items-center justify-between"
+                          >
+                            <span className="flex items-center gap-1.5">📄 <span>Export All Filtered (CSV)</span></span>
+                            <span className="text-[10px] font-bold font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{allFilteredRecords?.length ?? paginatedRecords.length}</span>
+                          </button>
+                        )}
+                        {onExportXlsx && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const exportList = (allFilteredRecords && allFilteredRecords.length > 0) ? allFilteredRecords : paginatedRecords;
+                              onExportXlsx(exportList, `followup_audit_logs_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                              setIsExportMenuOpen(false);
+                            }}
+                            className="w-full text-left px-2.5 py-1.5 text-xs hover:bg-emerald-50 hover:text-emerald-800 rounded-lg font-medium cursor-pointer flex items-center justify-between"
+                          >
+                            <span className="flex items-center gap-1.5">📊 <span>Export All Filtered (Excel)</span></span>
+                            <span className="text-[10px] font-bold font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{allFilteredRecords?.length ?? paginatedRecords.length}</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

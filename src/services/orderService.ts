@@ -1802,7 +1802,7 @@ export class OrderService {
     updates: Partial<OrderItem>,
     updatedBy: string = '1',
     notes: string = ''
-  ): Promise<{ updatedOrders: OrderItem[]; historyItem?: FollowupHistoryItem; remoteSynced: boolean }> {
+  ): Promise<{ updatedOrders: OrderItem[]; historyItem?: FollowupHistoryItem; remoteSynced: boolean; error?: string }> {
     console.log('Update Order Payload:', JSON.stringify(updates));
     const orders = (await this.getLocalOrders()) || [];
     const existingOrder = orders.find((ord) => String(ord.order_id || ord.id) === String(orderId));
@@ -2116,7 +2116,7 @@ export class OrderService {
     updates: Partial<OrderItem>,
     updatedBy: string = '1',
     notes: string = ''
-  ): Promise<{ updatedOrders: OrderItem[]; historyItem?: FollowupHistoryItem; remoteSynced: boolean }> {
+  ): Promise<{ updatedOrders: OrderItem[]; historyItem?: FollowupHistoryItem; remoteSynced: boolean; error?: string }> {
     return this.updateOrderStatus(orderId, updates, updatedBy, notes);
   }
 
