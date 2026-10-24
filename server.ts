@@ -87,6 +87,19 @@ async function startServer() {
   app.get('/health', (req, res) => res.status(200).send('OK'));
   app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
+  // Explicit route for user_details.json
+  app.get('/user_details.json', (req, res) => {
+    const filePath = path.join(__dirname, 'user_details.json');
+    if (fs.existsSync(filePath)) {
+      return res.sendFile(filePath);
+    }
+    const publicPath = path.join(__dirname, 'public', 'user_details.json');
+    if (fs.existsSync(publicPath)) {
+      return res.sendFile(publicPath);
+    }
+    return res.json([]);
+  });
+
   // API Proxy for fetching Google Sheet orders & tabs (ultra-fast for 30,000 - 100,000 orders)
   app.get('/api/fetch-orders', async (req, res) => {
     try {
@@ -361,6 +374,10 @@ async function startServer() {
       }
 
       fs.writeFileSync(filePath, JSON.stringify(users, null, 2), 'utf8');
+      const publicPath = path.join(__dirname, 'public', 'user_details.json');
+      try {
+        fs.writeFileSync(publicPath, JSON.stringify(users, null, 2), 'utf8');
+      } catch {}
       console.log('Successfully wrote to file.');
       return res.json({ success: true, message: 'Agent synced successfully to user_details.json' });
     } catch (err: any) {

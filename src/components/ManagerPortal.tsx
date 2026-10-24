@@ -3125,7 +3125,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               {activeTab === 'users' && 'User Details (Agent Directory)'}
               {activeTab === 'category-mapping' && 'Category, Team & Status Mapping'}
               {activeTab === 'sheet-connection' && 'Google Sheet & Dynamic Tabs Hub'}
-              {activeTab === 'profiles' && 'My Profile & Account'}
+              {activeTab === 'profiles' && 'My Account'}
             </h1>
           </div>
 
@@ -3145,25 +3145,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
               </span>
             </div>
 
-            {/* 2. Google Sheet Hub (Quick Access) */}
-            {isTabAllowed('sheet-connection') && (
-              <button
-                onClick={() => setActiveTab('sheet-connection')}
-                className={`p-2.5 rounded-xl border transition-all cursor-pointer shadow-xs flex items-center gap-2 group ${
-                  activeTab === 'sheet-connection'
-                    ? 'bg-teal-600 border-teal-500 text-white'
-                    : 'bg-[#111C3D] border-[#1E2C58] text-teal-400 hover:bg-[#16234D]'
-                }`}
-                title="Google Sheet & Connection Hub"
-              >
-                <FileSpreadsheet className={`w-4 h-4 transition-transform group-hover:scale-110 ${activeTab === 'sheet-connection' ? 'text-white' : 'text-teal-400'}`} />
-                <span className={`text-xs font-bold hidden md:inline ${activeTab === 'sheet-connection' ? 'text-white' : 'text-[#E2E8F0]'}`}>
-                  Sheet Hub
-                </span>
-              </button>
-            )}
-
-            {/* 3. Global Refresh Action */}
+            {/* Global Refresh Action */}
             <button
               onClick={() => onRefreshOrders()}
               disabled={isRefreshing}
@@ -4935,7 +4917,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
                         Search
                       </label>
-                      <div className="relative">
+                      <div className="relative z-50">
                         <button
                           type="button"
                           onClick={() => setOpenExportMenuId(openExportMenuId === 'orders' ? null : 'orders')}
@@ -4949,7 +4931,9 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                           )}
                         </button>
                         {openExportMenuId === 'orders' && (
-                          <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-1.5 w-60 text-slate-800">
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={() => setOpenExportMenuId(null)} />
+                            <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-1.5 w-60 text-slate-800">
                             <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between">
                               <span>Filtered Orders</span>
                               <span className="font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-bold">{filteredOrders.length} records</span>
@@ -5017,7 +5001,8 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                               </div>
                             )}
                           </div>
-                        )}
+                        </>
+                      )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -5971,6 +5956,58 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                       />
                     </div>
                   )}
+
+                  <div className="relative z-50">
+                    <button
+                      type="button"
+                      onClick={() => setOpenExportMenuId(openExportMenuId === 'summary-all' ? null : 'summary-all')}
+                      className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                    >
+                      <span>📥</span>
+                      <span>Export All</span>
+                    </button>
+                    {openExportMenuId === 'summary-all' && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setOpenExportMenuId(null)} />
+                        <div className="absolute right-0 top-full mt-2 bg-[#111C3D] border border-blue-500/50 rounded-xl shadow-2xl z-50 p-1.5 w-44 text-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const allSummaryRows = [
+                                ...(summaryStats.channelSummary || []).map((r: any) => ({ 'Type': 'Channel', ...r })),
+                                ...(summaryStats.categorySummary || []).map((r: any) => ({ 'Type': 'Category', ...r })),
+                                ...(summaryStats.citySummary || []).map((r: any) => ({ 'Type': 'City', ...r })),
+                                ...(summaryStats.dateSummary || []).map((r: any) => ({ 'Type': 'Date', ...r }))
+                              ];
+                              handleExportCsv(allSummaryRows, `all_summaries_${new Date().toISOString().slice(0, 10)}.csv`);
+                              setOpenExportMenuId(null);
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-100 hover:text-white hover:bg-blue-600/30 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+                          >
+                            <span>📄</span>
+                            <span>Export All (CSV)</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const allSummaryRows = [
+                                ...(summaryStats.channelSummary || []).map((r: any) => ({ 'Type': 'Channel', ...r })),
+                                ...(summaryStats.categorySummary || []).map((r: any) => ({ 'Type': 'Category', ...r })),
+                                ...(summaryStats.citySummary || []).map((r: any) => ({ 'Type': 'City', ...r })),
+                                ...(summaryStats.dateSummary || []).map((r: any) => ({ 'Type': 'Date', ...r }))
+                              ];
+                              handleExportXlsx(allSummaryRows, `all_summaries_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                              setOpenExportMenuId(null);
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-100 hover:text-white hover:bg-emerald-600/30 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+                          >
+                            <span>📊</span>
+                            <span>Export All (XLSX)</span>
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -6096,31 +6133,56 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
               {/* Channel Wise Summary */}
               {(summaryBreakdownTab === 'all' || summaryBreakdownTab === 'channel') && (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-                  <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-visible relative">
+                  <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between rounded-t-2xl relative z-40">
                     <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
                       <Layers className="w-4 h-4 text-indigo-600" />
                       <span>Channel Wise Summary</span>
                     </h4>
-                    <div className="flex items-center gap-2 relative">
+                    <div className="flex items-center gap-2 relative z-50">
                       <button
+                        type="button"
                         onClick={() => setOpenExportMenuId(openExportMenuId === 'channel' ? null : 'channel')}
-                        className="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer text-slate-700"
+                        className="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer text-slate-700 shadow-2xs transition-colors"
                       >
-                        📥 Export
+                        <span>📥</span>
+                        <span>Export</span>
                       </button>
                       {openExportMenuId === 'channel' && (
-                        <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-1 w-24">
-                          <button onClick={() => { handleExportCsv(summaryStats.channelSummary, 'channel_summary.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 rounded">CSV</button>
-                          <button onClick={() => { handleExportXlsx(summaryStats.channelSummary, 'channel_summary.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 rounded">XLSX</button>
-                        </div>
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setOpenExportMenuId(null)} />
+                          <div className="absolute right-0 top-full mt-2 bg-[#111C3D] border border-blue-500/50 rounded-xl shadow-2xl z-50 p-1.5 w-36 text-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleExportCsv(summaryStats.channelSummary, 'channel_summary.csv');
+                                setOpenExportMenuId(null);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-100 hover:text-white hover:bg-blue-600/30 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+                            >
+                              <span>📄</span>
+                              <span>Export CSV</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleExportXlsx(summaryStats.channelSummary, 'channel_summary.xlsx');
+                                setOpenExportMenuId(null);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-100 hover:text-white hover:bg-emerald-600/30 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+                            >
+                              <span>📊</span>
+                              <span>Export XLSX</span>
+                            </button>
+                          </div>
+                        </>
                       )}
                       <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">
                         {summaryStats.channelSummary.length} Channels
                       </span>
                     </div>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto rounded-b-2xl">
                     <table className="w-full text-xs text-left">
                       <thead>
                         <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 whitespace-nowrap select-none">
@@ -6318,31 +6380,56 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
               {/* Category Wise Summary */}
               {(summaryBreakdownTab === 'all' || summaryBreakdownTab === 'category') && (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-                  <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-visible relative">
+                  <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between rounded-t-2xl relative z-40">
                     <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
                       <FileText className="w-4 h-4 text-indigo-600" />
                       <span>Category Wise Summary</span>
                     </h4>
-                    <div className="flex items-center gap-2 relative">
+                    <div className="flex items-center gap-2 relative z-50">
                       <button
+                        type="button"
                         onClick={() => setOpenExportMenuId(openExportMenuId === 'category' ? null : 'category')}
-                        className="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer text-slate-700"
+                        className="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer text-slate-700 shadow-2xs transition-colors"
                       >
-                        📥 Export
+                        <span>📥</span>
+                        <span>Export</span>
                       </button>
                       {openExportMenuId === 'category' && (
-                        <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-1 w-24">
-                          <button onClick={() => { handleExportCsv(summaryStats.categorySummary, 'category_summary.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 rounded">CSV</button>
-                          <button onClick={() => { handleExportXlsx(summaryStats.categorySummary, 'category_summary.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 rounded">XLSX</button>
-                        </div>
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setOpenExportMenuId(null)} />
+                          <div className="absolute right-0 top-full mt-2 bg-[#111C3D] border border-blue-500/50 rounded-xl shadow-2xl z-50 p-1.5 w-36 text-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleExportCsv(summaryStats.categorySummary, 'category_summary.csv');
+                                setOpenExportMenuId(null);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-100 hover:text-white hover:bg-blue-600/30 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+                            >
+                              <span>📄</span>
+                              <span>Export CSV</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleExportXlsx(summaryStats.categorySummary, 'category_summary.xlsx');
+                                setOpenExportMenuId(null);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-100 hover:text-white hover:bg-emerald-600/30 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+                            >
+                              <span>📊</span>
+                              <span>Export XLSX</span>
+                            </button>
+                          </div>
+                        </>
                       )}
                       <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">
                         {summaryStats.categorySummary.length} Categories
                       </span>
                     </div>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto rounded-b-2xl">
                     <table className="w-full text-xs text-left">
                       <thead>
                         <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 whitespace-nowrap select-none">
@@ -6540,31 +6627,56 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
               {/* City Wise Summary */}
               {(summaryBreakdownTab === 'all' || summaryBreakdownTab === 'city') && (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-                  <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-visible relative">
+                  <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between rounded-t-2xl relative z-40">
                     <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
                       <Building2 className="w-4 h-4 text-indigo-600" />
                       <span>City Wise Summary</span>
                     </h4>
-                    <div className="flex items-center gap-2 relative">
+                    <div className="flex items-center gap-2 relative z-50">
                       <button
+                        type="button"
                         onClick={() => setOpenExportMenuId(openExportMenuId === 'city' ? null : 'city')}
-                        className="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer text-slate-700"
+                        className="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer text-slate-700 shadow-2xs transition-colors"
                       >
-                        📥 Export
+                        <span>📥</span>
+                        <span>Export</span>
                       </button>
                       {openExportMenuId === 'city' && (
-                        <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-1 w-24">
-                          <button onClick={() => { handleExportCsv(summaryStats.citySummary, 'city_summary.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 rounded">CSV</button>
-                          <button onClick={() => { handleExportXlsx(summaryStats.citySummary, 'city_summary.csv'); setOpenExportMenuId(null); }} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-100 rounded">XLSX</button>
-                        </div>
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setOpenExportMenuId(null)} />
+                          <div className="absolute right-0 top-full mt-2 bg-[#111C3D] border border-blue-500/50 rounded-xl shadow-2xl z-50 p-1.5 w-36 text-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleExportCsv(summaryStats.citySummary, 'city_summary.csv');
+                                setOpenExportMenuId(null);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-100 hover:text-white hover:bg-blue-600/30 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+                            >
+                              <span>📄</span>
+                              <span>Export CSV</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleExportXlsx(summaryStats.citySummary, 'city_summary.xlsx');
+                                setOpenExportMenuId(null);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-100 hover:text-white hover:bg-emerald-600/30 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+                            >
+                              <span>📊</span>
+                              <span>Export XLSX</span>
+                            </button>
+                          </div>
+                        </>
                       )}
                       <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">
                         {summaryStats.citySummary.length} Cities
                       </span>
                     </div>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto rounded-b-2xl">
                     <table className="w-full text-xs text-left">
                       <thead>
                         <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 whitespace-nowrap select-none">
@@ -6762,50 +6874,56 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
 
               {/* Date Wise Operational Summary */}
               {(summaryBreakdownTab === 'all' || summaryBreakdownTab === 'date') && (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-                  <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-visible relative">
+                  <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between rounded-t-2xl relative z-40">
                     <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-indigo-600" />
                       <span>Date Wise Summary</span>
                     </h4>
-                    <div className="flex items-center gap-2 relative">
+                    <div className="flex items-center gap-2 relative z-50">
                       <button
                         type="button"
                         onClick={() => setOpenExportMenuId(openExportMenuId === 'date' ? null : 'date')}
-                        className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer text-slate-700 shadow-2xs"
+                        className="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer text-slate-700 shadow-2xs transition-colors"
                       >
-                        📥 Export
+                        <span>📥</span>
+                        <span>Export</span>
                       </button>
                       {openExportMenuId === 'date' && (
-                        <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-20 p-1.5 w-32">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleExportCsv(summaryStats.dateSummary, 'date_wise_summary.csv');
-                              setOpenExportMenuId(null);
-                            }}
-                            className="w-full text-left px-3 py-1.5 text-xs font-semibold hover:bg-slate-100 rounded-lg cursor-pointer flex items-center gap-1.5"
-                          >
-                            <span>📄 Export CSV</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleExportXlsx(summaryStats.dateSummary, 'date_wise_summary.xlsx');
-                              setOpenExportMenuId(null);
-                            }}
-                            className="w-full text-left px-3 py-1.5 text-xs font-semibold hover:bg-slate-100 rounded-lg cursor-pointer flex items-center gap-1.5"
-                          >
-                            <span>📊 Export XLSX</span>
-                          </button>
-                        </div>
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setOpenExportMenuId(null)} />
+                          <div className="absolute right-0 top-full mt-2 bg-[#111C3D] border border-blue-500/50 rounded-xl shadow-2xl z-50 p-1.5 w-36 text-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleExportCsv(summaryStats.dateSummary, 'date_wise_summary.csv');
+                                setOpenExportMenuId(null);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-100 hover:text-white hover:bg-blue-600/30 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+                            >
+                              <span>📄</span>
+                              <span>Export CSV</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleExportXlsx(summaryStats.dateSummary, 'date_wise_summary.xlsx');
+                                setOpenExportMenuId(null);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-100 hover:text-white hover:bg-emerald-600/30 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+                            >
+                              <span>📊</span>
+                              <span>Export XLSX</span>
+                            </button>
+                          </div>
+                        </>
                       )}
                       <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2.5 py-0.5 rounded-full">
                         {summaryStats.dateSummary.length} Dates
                       </span>
                     </div>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto rounded-b-2xl">
                     <table className="w-full text-xs text-left">
                       <thead>
                         <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 whitespace-nowrap select-none">
@@ -7117,7 +7235,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     </div>
 
                     {/* 4. Export Button */}
-                    <div className="relative self-end">
+                    <div className="relative self-end z-50">
                       <button
                         type="button"
                         onClick={() => setOpenExportMenuId(openExportMenuId === 'agent-performance' ? null : 'agent-performance')}
@@ -7127,28 +7245,33 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                         <span>Export</span>
                       </button>
                       {openExportMenuId === 'agent-performance' && (
-                        <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-30 p-1 w-28">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleExportCsv(filteredAgentPerformance, `agent_performance_report_${new Date().toISOString().slice(0, 10)}.csv`);
-                              setOpenExportMenuId(null);
-                            }}
-                            className="w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-slate-100 text-slate-700 rounded cursor-pointer"
-                          >
-                            CSV
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleExportXlsx(filteredAgentPerformance, `agent_performance_report_${new Date().toISOString().slice(0, 10)}.xlsx`);
-                              setOpenExportMenuId(null);
-                            }}
-                            className="w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-slate-100 text-slate-700 rounded cursor-pointer"
-                          >
-                            XLSX
-                          </button>
-                        </div>
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setOpenExportMenuId(null)} />
+                          <div className="absolute right-0 top-full mt-1.5 bg-[#111C3D] border border-blue-500/50 rounded-xl shadow-2xl z-50 p-1.5 w-36 text-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleExportCsv(filteredAgentPerformance, `agent_performance_report_${new Date().toISOString().slice(0, 10)}.csv`);
+                                setOpenExportMenuId(null);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-100 hover:text-white hover:bg-blue-600/30 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+                            >
+                              <span>📄</span>
+                              <span>Export CSV</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleExportXlsx(filteredAgentPerformance, `agent_performance_report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                                setOpenExportMenuId(null);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-100 hover:text-white hover:bg-emerald-600/30 rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
+                            >
+                              <span>📊</span>
+                              <span>Export XLSX</span>
+                            </button>
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>
