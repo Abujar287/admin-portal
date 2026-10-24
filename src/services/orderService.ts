@@ -528,10 +528,14 @@ export class OrderService {
    * 4. Hidden HTML Form + iframe submission (100% reliable cross-origin fallback for Vercel static deployments)
    */
   static async postToGoogleScript(scriptUrl: string, bodyData: Record<string, any>): Promise<boolean> {
-    if (!scriptUrl) return false;
+    if (!scriptUrl) {
+        console.error('postToGoogleScript: Missing script URL');
+        return false;
+    }
 
     // 1. Try local server proxy route if available
     try {
+      console.log('Attempting proxy POST...');
       const proxyRes = await fetch('/api/proxy-script', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -539,14 +543,19 @@ export class OrderService {
       });
       if (proxyRes.ok) {
         const json = await proxyRes.json();
-        if (json.success) return true;
+        if (json.success) {
+            console.log('Proxy POST success');
+            return true;
+        }
       }
+      console.warn('Proxy POST failed, status:', proxyRes.status);
     } catch (proxyErr) {
       console.warn('Proxy script POST unavailable or failed:', proxyErr);
     }
 
     // 2. Direct fetch with FormData (no-cors)
     try {
+      console.log('Attempting FormData POST...');
       const formData = new FormData();
       for (const [key, val] of Object.entries(bodyData)) {
         if (val !== undefined && val !== null) {
@@ -558,6 +567,7 @@ export class OrderService {
         mode: 'no-cors',
         body: formData
       });
+      console.log('FormData POST finished (no-cors, assuming success)');
       return true;
     } catch (fetchErr) {
       console.warn('Direct fetch FormData POST failed, attempting URLSearchParams:', fetchErr);
@@ -565,6 +575,7 @@ export class OrderService {
 
     // 3. Direct fetch with URLSearchParams
     try {
+      console.log('Attempting URLSearchParams POST...');
       const params = new URLSearchParams();
       for (const [key, val] of Object.entries(bodyData)) {
         if (val !== undefined && val !== null) {
@@ -577,6 +588,7 @@ export class OrderService {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: params.toString()
       });
+      console.log('URLSearchParams POST finished (no-cors, assuming success)');
       return true;
     } catch (paramsErr) {
       console.warn('Direct fetch URLSearchParams POST failed, attempting hidden form submit:', paramsErr);
@@ -584,6 +596,7 @@ export class OrderService {
 
     // 4. Guaranteed fallback for all static hosts (e.g. Vercel static build): Hidden Form Submission
     try {
+      console.log('Attempting hidden form submission...');
       const iframeName = `hidden_iframe_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const iframe = document.createElement('iframe');
       iframe.name = iframeName;
@@ -608,6 +621,7 @@ export class OrderService {
 
       document.body.appendChild(form);
       form.submit();
+      console.log('Hidden form submitted');
 
       setTimeout(() => {
         try {

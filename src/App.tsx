@@ -5,20 +5,7 @@ import { AuthScreen } from './components/AuthScreen';
 import { ManagerPortal } from './components/ManagerPortal';
 
 export function App() {
-  const [currentManager, setCurrentManager] = useState<ManagerUser | null>(() => {
-    try {
-      const saved = localStorage.getItem('agent_portal_current_manager');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && (parsed.role === 'Manager' || parsed.user === '1' || parsed.user === 'Manager')) {
-          parsed.name = 'Manager';
-          parsed.user = 'Manager';
-        }
-        return parsed;
-      }
-    } catch {}
-    return null;
-  });
+  const [currentManager, setCurrentManager] = useState<ManagerUser | null>(null);
 
   const [agents, setAgents] = useState<AgentUser[]>([]);
   const [orders, setOrders] = useState<OrderItem[]>([]);

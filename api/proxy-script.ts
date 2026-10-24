@@ -11,8 +11,10 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
+    console.log('Proxy request body:', req.body);
     const { url, ...formData } = req.body || {};
     if (!url) {
+      console.error('Proxy missing URL');
       return res.status(400).json({ error: 'Missing script URL' });
     }
 

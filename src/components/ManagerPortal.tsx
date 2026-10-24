@@ -3144,7 +3144,10 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
             <div className="relative" ref={userMenuRef}>
               <button
                 type="button"
-                onClick={() => setIsUserMenuOpen(prev => !prev)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsUserMenuOpen(prev => !prev);
+                }}
                 className="flex items-center gap-2 pl-2 pr-3 py-1.5 bg-[#111C3D] hover:bg-[#16234D] rounded-xl border border-[#1E2C58] transition-all cursor-pointer shadow-xs select-none"
                 title="Account Menu"
               >
@@ -3210,6 +3213,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <button
                       type="button"
                       onClick={() => {
+                        console.log('Profile tab clicked');
                         setActiveTab('profiles');
                         setIsUserMenuOpen(false);
                       }}
@@ -3222,6 +3226,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <button
                       type="button"
                       onClick={() => {
+                        console.log('Sheet tab clicked');
                         setActiveTab('sheet-connection');
                         setIsUserMenuOpen(false);
                       }}
@@ -3234,6 +3239,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <button
                       type="button"
                       onClick={() => {
+                        console.log('Lock clicked');
                         setIsLocked(true);
                         setIsUserMenuOpen(false);
                       }}
@@ -3248,6 +3254,7 @@ export const ManagerPortal: React.FC<ManagerPortalProps> = ({
                     <button
                       type="button"
                       onClick={() => {
+                        console.log('Logout clicked');
                         setIsUserMenuOpen(false);
                         onLogout();
                       }}
